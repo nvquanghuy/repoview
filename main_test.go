@@ -165,6 +165,50 @@ func TestHandleFile_Markdown(t *testing.T) {
 	}
 }
 
+func TestHandleFile_MarkdownFrontmatter(t *testing.T) {
+	setRoot(t, "testdata")
+
+	req := httptest.NewRequest("GET", "/api/file?path=frontmatter.md", nil)
+	w := httptest.NewRecorder()
+	handleFile(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+
+	var resp FileResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+
+	if !resp.IsMarkdown {
+		t.Error("expected isMarkdown to be true")
+	}
+	// Should contain frontmatter table with keys and values.
+	if !strings.Contains(resp.Content, "<table>") {
+		t.Error("expected frontmatter table")
+	}
+	if !strings.Contains(resp.Content, "title") {
+		t.Error("expected frontmatter key 'title'")
+	}
+	if !strings.Contains(resp.Content, "My Document") {
+		t.Error("expected frontmatter value 'My Document'")
+	}
+	if !strings.Contains(resp.Content, "author") {
+		t.Error("expected frontmatter key 'author'")
+	}
+	if !strings.Contains(resp.Content, "Jane Doe") {
+		t.Error("expected frontmatter value 'Jane Doe'")
+	}
+	// Body should be rendered as markdown.
+	if !strings.Contains(resp.Content, "<h1>") {
+		t.Error("expected rendered <h1> from markdown body")
+	}
+	if !strings.Contains(resp.Content, "Welcome") {
+		t.Error("expected body content 'Welcome'")
+	}
+}
+
 func TestHandleFile_CSV(t *testing.T) {
 	setRoot(t, "testdata")
 

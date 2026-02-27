@@ -3,9 +3,11 @@
 ## Workflow
 - **Always write tests** for new features and changes. Don't skip tests unless explicitly told to.
 - Run tests before considering work complete.
+- **Update CHANGELOG.md** when adding new features or making user-facing changes. Add an entry under the appropriate version/section describing the change.
 
 ## Build & Test
 - Build: `go build -o repoview .`
+- Install: `go install .` (places binary in `$GOBIN`, managed by mise)
 - Test: `go test -v ./...`
 
 ## Testing Patterns

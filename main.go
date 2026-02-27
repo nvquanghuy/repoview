@@ -224,16 +224,64 @@ func handleFile(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(resp)
 }
 
+// parseFrontmatter extracts YAML frontmatter key-value pairs from markdown data.
+// It returns the pairs and the remaining body. If no valid frontmatter is found,
+// it returns nil and the original data unchanged.
+func parseFrontmatter(data []byte) ([][2]string, []byte) {
+	s := string(data)
+	if !strings.HasPrefix(s, "---\n") {
+		return nil, data
+	}
+	end := strings.Index(s[4:], "\n---\n")
+	if end < 0 {
+		return nil, data
+	}
+	block := s[4 : 4+end]
+	body := []byte(s[4+end+5:])
+
+	var pairs [][2]string
+	for _, line := range strings.Split(block, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		idx := strings.Index(line, ":")
+		if idx < 0 {
+			continue
+		}
+		key := strings.TrimSpace(line[:idx])
+		val := strings.TrimSpace(line[idx+1:])
+		if key != "" {
+			pairs = append(pairs, [2]string{key, val})
+		}
+	}
+	if len(pairs) == 0 {
+		return nil, data
+	}
+	return pairs, body
+}
+
 // renderMarkdown converts markdown bytes to HTML using goldmark with GFM.
 func renderMarkdown(w io.Writer, data []byte) {
+	pairs, body := parseFrontmatter(data)
+
+	if len(pairs) > 0 {
+		fmt.Fprint(w, "<table><thead><tr><th>Key</th><th>Value</th></tr></thead><tbody>")
+		for _, p := range pairs {
+			fmt.Fprintf(w, "<tr><td>%s</td><td>%s</td></tr>",
+				html.EscapeString(p[0]), html.EscapeString(p[1]))
+		}
+		fmt.Fprint(w, "</tbody></table>")
+	}
+
 	md := goldmark.New(
 		goldmark.WithExtensions(
 			extension.GFM,
 		),
 	)
 	var buf bytes.Buffer
-	if err := md.Convert(data, &buf); err != nil {
-		fmt.Fprintf(w, "<pre>%s</pre>", html.EscapeString(string(data)))
+	if err := md.Convert(body, &buf); err != nil {
+		fmt.Fprintf(w, "<pre>%s</pre>", html.EscapeString(string(body)))
 		return
 	}
 	buf.WriteTo(w)
