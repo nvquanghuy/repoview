@@ -33,7 +33,7 @@ import (
 //go:embed static/index.html
 var staticFiles embed.FS
 
-const version = "10"
+const version = "11"
 
 var rootDir string
 

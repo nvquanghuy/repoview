@@ -359,6 +359,14 @@ async function navigateTo(path, skipPush) {
   }
   refreshTree();
 
+  // Update page title
+  if (path) {
+    var dirname = path.split('/').pop();
+    document.title = dirname + ' - RepoView';
+  } else {
+    document.title = 'RepoView';
+  }
+
   document.getElementById('content-area').innerHTML = renderDirListing(items, path);
   bindDirListingClicks();
 }
@@ -410,6 +418,10 @@ async function loadFile(path, skipPush) {
   } else {
     area.innerHTML = '<div class="source-code">' + data.content + '</div>';
   }
+
+  // Update page title
+  var filename = path.split('/').pop();
+  document.title = filename + ' - RepoView';
 
   wsWatch(path);
   refreshTree();
@@ -684,6 +696,7 @@ window.addEventListener('popstate', function() {
     // Back to root
     currentPath = '';
     currentFilePath = '';
+    document.title = 'RepoView';
     updateBreadcrumb('');
     fetchTree('').then(function(root) {
       document.getElementById('content-area').innerHTML = renderDirListing(root);

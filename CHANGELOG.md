@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.1.2] - 2026-02-27
+
+### Added
+
+- Dynamic page title: shows `filename - RepoView` when viewing a file, `dirname - RepoView` for subdirectories, and `RepoView` at root
+
 ## [0.1.1] - 2026-02-27
 
 ### Added

@@ -112,6 +112,29 @@ test.describe("Anchor links", () => {
   });
 });
 
+test.describe("Page title", () => {
+  test("title updates to show filename when viewing a file", async ({ page }) => {
+    await page.goto("/");
+    await expect(page).toHaveTitle("RepoView");
+    await page.locator(".tree-item .label", { hasText: "hello.md" }).click();
+    await expect(page).toHaveTitle("hello.md - RepoView");
+  });
+
+  test("title updates to show dirname when navigating to a subdirectory", async ({ page }) => {
+    await page.goto("/");
+    await page.locator(".tree-item .label", { hasText: "subdir" }).click();
+    await expect(page).toHaveTitle("subdir - RepoView");
+  });
+
+  test("title resets to RepoView when navigating back to root", async ({ page }) => {
+    await page.goto("/");
+    await page.locator(".tree-item .label", { hasText: "hello.md" }).click();
+    await expect(page).toHaveTitle("hello.md - RepoView");
+    await page.locator(".crumb.root").click();
+    await expect(page).toHaveTitle("RepoView");
+  });
+});
+
 test.describe("URL routing", () => {
   test("direct navigation to a file URL loads the file", async ({ page }) => {
     await page.goto("/hello.md");
