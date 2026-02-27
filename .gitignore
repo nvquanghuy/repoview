@@ -17,3 +17,7 @@ mise.toml
 
 # MCP
 .mcp.json
+
+# Playwright / tests
+tests/node_modules/
+tests/test-results/
