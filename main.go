@@ -34,7 +34,7 @@ import (
 //go:embed static/index.html
 var staticFiles embed.FS
 
-const version = "12"
+const version = "13"
 
 var rootDir string
 
@@ -152,10 +152,6 @@ func handleTree(w http.ResponseWriter, r *http.Request) {
 	result := make([]TreeEntry, 0, len(entries))
 	for _, e := range entries {
 		name := e.Name()
-		// Skip hidden files/dirs.
-		if strings.HasPrefix(name, ".") {
-			continue
-		}
 		relPath, _ := filepath.Rel(rootDir, filepath.Join(dirPath, name))
 		ext := ""
 		if !e.IsDir() {

@@ -1,5 +1,11 @@
 # Changelog
 
+## [v13] - 2026-02-27
+
+### Changed
+
+- Show dotfiles and dotfolders (e.g. `.github`, `.gitignore`) in the sidebar file tree
+
 ## [v12] - 2026-02-27
 
 ### Added

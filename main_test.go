@@ -90,7 +90,7 @@ func TestHandleTree_Subdir(t *testing.T) {
 }
 
 func TestHandleTree_HiddenFiles(t *testing.T) {
-	// Create a hidden file in testdata, then verify it's excluded.
+	// Create a hidden file in testdata, then verify it's included.
 	hidden := filepath.Join("testdata", ".hidden")
 	os.WriteFile(hidden, []byte("secret"), 0644)
 	defer os.Remove(hidden)
@@ -104,10 +104,14 @@ func TestHandleTree_HiddenFiles(t *testing.T) {
 	var entries []TreeEntry
 	json.NewDecoder(w.Body).Decode(&entries)
 
+	found := false
 	for _, e := range entries {
-		if strings.HasPrefix(e.Name, ".") {
-			t.Errorf("hidden file %q should be excluded", e.Name)
+		if e.Name == ".hidden" {
+			found = true
 		}
+	}
+	if !found {
+		t.Error("expected dotfile .hidden to be included in tree")
 	}
 }
 
