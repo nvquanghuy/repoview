@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.1.1] - 2026-02-27
+
+### Added
+
+- Playwright browser test suite (`tests/`) with 10 end-to-end tests covering sidebar tree, file viewing (markdown, CSV, code), frontmatter rendering, directory listing, parent navigation, fuzzy search, anchor links, and URL routing
+
 ## [0.1.0] - 2026-02-27
 
 ### Added

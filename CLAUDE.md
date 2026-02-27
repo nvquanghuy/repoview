@@ -9,7 +9,8 @@
 ## Build & Test
 - Build: `go build -o repoview .`
 - Install: `go install .` (places binary in `$GOBIN`, managed by mise)
-- Test: `go test -v ./...`
+- Test (backend): `go test -v ./...`
+- Test (frontend/browser): `cd tests && npm test`
 
 ## Testing Patterns
 - Use `setRoot(t, "testdata")` to set the root directory for tests.
