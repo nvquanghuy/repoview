@@ -10,4 +10,5 @@ require (
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c // indirect
 	github.com/yuin/goldmark v1.7.16 // indirect
 	golang.org/x/sys v0.13.0 // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

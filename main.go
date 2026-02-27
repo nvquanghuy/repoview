@@ -28,12 +28,13 @@ import (
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/extension"
 	"github.com/yuin/goldmark/parser"
+	"gopkg.in/yaml.v3"
 )
 
 //go:embed static/index.html
 var staticFiles embed.FS
 
-const version = "11"
+const version = "12"
 
 var rootDir string
 
@@ -218,6 +219,7 @@ func handleFile(w http.ResponseWriter, r *http.Request) {
 	case isCSV:
 		renderCSV(&buf, data)
 	default:
+		data = prettyPrint(data, ext)
 		renderCode(&buf, data, filepath.Base(filePath))
 	}
 
@@ -351,6 +353,28 @@ func renderCode(w io.Writer, data []byte, filename string) {
 		fmt.Fprintf(w, "<pre>%s</pre>", html.EscapeString(string(data)))
 		return
 	}
+}
+
+// prettyPrint re-formats JSON and YAML content with proper indentation.
+// If parsing fails, the original data is returned unchanged.
+func prettyPrint(data []byte, ext string) []byte {
+	switch ext {
+	case ".json":
+		var v any
+		if err := json.Unmarshal(data, &v); err == nil {
+			if pretty, err := json.MarshalIndent(v, "", "  "); err == nil {
+				return pretty
+			}
+		}
+	case ".yaml", ".yml":
+		var v any
+		if err := yaml.Unmarshal(data, &v); err == nil {
+			if pretty, err := yaml.Marshal(v); err == nil {
+				return pretty
+			}
+		}
+	}
+	return data
 }
 
 // handleFiles returns a flat list of all file paths for fuzzy search.

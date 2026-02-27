@@ -289,6 +289,66 @@ func TestHandleFile_PySyntax(t *testing.T) {
 	}
 }
 
+func TestHandleFile_JSON(t *testing.T) {
+	setRoot(t, "testdata")
+
+	req := httptest.NewRequest("GET", "/api/file?path=data.json", nil)
+	w := httptest.NewRecorder()
+	handleFile(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+
+	var resp FileResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+
+	// Should be pretty-printed (contains newlines and indentation).
+	if !strings.Contains(resp.Content, "Alice") {
+		t.Error("expected JSON content with 'Alice'")
+	}
+	// Syntax-highlighted spans from Chroma.
+	if !strings.Contains(resp.Content, "<span") {
+		t.Error("expected syntax-highlighted <span> tokens in JSON file")
+	}
+	// Pretty-printed JSON should have indentation visible in the output.
+	// The raw fixture is minified, so the presence of formatted key on its own line means it was pretty-printed.
+	if !strings.Contains(resp.Content, "hobbies") {
+		t.Error("expected 'hobbies' in pretty-printed JSON")
+	}
+}
+
+func TestHandleFile_YAML(t *testing.T) {
+	setRoot(t, "testdata")
+
+	req := httptest.NewRequest("GET", "/api/file?path=config.yaml", nil)
+	w := httptest.NewRecorder()
+	handleFile(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+
+	var resp FileResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+
+	// Should contain YAML keys.
+	if !strings.Contains(resp.Content, "server") {
+		t.Error("expected YAML content with 'server'")
+	}
+	if !strings.Contains(resp.Content, "database") {
+		t.Error("expected YAML content with 'database'")
+	}
+	// Syntax-highlighted.
+	if !strings.Contains(resp.Content, "<span") {
+		t.Error("expected syntax-highlighted <span> tokens in YAML file")
+	}
+}
+
 func TestHandleFile_PlainText(t *testing.T) {
 	setRoot(t, "testdata")
 

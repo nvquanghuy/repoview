@@ -1,18 +1,24 @@
 # Changelog
 
-## [0.1.2] - 2026-02-27
+## [v12] - 2026-02-27
+
+### Added
+
+- Pretty-print support for JSON and YAML files: minified/compact files are automatically formatted with proper indentation before syntax highlighting. Gracefully falls back to raw content if parsing fails.
+
+## [v11] - 2026-02-27
 
 ### Added
 
 - Dynamic page title: shows `filename - RepoView` when viewing a file, `dirname - RepoView` for subdirectories, and `RepoView` at root
 
-## [0.1.1] - 2026-02-27
+## [v10] - 2026-02-27
 
 ### Added
 
 - Playwright browser test suite (`tests/`) with 10 end-to-end tests covering sidebar tree, file viewing (markdown, CSV, code), frontmatter rendering, directory listing, parent navigation, fuzzy search, anchor links, and URL routing
 
-## [0.1.0] - 2026-02-27
+## [v1] - 2026-02-27
 
 ### Added
 

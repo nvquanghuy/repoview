@@ -1,0 +1,12 @@
+server:
+  host: localhost
+  port: 8080
+database:
+  name: myapp
+  credentials:
+    user: admin
+    password: secret
+features:
+  - logging
+  - caching
+  - monitoring

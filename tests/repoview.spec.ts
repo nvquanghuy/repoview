@@ -43,6 +43,27 @@ test.describe("File viewing", () => {
   });
 });
 
+test.describe("Pretty-printed files", () => {
+  test("JSON — pretty-printed and syntax-highlighted", async ({ page }) => {
+    await page.goto("/");
+    await page.locator(".tree-item .label", { hasText: "data.json" }).click();
+    const content = page.locator("#content-area");
+    await expect(content.locator(".source-code")).toBeVisible();
+    // Pretty-printed JSON should show "name" key
+    await expect(content.locator(".source-code", { hasText: "name" })).toBeVisible();
+    await expect(content.locator(".source-code", { hasText: "Alice" })).toBeVisible();
+  });
+
+  test("YAML — pretty-printed and syntax-highlighted", async ({ page }) => {
+    await page.goto("/");
+    await page.locator(".tree-item .label", { hasText: "config.yaml" }).click();
+    const content = page.locator("#content-area");
+    await expect(content.locator(".source-code")).toBeVisible();
+    await expect(content.locator(".source-code", { hasText: "server" })).toBeVisible();
+    await expect(content.locator(".source-code", { hasText: "database" })).toBeVisible();
+  });
+});
+
 test.describe("Frontmatter", () => {
   test("renders frontmatter table and body", async ({ page }) => {
     await page.goto("/");
