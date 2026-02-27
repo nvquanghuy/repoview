@@ -27,12 +27,13 @@ import (
 	"github.com/pkg/browser"
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/extension"
+	"github.com/yuin/goldmark/parser"
 )
 
 //go:embed static/index.html
 var staticFiles embed.FS
 
-const version = "6"
+const version = "7"
 
 var rootDir string
 
@@ -285,6 +286,9 @@ func renderMarkdown(w io.Writer, data []byte) {
 	md := goldmark.New(
 		goldmark.WithExtensions(
 			extension.GFM,
+		),
+		goldmark.WithParserOptions(
+			parser.WithAutoHeadingID(),
 		),
 	)
 	var buf bytes.Buffer

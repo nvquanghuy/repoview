@@ -407,6 +407,18 @@ async function loadFile(path, skipPush) {
 
   wsWatch(path);
   refreshTree();
+
+  // Handle hash anchor scrolling within the content area.
+  area.querySelectorAll('a[href^="#"]').forEach(function(link) {
+    link.onclick = function(e) {
+      var id = link.getAttribute('href').slice(1);
+      var target = document.getElementById(id);
+      if (target) {
+        e.preventDefault();
+        target.scrollIntoView({ behavior: 'smooth' });
+      }
+    };
+  });
 }
 
 /* ── Breadcrumb ───────────────────────────────────────────── */

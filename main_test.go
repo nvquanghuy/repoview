@@ -157,8 +157,12 @@ func TestHandleFile_Markdown(t *testing.T) {
 		t.Errorf("expected path hello.md, got %s", resp.Path)
 	}
 	// Goldmark should produce an <h1> tag from the "# Hello World" heading.
-	if !strings.Contains(resp.Content, "<h1>") {
+	if !strings.Contains(resp.Content, "<h1") {
 		t.Error("expected rendered HTML to contain <h1>")
+	}
+	// Headings should have id attributes for anchor linking.
+	if !strings.Contains(resp.Content, `id="hello-world"`) {
+		t.Error("expected heading to have id attribute for anchor linking")
 	}
 	if !strings.Contains(resp.Content, "<table>") {
 		t.Error("expected rendered HTML to contain a table")
@@ -201,7 +205,7 @@ func TestHandleFile_MarkdownFrontmatter(t *testing.T) {
 		t.Error("expected frontmatter value 'Jane Doe'")
 	}
 	// Body should be rendered as markdown.
-	if !strings.Contains(resp.Content, "<h1>") {
+	if !strings.Contains(resp.Content, "<h1") {
 		t.Error("expected rendered <h1> from markdown body")
 	}
 	if !strings.Contains(resp.Content, "Welcome") {
