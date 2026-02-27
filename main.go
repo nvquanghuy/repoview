@@ -18,6 +18,10 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/alecthomas/chroma/v2"
+	chromahtml "github.com/alecthomas/chroma/v2/formatters/html"
+	"github.com/alecthomas/chroma/v2/lexers"
+	"github.com/alecthomas/chroma/v2/styles"
 	"github.com/fsnotify/fsnotify"
 	"github.com/gorilla/websocket"
 	"github.com/pkg/browser"
@@ -77,12 +81,19 @@ func main() {
 		handleWS(w, r, hub, watcher)
 	})
 
-	// Serve embedded static files at root.
+	// Serve index.html for all non-API paths (SPA catch-all).
 	staticSub, err := fs.Sub(staticFiles, "static")
 	if err != nil {
 		log.Fatal(err)
 	}
-	http.Handle("/", http.FileServer(http.FS(staticSub)))
+	indexHTML, err := fs.ReadFile(staticSub, "index.html")
+	if err != nil {
+		log.Fatal(err)
+	}
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Write(indexHTML)
+	})
 
 	addr := fmt.Sprintf("0.0.0.0:%d", *port)
 	url := fmt.Sprintf("http://%s", addr)
@@ -198,7 +209,7 @@ func handleFile(w http.ResponseWriter, r *http.Request) {
 	case isCSV:
 		renderCSV(&buf, data)
 	default:
-		fmt.Fprintf(&buf, "<pre>%s</pre>", html.EscapeString(string(data)))
+		renderCode(&buf, data, filepath.Base(filePath))
 	}
 
 	resp := FileResponse{
@@ -254,6 +265,32 @@ func renderCSV(w io.Writer, data []byte) {
 		fmt.Fprint(w, "</tr>")
 	}
 	fmt.Fprint(w, "</tbody></table>")
+}
+
+// renderCode syntax-highlights code using chroma and writes HTML to w.
+// Falls back to plain <pre> on any error or when no lexer matches.
+func renderCode(w io.Writer, data []byte, filename string) {
+	lexer := lexers.Match(filename)
+	if lexer == nil {
+		lexer = lexers.Analyse(string(data))
+	}
+	if lexer == nil {
+		lexer = lexers.Fallback
+	}
+	lexer = chroma.Coalesce(lexer)
+
+	style := styles.Get("github")
+	formatter := chromahtml.New(chromahtml.WithLineNumbers(true))
+
+	iterator, err := lexer.Tokenise(nil, string(data))
+	if err != nil {
+		fmt.Fprintf(w, "<pre>%s</pre>", html.EscapeString(string(data)))
+		return
+	}
+	if err := formatter.Format(w, style, iterator); err != nil {
+		fmt.Fprintf(w, "<pre>%s</pre>", html.EscapeString(string(data)))
+		return
+	}
 }
 
 // handleFiles returns a flat list of all file paths for fuzzy search.

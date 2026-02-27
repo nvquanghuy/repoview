@@ -2,9 +2,11 @@ package main
 
 import (
 	"encoding/json"
+	"io"
 	"io/fs"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -191,6 +193,54 @@ func TestHandleFile_CSV(t *testing.T) {
 	}
 }
 
+func TestHandleFile_GoSyntax(t *testing.T) {
+	setRoot(t, "testdata")
+
+	req := httptest.NewRequest("GET", "/api/file?path=sample.go", nil)
+	w := httptest.NewRecorder()
+	handleFile(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+
+	var resp FileResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+
+	if !strings.Contains(resp.Content, "<span") {
+		t.Error("expected syntax-highlighted <span> tokens in Go file")
+	}
+	if !strings.Contains(resp.Content, "Println") {
+		t.Error("expected Go source content in response")
+	}
+}
+
+func TestHandleFile_PySyntax(t *testing.T) {
+	setRoot(t, "testdata")
+
+	req := httptest.NewRequest("GET", "/api/file?path=sample.py", nil)
+	w := httptest.NewRecorder()
+	handleFile(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+
+	var resp FileResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+
+	if !strings.Contains(resp.Content, "<span") {
+		t.Error("expected syntax-highlighted <span> tokens in Python file")
+	}
+	if !strings.Contains(resp.Content, "greet") {
+		t.Error("expected Python source content in response")
+	}
+}
+
 func TestHandleFile_PlainText(t *testing.T) {
 	setRoot(t, "testdata")
 
@@ -208,7 +258,7 @@ func TestHandleFile_PlainText(t *testing.T) {
 	if resp.IsMarkdown || resp.IsCSV {
 		t.Error("expected plain text, not markdown or CSV")
 	}
-	if !strings.Contains(resp.Content, "<pre>") {
+	if !strings.Contains(resp.Content, "<pre") {
 		t.Error("expected <pre> wrapper for plain text")
 	}
 	if !strings.Contains(resp.Content, "plain text file") {
@@ -347,17 +397,24 @@ func TestWebSocket(t *testing.T) {
 
 // ── Static file serving test ────────────────────────────────
 
-func TestStaticFileServed(t *testing.T) {
-	setRoot(t, "testdata")
-
+// newTestServer creates a test server with the same routing as production.
+func newTestServer(t *testing.T) *httptest.Server {
+	t.Helper()
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/tree", handleTree)
 	mux.HandleFunc("/api/file", handleFile)
-	// Serve embedded static files.
 	sub, _ := fs.Sub(staticFiles, "static")
-	mux.Handle("/", http.FileServer(http.FS(sub)))
+	indexHTML, _ := fs.ReadFile(sub, "index.html")
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Write(indexHTML)
+	})
+	return httptest.NewServer(mux)
+}
 
-	srv := httptest.NewServer(mux)
+func TestStaticFileServed(t *testing.T) {
+	setRoot(t, "testdata")
+	srv := newTestServer(t)
 	defer srv.Close()
 
 	resp, err := http.Get(srv.URL + "/")
@@ -371,5 +428,162 @@ func TestStaticFileServed(t *testing.T) {
 	}
 	if ct := resp.Header.Get("Content-Type"); !strings.Contains(ct, "text/html") {
 		t.Errorf("expected text/html, got %s", ct)
+	}
+}
+
+// ── SPA routing tests (/files/*) ────────────────────────────
+
+func TestSPARoute_ServesIndexHTML(t *testing.T) {
+	setRoot(t, "testdata")
+	srv := newTestServer(t)
+	defer srv.Close()
+
+	paths := []string{
+		"/hello.md",
+		"/subdir/nested.md",
+		"/subdir",
+		"/",
+	}
+
+	// Read index.html to compare against.
+	sub, _ := fs.Sub(staticFiles, "static")
+	indexData, _ := fs.ReadFile(sub, "index.html")
+	indexBody := string(indexData)
+
+	for _, p := range paths {
+		resp, err := http.Get(srv.URL + p)
+		if err != nil {
+			t.Fatalf("failed to GET %s: %v", p, err)
+		}
+		body, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("GET %s: expected 200, got %d", p, resp.StatusCode)
+		}
+		if ct := resp.Header.Get("Content-Type"); !strings.Contains(ct, "text/html") {
+			t.Errorf("GET %s: expected text/html, got %s", p, ct)
+		}
+		if string(body) != indexBody {
+			t.Errorf("GET %s: response body does not match index.html", p)
+		}
+	}
+}
+
+func TestFilesRoute_DoesNotAffectAPI(t *testing.T) {
+	setRoot(t, "testdata")
+	srv := newTestServer(t)
+	defer srv.Close()
+
+	resp, err := http.Get(srv.URL + "/api/tree")
+	if err != nil {
+		t.Fatalf("failed to GET /api/tree: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+	if ct := resp.Header.Get("Content-Type"); !strings.Contains(ct, "application/json") {
+		t.Errorf("expected application/json, got %s", ct)
+	}
+}
+
+// ── Special filename tests ──────────────────────────────────
+
+func TestHandleFile_SpecialNames(t *testing.T) {
+	setRoot(t, "testdata")
+
+	cases := []struct {
+		name     string
+		apiPath  string
+		wantCode int
+	}{
+		{"spaces", "file with spaces.txt", http.StatusOK},
+		{"uppercase", "UPPERCASE.TXT", http.StatusOK},
+		{"parens", "special (1).md", http.StatusOK},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest("GET", "/api/file?path="+url.QueryEscape(tc.apiPath), nil)
+			w := httptest.NewRecorder()
+			handleFile(w, req)
+
+			if w.Code != tc.wantCode {
+				t.Errorf("expected %d, got %d", tc.wantCode, w.Code)
+			}
+			if tc.wantCode == http.StatusOK {
+				var resp FileResponse
+				if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+					t.Fatalf("invalid JSON: %v", err)
+				}
+				if resp.Content == "" {
+					t.Error("expected non-empty content")
+				}
+			}
+		})
+	}
+}
+
+func TestHandleTree_SpecialNames(t *testing.T) {
+	setRoot(t, "testdata")
+
+	req := httptest.NewRequest("GET", "/api/tree", nil)
+	w := httptest.NewRecorder()
+	handleTree(w, req)
+
+	var entries []TreeEntry
+	if err := json.NewDecoder(w.Body).Decode(&entries); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+
+	wantNames := map[string]bool{
+		"file with spaces.txt": false,
+		"UPPERCASE.TXT":        false,
+		"special (1).md":       false,
+	}
+	for _, e := range entries {
+		if _, ok := wantNames[e.Name]; ok {
+			wantNames[e.Name] = true
+		}
+	}
+	for name, found := range wantNames {
+		if !found {
+			t.Errorf("expected %q in tree listing", name)
+		}
+	}
+}
+
+func TestSPARoute_EncodedPaths(t *testing.T) {
+	setRoot(t, "testdata")
+	srv := newTestServer(t)
+	defer srv.Close()
+
+	sub, _ := fs.Sub(staticFiles, "static")
+	indexData, _ := fs.ReadFile(sub, "index.html")
+	indexBody := string(indexData)
+
+	// URL-encoded paths that the browser would produce
+	paths := []string{
+		"/file%20with%20spaces.txt",
+		"/UPPERCASE.TXT",
+		"/special%20(1).md",
+	}
+
+	for _, p := range paths {
+		resp, err := http.Get(srv.URL + p)
+		if err != nil {
+			t.Fatalf("failed to GET %s: %v", p, err)
+		}
+		body, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("GET %s: expected 200, got %d", p, resp.StatusCode)
+		}
+		if string(body) != indexBody {
+			t.Errorf("GET %s: response body does not match index.html", p)
+		}
 	}
 }

@@ -3,6 +3,8 @@ module repoview
 go 1.25.0
 
 require (
+	github.com/alecthomas/chroma/v2 v2.23.1 // indirect
+	github.com/dlclark/regexp2 v1.11.5 // indirect
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
 	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c // indirect
