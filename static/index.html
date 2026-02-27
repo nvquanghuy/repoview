@@ -339,9 +339,10 @@ function renderDirListing(items) {
 }
 
 /* ── Navigate to directory ────────────────────────────────── */
-async function navigateTo(path) {
+async function navigateTo(path, skipPush) {
   currentPath = path;
   currentFilePath = '';
+  if (!skipPush) pushURL(path);
   updateBreadcrumb(path);
   var items = await fetchTree(path);
 
@@ -371,12 +372,13 @@ function bindDirListingClicks() {
 }
 
 /* ── File loading ─────────────────────────────────────────── */
-async function loadFile(path) {
+async function loadFile(path, skipPush) {
   // Unwatch old file
   if (currentFilePath) wsUnwatch(currentFilePath);
 
   currentFilePath = path;
   currentPath = path.includes('/') ? path.substring(0, path.lastIndexOf('/')) : '';
+  if (!skipPush) pushURL(path);
   updateBreadcrumb(path);
 
   // Expand parent dirs in sidebar
@@ -630,13 +632,58 @@ document.addEventListener('keydown', function(e) {
   }
 })();
 
+/* ── URL routing ──────────────────────────────────────────── */
+function encodePath(path) {
+  return path.split('/').map(encodeURIComponent).join('/');
+}
+
+function pushURL(path) {
+  var url = path ? '/' + encodePath(path) : '/';
+  if (location.pathname !== url) {
+    history.pushState(null, '', url);
+  }
+}
+
+function isFilePath(path) {
+  var lastSegment = path.split('/').pop();
+  return lastSegment.indexOf('.') !== -1;
+}
+
+function navigateFromURL(skipPush) {
+  var raw = location.pathname.replace(/^\//, '');
+  if (!raw) return false;
+  var path = decodeURIComponent(raw);
+  if (isFilePath(path)) {
+    loadFile(path, skipPush);
+  } else {
+    navigateTo(path, skipPush);
+  }
+  return true;
+}
+
+window.addEventListener('popstate', function() {
+  if (!navigateFromURL(true)) {
+    // Back to root
+    currentPath = '';
+    currentFilePath = '';
+    updateBreadcrumb('');
+    fetchTree('').then(function(root) {
+      document.getElementById('content-area').innerHTML = renderDirListing(root);
+      bindDirListingClicks();
+      refreshTree();
+    });
+  }
+});
+
 /* ── Init ─────────────────────────────────────────────────── */
 (async function init() {
   await refreshTree();
   connectWS();
-  var root = await fetchTree('');
-  document.getElementById('content-area').innerHTML = renderDirListing(root);
-  bindDirListingClicks();
+  if (!navigateFromURL(true)) {
+    var root = await fetchTree('');
+    document.getElementById('content-area').innerHTML = renderDirListing(root);
+    bindDirListingClicks();
+  }
 })();
 </script>
 </body>
