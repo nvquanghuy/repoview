@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RepoView</title>
+<style>
+/* ── Reset & Base ─────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; overflow: hidden; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #1f2328;
+  background: #fff;
+}
+a { color: #0969da; text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* ── Layout ───────────────────────────────────────────────── */
+#app { display: flex; height: 100vh; }
+#sidebar {
+  width: 250px; min-width: 140px; max-width: 50vw;
+  background: #f6f8fa; border-right: 1px solid #d0d7de;
+  display: flex; flex-direction: column; flex-shrink: 0;
+  overflow: hidden; position: relative;
+}
+#sidebar-header {
+  padding: 12px 16px; border-bottom: 1px solid #d0d7de;
+  font-weight: 600; font-size: 14px; display: flex;
+  align-items: center; gap: 8px; flex-shrink: 0;
+}
+#sidebar-header .repo-icon { color: #656d76; }
+#tree-container { flex: 1; overflow-y: auto; padding: 4px 0; }
+#resize-handle {
+  position: absolute; top: 0; right: -3px; width: 6px; height: 100%;
+  cursor: col-resize; z-index: 10;
+}
+#resize-handle:hover, #resize-handle.active { background: #0969da40; }
+
+#main { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
+#breadcrumb-bar {
+  position: sticky; top: 0; z-index: 5;
+  padding: 8px 24px; border-bottom: 1px solid #d0d7de;
+  background: #fff; display: flex; align-items: center; gap: 4px;
+  font-size: 14px; flex-shrink: 0; flex-wrap: wrap;
+}
+#breadcrumb-bar .sep { color: #656d76; margin: 0 2px; }
+#breadcrumb-bar .crumb { cursor: pointer; color: #0969da; }
+#breadcrumb-bar .crumb:hover { text-decoration: underline; }
+#breadcrumb-bar .crumb.current { color: #1f2328; font-weight: 600; cursor: default; }
+#breadcrumb-bar .crumb.current:hover { text-decoration: none; }
+#go-to-file-btn {
+  margin-left: auto; padding: 3px 12px; font-size: 12px;
+  border: 1px solid #d0d7de; border-radius: 6px; background: #f6f8fa;
+  color: #1f2328; cursor: pointer; display: flex; align-items: center; gap: 6px;
+}
+#go-to-file-btn:hover { background: #eaeef2; }
+#go-to-file-btn kbd {
+  font-family: inherit; font-size: 11px; padding: 0 4px;
+  border: 1px solid #d0d7de; border-radius: 3px; background: #fff;
+}
+#content-area { flex: 1; overflow-y: auto; padding: 24px; }
+
+/* ── Welcome ──────────────────────────────────────────────── */
+.welcome { color: #656d76; text-align: center; margin-top: 120px; }
+.welcome h2 { font-size: 20px; margin-bottom: 8px; color: #1f2328; }
+
+/* ── Dir listing ──────────────────────────────────────────── */
+.dir-listing { border: 1px solid #d0d7de; border-radius: 6px; overflow: hidden; }
+.dir-listing-row {
+  display: flex; align-items: center; padding: 8px 16px; gap: 8px;
+  border-bottom: 1px solid #d0d7de; cursor: pointer; font-size: 14px;
+}
+.dir-listing-row:last-child { border-bottom: none; }
+.dir-listing-row:hover { background: #f6f8fa; }
+.dir-listing-row .icon { flex-shrink: 0; color: #54aeff; width: 16px; }
+.dir-listing-row .icon.folder { color: #54aeff; }
+.dir-listing-row .icon.file { color: #656d76; }
+.dir-listing-row .name { flex: 1; }
+
+/* ── Tree ─────────────────────────────────────────────────── */
+.tree-item {
+  display: flex; align-items: center; padding: 4px 8px;
+  cursor: pointer; gap: 4px; white-space: nowrap;
+  border-radius: 6px; margin: 1px 4px; font-size: 13px;
+}
+.tree-item:hover { background: #eaeef2; }
+.tree-item.active { background: #ddf4ff; }
+.tree-item .icon { flex-shrink: 0; width: 16px; height: 16px; }
+.tree-item .caret {
+  flex-shrink: 0; width: 16px; height: 16px;
+  display: flex; align-items: center; justify-content: center;
+  transition: transform .12s;
+}
+.tree-item .caret.open { transform: rotate(90deg); }
+.tree-item .caret.hidden { visibility: hidden; }
+.tree-item .label { overflow: hidden; text-overflow: ellipsis; }
+.tree-children { padding-left: 12px; }
+.tree-children.collapsed { display: none; }
+
+/* ── Fuzzy Search Modal ───────────────────────────────────── */
+#search-overlay {
+  display: none; position: fixed; inset: 0; z-index: 100;
+  background: #00000040; justify-content: center; padding-top: 80px;
+}
+#search-overlay.open { display: flex; }
+#search-box {
+  width: 540px; max-width: 90vw; background: #fff;
+  border: 1px solid #d0d7de; border-radius: 12px;
+  box-shadow: 0 8px 24px #00000020; overflow: hidden; align-self: flex-start;
+}
+#search-input {
+  width: 100%; padding: 12px 16px; font-size: 16px;
+  border: none; outline: none; border-bottom: 1px solid #d0d7de;
+  font-family: inherit;
+}
+#search-results {
+  max-height: 400px; overflow-y: auto;
+}
+.search-result {
+  padding: 8px 16px; cursor: pointer; display: flex;
+  align-items: center; gap: 8px; font-size: 13px;
+}
+.search-result:hover, .search-result.selected { background: #ddf4ff; }
+.search-result .sr-icon { flex-shrink: 0; color: #656d76; width: 16px; }
+.search-result .sr-path { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.search-result mark { background: none; font-weight: 700; color: #1f2328; }
+#search-empty { padding: 16px; color: #656d76; text-align: center; font-size: 13px; }
+
+/* ── Markdown body (GitHub-style) ─────────────────────────── */
+.markdown-body {
+  font-size: 16px; line-height: 1.6; word-wrap: break-word;
+  color: #1f2328;
+}
+.markdown-body h1, .markdown-body h2, .markdown-body h3,
+.markdown-body h4, .markdown-body h5, .markdown-body h6 {
+  margin-top: 24px; margin-bottom: 16px; font-weight: 600; line-height: 1.25;
+}
+.markdown-body h1 { font-size: 2em; padding-bottom: .3em; border-bottom: 1px solid #d0d7de; }
+.markdown-body h2 { font-size: 1.5em; padding-bottom: .3em; border-bottom: 1px solid #d0d7de; }
+.markdown-body h3 { font-size: 1.25em; }
+.markdown-body h4 { font-size: 1em; }
+.markdown-body h5 { font-size: .875em; }
+.markdown-body h6 { font-size: .85em; color: #656d76; }
+.markdown-body p { margin-top: 0; margin-bottom: 16px; }
+.markdown-body ul, .markdown-body ol { padding-left: 2em; margin-bottom: 16px; }
+.markdown-body li + li { margin-top: .25em; }
+.markdown-body blockquote {
+  margin: 0 0 16px; padding: 0 1em;
+  color: #656d76; border-left: .25em solid #d0d7de;
+}
+.markdown-body code {
+  padding: .2em .4em; font-size: 85%; background: #eff1f3;
+  border-radius: 6px; font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+}
+.markdown-body pre {
+  margin-bottom: 16px; padding: 16px; overflow: auto;
+  font-size: 85%; line-height: 1.45; background: #f6f8fa;
+  border-radius: 6px; border: 1px solid #d0d7de;
+}
+.markdown-body pre code {
+  padding: 0; background: transparent; border-radius: 0; font-size: 100%;
+}
+.markdown-body table {
+  border-collapse: collapse; border-spacing: 0;
+  margin-bottom: 16px; width: auto; overflow: auto;
+  display: block;
+}
+.markdown-body table th, .markdown-body table td {
+  padding: 6px 13px; border: 1px solid #d0d7de;
+}
+.markdown-body table th { font-weight: 600; background: #f6f8fa; }
+.markdown-body table tr:nth-child(2n) { background: #f6f8fa; }
+.markdown-body img { max-width: 100%; }
+.markdown-body hr { height: .25em; padding: 0; margin: 24px 0; background: #d0d7de; border: 0; }
+.markdown-body a { color: #0969da; }
+.markdown-body .task-list-item { list-style: none; }
+.markdown-body .task-list-item input { margin-right: .5em; }
+
+/* ── Source code (non-markdown) ───────────────────────────── */
+.source-code {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 13px; line-height: 1.5;
+  border: 1px solid #d0d7de; border-radius: 6px; overflow: auto;
+}
+.source-code pre { margin: 0; padding: 16px; }
+
+/* ── CSV table ────────────────────────────────────────────── */
+.csv-table { border: 1px solid #d0d7de; border-radius: 6px; overflow: auto; }
+.csv-table table { border-collapse: collapse; width: 100%; }
+.csv-table th, .csv-table td { padding: 6px 13px; border: 1px solid #d0d7de; font-size: 13px; }
+.csv-table th { background: #f6f8fa; font-weight: 600; position: sticky; top: 0; }
+
+/* ── Scrollbar ────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #d0d7de; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #afb8c1; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="sidebar">
+    <div id="sidebar-header">
+      <svg class="repo-icon" width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M2 2.5A2.5 2.5 0 0 1 4.5 0h8.75a.75.75 0 0 1 .75.75v12.5a.75.75 0 0 1-.75.75h-2.5a.75.75 0 0 1 0-1.5h1.75v-2h-8a1 1 0 0 0-.714 1.7.75.75 0 1 1-1.072 1.05A2.495 2.495 0 0 1 2 11.5Zm10.5-1h-8a1 1 0 0 0-1 1v6.708A2.486 2.486 0 0 1 4.5 9h8ZM5 12.25a.25.25 0 0 1 .25-.25h3.5a.25.25 0 0 1 .25.25v3.25a.25.25 0 0 1-.4.2l-1.45-1.087a.249.249 0 0 0-.3 0L5.4 15.7a.25.25 0 0 1-.4-.2Z"/></svg>
+      <span id="repo-name">Files</span>
+    </div>
+    <div id="tree-container"></div>
+    <div id="resize-handle"></div>
+  </div>
+  <div id="main">
+    <div id="breadcrumb-bar">
+      <span class="crumb root" onclick="navigateTo('')">root</span>
+      <span id="breadcrumb-path"></span>
+      <button id="go-to-file-btn" onclick="openSearch()">
+        Go to file <kbd>t</kbd>
+      </button>
+    </div>
+    <div id="content-area">
+      <div class="welcome">
+        <h2>Welcome to RepoView</h2>
+        <p>Select a file from the sidebar or press <strong>t</strong> to search.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="search-overlay" onclick="if(event.target===this)closeSearch()">
+  <div id="search-box">
+    <input id="search-input" type="text" placeholder="Go to file…" oninput="onSearchInput()" onkeydown="onSearchKey(event)">
+    <div id="search-results"></div>
+  </div>
+</div>
+
+<script>
+/* ── SVG helpers ──────────────────────────────────────────── */
+const SVG = {
+  folderClosed: '<svg width="16" height="16" viewBox="0 0 16 16" fill="#54aeff"><path d="M1.75 1A1.75 1.75 0 0 0 0 2.75v10.5C0 14.216.784 15 1.75 15h12.5A1.75 1.75 0 0 0 16 13.25v-8.5A1.75 1.75 0 0 0 14.25 3H7.5a.25.25 0 0 1-.2-.1l-.9-1.2C6.07 1.26 5.55 1 5 1H1.75Z"/></svg>',
+  folderOpen: '<svg width="16" height="16" viewBox="0 0 16 16" fill="#54aeff"><path d="M.513 1.513A1.75 1.75 0 0 1 1.75 1h3.5c.55 0 1.07.26 1.4.7l.9 1.2a.25.25 0 0 0 .2.1h6.5A1.75 1.75 0 0 1 16 4.75v8.5A1.75 1.75 0 0 1 14.25 15H1.75A1.75 1.75 0 0 1 0 13.25V2.75c0-.464.184-.91.513-1.237ZM1.75 2.5a.25.25 0 0 0-.25.25v10.5c0 .138.112.25.25.25h12.5a.25.25 0 0 0 .25-.25v-8.5a.25.25 0 0 0-.25-.25H7.5c-.55 0-1.07-.26-1.4-.7l-.9-1.2a.25.25 0 0 0-.2-.1Z"/></svg>',
+  file: '<svg width="16" height="16" viewBox="0 0 16 16" fill="#656d76"><path d="M2 1.75C2 .784 2.784 0 3.75 0h6.586c.464 0 .909.184 1.237.513l2.914 2.914c.329.328.513.773.513 1.237v9.586A1.75 1.75 0 0 1 13.25 16h-9.5A1.75 1.75 0 0 1 2 14.25Zm1.75-.25a.25.25 0 0 0-.25.25v12.5c0 .138.112.25.25.25h9.5a.25.25 0 0 0 .25-.25V6h-2.75A1.75 1.75 0 0 1 9 4.25V1.5Zm6.75.062V4.25c0 .138.112.25.25.25h2.688l-.011-.013-2.914-2.914-.013-.011Z"/></svg>',
+  caret: '<svg width="16" height="16" viewBox="0 0 16 16" fill="#656d76"><path d="M6.22 3.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042L9.94 8 6.22 4.28a.75.75 0 0 1 0-1.06Z"/></svg>',
+};
+
+/* ── State ────────────────────────────────────────────────── */
+let currentPath = '';
+let currentFilePath = '';
+let expandedDirs = new Set();
+let treeCache = {};
+let allFiles = null;
+let searchIdx = 0;
+let ws = null;
+let watchedPaths = new Set();
+
+/* ── Tree ─────────────────────────────────────────────────── */
+async function fetchTree(path) {
+  if (treeCache[path]) return treeCache[path];
+  const res = await fetch('/api/tree?path=' + encodeURIComponent(path));
+  const data = await res.json();
+  treeCache[path] = data;
+  return data;
+}
+
+function renderTree(items, container, depth) {
+  items.sort((a, b) => {
+    if (a.isDir !== b.isDir) return a.isDir ? -1 : 1;
+    return a.name.localeCompare(b.name);
+  });
+  for (const item of items) {
+    const row = document.createElement('div');
+    row.className = 'tree-item' + (item.path === currentFilePath ? ' active' : '');
+    row.style.paddingLeft = (8 + depth * 12) + 'px';
+    row.dataset.path = item.path;
+    row.dataset.isDir = item.isDir;
+
+    const isOpen = expandedDirs.has(item.path);
+    if (item.isDir) {
+      row.innerHTML = '<span class="caret ' + (isOpen ? 'open' : '') + '">' + SVG.caret + '</span>' +
+        '<span class="icon">' + (isOpen ? SVG.folderOpen : SVG.folderClosed) + '</span>' +
+        '<span class="label">' + esc(item.name) + '</span>';
+      row.onclick = (function(p) { return function(e) { e.stopPropagation(); toggleDir(p); }; })(item.path);
+    } else {
+      row.innerHTML = '<span class="caret hidden">' + SVG.caret + '</span>' +
+        '<span class="icon">' + SVG.file + '</span>' +
+        '<span class="label">' + esc(item.name) + '</span>';
+      row.onclick = (function(p) { return function(e) { e.stopPropagation(); loadFile(p); }; })(item.path);
+    }
+    container.appendChild(row);
+
+    if (item.isDir) {
+      const childContainer = document.createElement('div');
+      childContainer.className = 'tree-children' + (isOpen ? '' : ' collapsed');
+      childContainer.id = 'tree-children-' + item.path.replace(/[^a-zA-Z0-9]/g, '_');
+      container.appendChild(childContainer);
+      if (isOpen && treeCache[item.path]) {
+        renderTree(treeCache[item.path], childContainer, depth + 1);
+      }
+    }
+  }
+}
+
+async function toggleDir(path) {
+  if (expandedDirs.has(path)) {
+    expandedDirs.delete(path);
+    wsUnwatch(path);
+  } else {
+    expandedDirs.add(path);
+    await fetchTree(path);
+    wsWatch(path);
+  }
+  refreshTree();
+}
+
+async function refreshTree() {
+  var root = await fetchTree('');
+  var container = document.getElementById('tree-container');
+  container.innerHTML = '';
+  renderTree(root, container, 0);
+}
+
+/* ── Dir listing in main area ─────────────────────────────── */
+function renderDirListing(items) {
+  items.sort(function(a, b) {
+    if (a.isDir !== b.isDir) return a.isDir ? -1 : 1;
+    return a.name.localeCompare(b.name);
+  });
+  var html = '<div class="dir-listing">';
+  for (var i = 0; i < items.length; i++) {
+    var item = items[i];
+    var icon = item.isDir
+      ? '<span class="icon folder">' + SVG.folderClosed + '</span>'
+      : '<span class="icon file">' + SVG.file + '</span>';
+    html += '<div class="dir-listing-row" data-path="' + escAttr(item.path) + '" data-isdir="' + item.isDir + '">' +
+      icon + '<span class="name">' + esc(item.name) + '</span></div>';
+  }
+  html += '</div>';
+  return html;
+}
+
+/* ── Navigate to directory ────────────────────────────────── */
+async function navigateTo(path) {
+  currentPath = path;
+  currentFilePath = '';
+  updateBreadcrumb(path);
+  var items = await fetchTree(path);
+
+  // expand in sidebar
+  if (path) {
+    expandedDirs.add(path);
+    wsWatch(path);
+  }
+  refreshTree();
+
+  document.getElementById('content-area').innerHTML = renderDirListing(items);
+  bindDirListingClicks();
+}
+
+function bindDirListingClicks() {
+  var rows = document.querySelectorAll('.dir-listing-row');
+  rows.forEach(function(row) {
+    row.onclick = function() {
+      var p = row.dataset.path;
+      if (row.dataset.isdir === 'true') {
+        navigateTo(p);
+      } else {
+        loadFile(p);
+      }
+    };
+  });
+}
+
+/* ── File loading ─────────────────────────────────────────── */
+async function loadFile(path) {
+  // Unwatch old file
+  if (currentFilePath) wsUnwatch(currentFilePath);
+
+  currentFilePath = path;
+  currentPath = path.includes('/') ? path.substring(0, path.lastIndexOf('/')) : '';
+  updateBreadcrumb(path);
+
+  // Expand parent dirs in sidebar
+  var parts = path.split('/');
+  var accumulated = '';
+  for (var i = 0; i < parts.length - 1; i++) {
+    accumulated = accumulated ? accumulated + '/' + parts[i] : parts[i];
+    if (!expandedDirs.has(accumulated)) {
+      expandedDirs.add(accumulated);
+      await fetchTree(accumulated);
+      wsWatch(accumulated);
+    }
+  }
+
+  var res = await fetch('/api/file?path=' + encodeURIComponent(path));
+  var data = await res.json();
+
+  var area = document.getElementById('content-area');
+  if (data.isMarkdown) {
+    area.innerHTML = '<div class="markdown-body">' + data.content + '</div>';
+  } else if (data.isCSV) {
+    area.innerHTML = '<div class="csv-table">' + data.content + '</div>';
+  } else {
+    area.innerHTML = '<div class="source-code">' + data.content + '</div>';
+  }
+
+  wsWatch(path);
+  refreshTree();
+}
+
+/* ── Breadcrumb ───────────────────────────────────────────── */
+function updateBreadcrumb(path) {
+  var bc = document.getElementById('breadcrumb-path');
+  if (!path) { bc.innerHTML = ''; return; }
+  var parts = path.split('/');
+  var html = '';
+  var accumulated = '';
+  for (var i = 0; i < parts.length; i++) {
+    accumulated = accumulated ? accumulated + '/' + parts[i] : parts[i];
+    var isLast = i === parts.length - 1;
+    html += '<span class="sep">/</span>';
+    if (isLast) {
+      html += '<span class="crumb current">' + esc(parts[i]) + '</span>';
+    } else {
+      html += '<span class="crumb" data-nav="' + escAttr(accumulated) + '">' + esc(parts[i]) + '</span>';
+    }
+  }
+  bc.innerHTML = html;
+  // Bind click handlers
+  bc.querySelectorAll('.crumb[data-nav]').forEach(function(el) {
+    el.onclick = function() { navigateTo(el.dataset.nav); };
+  });
+}
+
+/* ── Fuzzy Search ─────────────────────────────────────────── */
+async function openSearch() {
+  document.getElementById('search-overlay').classList.add('open');
+  var input = document.getElementById('search-input');
+  input.value = '';
+  input.focus();
+  if (!allFiles) {
+    var res = await fetch('/api/files');
+    allFiles = await res.json();
+  }
+  renderSearchResults(allFiles.slice(0, 50), false);
+  searchIdx = 0;
+  updateSearchSelection();
+}
+
+function closeSearch() {
+  document.getElementById('search-overlay').classList.remove('open');
+}
+
+function onSearchInput() {
+  var q = document.getElementById('search-input').value.trim();
+  if (!allFiles) return;
+  if (!q) {
+    renderSearchResults(allFiles.slice(0, 50), false);
+  } else {
+    var results = fuzzysort(q, allFiles, 50);
+    renderSearchResults(results, true);
+  }
+  searchIdx = 0;
+  updateSearchSelection();
+}
+
+function onSearchKey(e) {
+  var results = document.querySelectorAll('.search-result');
+  if (e.key === 'ArrowDown') { e.preventDefault(); searchIdx = Math.min(searchIdx + 1, results.length - 1); updateSearchSelection(); }
+  else if (e.key === 'ArrowUp') { e.preventDefault(); searchIdx = Math.max(searchIdx - 1, 0); updateSearchSelection(); }
+  else if (e.key === 'Enter') {
+    e.preventDefault();
+    if (results[searchIdx]) { results[searchIdx].click(); }
+  }
+  else if (e.key === 'Escape') { closeSearch(); }
+}
+
+function updateSearchSelection() {
+  var items = document.querySelectorAll('.search-result');
+  items.forEach(function(el, i) { el.classList.toggle('selected', i === searchIdx); });
+  if (items[searchIdx]) items[searchIdx].scrollIntoView({ block: 'nearest' });
+}
+
+function renderSearchResults(items, isHighlighted) {
+  var container = document.getElementById('search-results');
+  if (!items || items.length === 0) {
+    container.innerHTML = '<div id="search-empty">No files found</div>';
+    return;
+  }
+  var html = '';
+  for (var i = 0; i < items.length; i++) {
+    var item = items[i];
+    var display, raw;
+    if (isHighlighted) {
+      display = item.highlighted;
+      raw = item.target;
+    } else {
+      display = esc(item);
+      raw = item;
+    }
+    html += '<div class="search-result" data-path="' + escAttr(raw) + '">' +
+      '<span class="sr-icon">' + SVG.file + '</span>' +
+      '<span class="sr-path">' + display + '</span></div>';
+  }
+  container.innerHTML = html;
+  container.querySelectorAll('.search-result').forEach(function(el) {
+    el.onclick = function() {
+      closeSearch();
+      loadFile(el.dataset.path);
+    };
+  });
+}
+
+/* ── Minimal fuzzysort implementation ─────────────────────── */
+function fuzzysort(query, targets, limit) {
+  var ql = query.toLowerCase();
+  var scored = [];
+  for (var t = 0; t < targets.length; t++) {
+    var target = targets[t];
+    var tl = target.toLowerCase();
+    var qi = 0, score = 0, consecutive = 0, lastIdx = -1;
+    var indices = [];
+    for (var ti = 0; ti < tl.length && qi < ql.length; ti++) {
+      if (tl[ti] === ql[qi]) {
+        indices.push(ti);
+        consecutive = (ti === lastIdx + 1) ? consecutive + 1 : 1;
+        score += consecutive + (ti === 0 ? 2 : 0);
+        if (ti > 0 && (target[ti-1] === '/' || target[ti-1] === '.' || target[ti-1] === '-' || target[ti-1] === '_')) score += 2;
+        lastIdx = ti;
+        qi++;
+      }
+    }
+    if (qi === ql.length) {
+      score -= target.length * 0.1;
+      scored.push({ target: target, score: score, indices: indices });
+    }
+  }
+  scored.sort(function(a, b) { return b.score - a.score; });
+  var results = scored.slice(0, limit);
+  return results.map(function(r) {
+    var highlighted = '';
+    var last = 0;
+    for (var j = 0; j < r.indices.length; j++) {
+      var idx = r.indices[j];
+      highlighted += esc(r.target.substring(last, idx)) + '<mark>' + esc(r.target[idx]) + '</mark>';
+      last = idx + 1;
+    }
+    highlighted += esc(r.target.substring(last));
+    return { target: r.target, highlighted: highlighted };
+  });
+}
+
+/* ── WebSocket ────────────────────────────────────────────── */
+function connectWS() {
+  var proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  ws = new WebSocket(proto + '//' + location.host + '/ws');
+  ws.onopen = function() {
+    for (var p of watchedPaths) {
+      ws.send(JSON.stringify({ action: 'watch', path: p }));
+    }
+  };
+  ws.onmessage = function(e) {
+    try {
+      var msg = JSON.parse(e.data);
+      if (msg.path) {
+        var parent = msg.path.includes('/') ? msg.path.substring(0, msg.path.lastIndexOf('/')) : '';
+        delete treeCache[parent];
+        delete treeCache[msg.path];
+        refreshTree();
+        if (msg.path === currentFilePath) {
+          loadFile(currentFilePath);
+        }
+      }
+    } catch(err) {}
+  };
+  ws.onclose = function() { setTimeout(connectWS, 2000); };
+  ws.onerror = function() { ws.close(); };
+}
+
+function wsWatch(path) {
+  watchedPaths.add(path);
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({ action: 'watch', path: path }));
+  }
+}
+
+function wsUnwatch(path) {
+  watchedPaths.delete(path);
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({ action: 'unwatch', path: path }));
+  }
+}
+
+/* ── Helpers ──────────────────────────────────────────────── */
+function esc(s) {
+  var d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+function escAttr(s) {
+  return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+/* ── Keyboard shortcut ────────────────────────────────────── */
+document.addEventListener('keydown', function(e) {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+  if (e.key === 't') { e.preventDefault(); openSearch(); }
+});
+
+/* ── Resize handle ────────────────────────────────────────── */
+(function initResize() {
+  var handle = document.getElementById('resize-handle');
+  var sidebar = document.getElementById('sidebar');
+  var startX, startW;
+  handle.addEventListener('mousedown', function(e) {
+    e.preventDefault();
+    startX = e.clientX;
+    startW = sidebar.offsetWidth;
+    handle.classList.add('active');
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  });
+  function onMove(e) {
+    var w = startW + (e.clientX - startX);
+    sidebar.style.width = Math.max(140, Math.min(w, window.innerWidth * 0.5)) + 'px';
+  }
+  function onUp() {
+    handle.classList.remove('active');
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup', onUp);
+  }
+})();
+
+/* ── Init ─────────────────────────────────────────────────── */
+(async function init() {
+  await refreshTree();
+  connectWS();
+  var root = await fetchTree('');
+  document.getElementById('content-area').innerHTML = renderDirListing(root);
+  bindDirListingClicks();
+})();
+</script>
+</body>
+</html>

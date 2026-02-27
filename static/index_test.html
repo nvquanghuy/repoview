@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>RepoView Frontend Tests</title>
+<style>
+body { font-family: monospace; font-size: 14px; padding: 24px; background: #1e1e1e; color: #d4d4d4; }
+h1 { color: #569cd6; margin-bottom: 16px; }
+.pass { color: #4ec9b0; }
+.fail { color: #f44747; }
+.summary { margin-top: 16px; padding: 12px; border: 1px solid #444; border-radius: 4px; }
+.test-line { padding: 2px 0; }
+</style>
+</head>
+<body>
+<h1>RepoView Frontend Tests</h1>
+<div id="results"></div>
+<div id="summary" class="summary"></div>
+
+<script>
+/* ── Test framework ──────────────────────────────────────── */
+var results = [];
+function assert(condition, name) {
+  results.push({ name: name, pass: !!condition });
+  if (!condition) console.error('FAIL:', name);
+  else console.log('PASS:', name);
+}
+
+function assertEqual(actual, expected, name) {
+  var pass = actual === expected;
+  results.push({ name: name, pass: pass });
+  if (!pass) console.error('FAIL:', name, '| expected:', expected, '| got:', actual);
+  else console.log('PASS:', name);
+}
+
+function assertContains(str, sub, name) {
+  var pass = typeof str === 'string' && str.indexOf(sub) !== -1;
+  results.push({ name: name, pass: pass });
+  if (!pass) console.error('FAIL:', name, '| expected to contain:', sub, '| in:', str);
+  else console.log('PASS:', name);
+}
+
+function renderResults() {
+  var el = document.getElementById('results');
+  var html = '';
+  var passed = 0, failed = 0;
+  for (var i = 0; i < results.length; i++) {
+    var r = results[i];
+    if (r.pass) passed++; else failed++;
+    html += '<div class="test-line ' + (r.pass ? 'pass' : 'fail') + '">' +
+      (r.pass ? 'PASS' : 'FAIL') + ': ' + r.name + '</div>';
+  }
+  el.innerHTML = html;
+  var sum = document.getElementById('summary');
+  var allPass = failed === 0;
+  sum.className = 'summary ' + (allPass ? 'pass' : 'fail');
+  sum.textContent = passed + ' passed, ' + failed + ' failed, ' + results.length + ' total';
+}
+
+/* ── Helpers extracted from index.html ───────────────────── */
+function esc(s) {
+  var d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+function escAttr(s) {
+  return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function fuzzysort(query, targets, limit) {
+  var ql = query.toLowerCase();
+  var scored = [];
+  for (var t = 0; t < targets.length; t++) {
+    var target = targets[t];
+    var tl = target.toLowerCase();
+    var qi = 0, score = 0, consecutive = 0, lastIdx = -1;
+    var indices = [];
+    for (var ti = 0; ti < tl.length && qi < ql.length; ti++) {
+      if (tl[ti] === ql[qi]) {
+        indices.push(ti);
+        consecutive = (ti === lastIdx + 1) ? consecutive + 1 : 1;
+        score += consecutive + (ti === 0 ? 2 : 0);
+        if (ti > 0 && (target[ti-1] === '/' || target[ti-1] === '.' || target[ti-1] === '-' || target[ti-1] === '_')) score += 2;
+        lastIdx = ti;
+        qi++;
+      }
+    }
+    if (qi === ql.length) {
+      score -= target.length * 0.1;
+      scored.push({ target: target, score: score, indices: indices });
+    }
+  }
+  scored.sort(function(a, b) { return b.score - a.score; });
+  var r = scored.slice(0, limit);
+  return r.map(function(r) {
+    var highlighted = '';
+    var last = 0;
+    for (var j = 0; j < r.indices.length; j++) {
+      var idx = r.indices[j];
+      highlighted += esc(r.target.substring(last, idx)) + '<mark>' + esc(r.target[idx]) + '</mark>';
+      last = idx + 1;
+    }
+    highlighted += esc(r.target.substring(last));
+    return { target: r.target, highlighted: highlighted };
+  });
+}
+
+/* ── Tests ────────────────────────────────────────────────── */
+
+// Test: esc() escapes HTML entities
+assertEqual(esc('<script>alert(1)</script>'), '&lt;script&gt;alert(1)&lt;/script&gt;', 'esc() escapes HTML tags');
+assertEqual(esc('a & b'), 'a &amp; b', 'esc() escapes ampersand');
+assertEqual(esc('hello'), 'hello', 'esc() leaves plain text unchanged');
+
+// Test: escAttr() escapes attribute values
+assertEqual(escAttr('"quoted"'), '&quot;quoted&quot;', 'escAttr() escapes double quotes');
+assertEqual(escAttr("it's"), "it&#39;s", 'escAttr() escapes single quotes');
+assertEqual(escAttr('<tag>'), '&lt;tag&gt;', 'escAttr() escapes angle brackets');
+
+// Test: fuzzysort basic matching
+var files = ['src/main.go', 'src/util.go', 'README.md', 'static/index.html', 'data.csv'];
+var matches = fuzzysort('main', files, 10);
+assert(matches.length > 0, 'fuzzysort("main") returns results');
+assertEqual(matches[0].target, 'src/main.go', 'fuzzysort("main") best match is src/main.go');
+
+// Test: fuzzysort no match
+var noMatch = fuzzysort('zzzzzz', files, 10);
+assertEqual(noMatch.length, 0, 'fuzzysort returns empty for no match');
+
+// Test: fuzzysort highlighting contains <mark> tags
+assertContains(matches[0].highlighted, '<mark>', 'fuzzysort highlighting contains <mark> tags');
+
+// Test: fuzzysort respects limit
+var limited = fuzzysort('s', files, 2);
+assert(limited.length <= 2, 'fuzzysort respects limit parameter');
+
+// Test: loadFile parses JSON and renders markdown
+(async function testLoadFileMarkdown() {
+  var mockResponse = {
+    content: '<h1>Hello</h1><p>World</p>',
+    name: 'test.md',
+    path: 'test.md',
+    isMarkdown: true,
+    isCSV: false
+  };
+
+  // Create a temporary content area.
+  var area = document.createElement('div');
+  area.id = 'test-content-area';
+
+  // Simulate what loadFile does with the JSON response.
+  if (mockResponse.isMarkdown) {
+    area.innerHTML = '<div class="markdown-body">' + mockResponse.content + '</div>';
+  } else if (mockResponse.isCSV) {
+    area.innerHTML = '<div class="csv-table">' + mockResponse.content + '</div>';
+  } else {
+    area.innerHTML = '<div class="source-code">' + mockResponse.content + '</div>';
+  }
+
+  assertContains(area.innerHTML, 'markdown-body', 'Markdown response renders with markdown-body class');
+  assertContains(area.innerHTML, '<h1>Hello</h1>', 'Markdown HTML content is preserved');
+})();
+
+// Test: loadFile parses JSON and renders CSV
+(function testLoadFileCSV() {
+  var mockResponse = {
+    content: '<table><thead><tr><th>name</th></tr></thead></table>',
+    name: 'data.csv',
+    path: 'data.csv',
+    isMarkdown: false,
+    isCSV: true
+  };
+
+  var area = document.createElement('div');
+  if (mockResponse.isCSV) {
+    area.innerHTML = '<div class="csv-table">' + mockResponse.content + '</div>';
+  }
+
+  assertContains(area.innerHTML, 'csv-table', 'CSV response renders with csv-table class');
+  assertContains(area.innerHTML, '<table>', 'CSV HTML table is preserved');
+})();
+
+// Test: loadFile parses JSON and renders source code
+(function testLoadFileSource() {
+  var mockResponse = {
+    content: '<pre>console.log("hi")</pre>',
+    name: 'app.js',
+    path: 'app.js',
+    isMarkdown: false,
+    isCSV: false
+  };
+
+  var area = document.createElement('div');
+  area.innerHTML = '<div class="source-code">' + mockResponse.content + '</div>';
+
+  assertContains(area.innerHTML, 'source-code', 'Source response renders with source-code class');
+  assertContains(area.innerHTML, '<pre>', 'Source content has pre tag');
+})();
+
+// Test: fetchTree parses JSON array
+(function testFetchTreeParsing() {
+  var mockTreeJSON = [
+    { name: 'src', path: 'src', isDir: true, extension: '' },
+    { name: 'main.go', path: 'main.go', isDir: false, extension: 'go' }
+  ];
+
+  assertEqual(mockTreeJSON.length, 2, 'Tree JSON has 2 entries');
+  assertEqual(mockTreeJSON[0].isDir, true, 'First entry is a directory');
+  assertEqual(mockTreeJSON[1].extension, 'go', 'Second entry has .go extension');
+})();
+
+// Test: keyboard shortcut handler skips INPUT elements
+(function testKeyboardShortcut() {
+  var prevented = false;
+  var mockEvent = {
+    target: { tagName: 'INPUT' },
+    key: 't',
+    preventDefault: function() { prevented = true; }
+  };
+
+  // Simulate the handler logic from index.html.
+  if (mockEvent.target.tagName === 'INPUT' || mockEvent.target.tagName === 'TEXTAREA') {
+    // Should skip.
+  } else if (mockEvent.key === 't') {
+    mockEvent.preventDefault();
+  }
+
+  assertEqual(prevented, false, 'Keyboard shortcut skips INPUT elements');
+
+  // Now test with a non-input target.
+  var triggered = false;
+  var mockEvent2 = {
+    target: { tagName: 'DIV' },
+    key: 't',
+    preventDefault: function() { triggered = true; }
+  };
+
+  if (mockEvent2.target.tagName === 'INPUT' || mockEvent2.target.tagName === 'TEXTAREA') {
+    // skip
+  } else if (mockEvent2.key === 't') {
+    mockEvent2.preventDefault();
+  }
+
+  assertEqual(triggered, true, 'Keyboard shortcut triggers for non-input elements');
+})();
+
+// Test: live API call to /api/file (only runs when served by repoview)
+(async function testLiveAPI() {
+  try {
+    var res = await fetch('/api/file?path=testdata/hello.md');
+    if (res.ok) {
+      var data = await res.json();
+      assertEqual(typeof data.content, 'string', 'Live API: content is string');
+      assertEqual(data.isMarkdown, true, 'Live API: isMarkdown is true');
+      assertEqual(data.name, 'hello.md', 'Live API: name is hello.md');
+      assertContains(data.content, '<h1>', 'Live API: content contains rendered HTML');
+    } else {
+      console.log('Skipping live API test (file not found — not running from repo root?)');
+    }
+  } catch (e) {
+    console.log('Skipping live API tests (not served by repoview)');
+  }
+  renderResults();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,61 @@
+# RepoView
+
+A lightweight, single-binary local folder viewer that replicates the GitHub UI for browsing files, rendering Markdown, and viewing CSV data.
+
+## Features
+
+- **GitHub-style UI** — familiar layout with resizable sidebar, breadcrumb navigation, and file tree
+- **Markdown rendering** — GitHub-Flavored Markdown via goldmark (tables, task lists, code blocks)
+- **CSV rendering** — automatic conversion to styled HTML tables
+- **Fuzzy file search** — press `t` to open a "Go to file" modal with fuzzy matching
+- **Live reload** — WebSocket-based file watching with fsnotify; changes appear instantly
+- **Single binary** — all HTML/CSS/JS embedded via `go:embed`, no external dependencies at runtime
+- **Lazy-loading tree** — sidebar fetches directory contents on demand for fast startup on large repos
+
+## Quick Start
+
+```bash
+go build -o repoview .
+./repoview              # serves current directory at http://localhost:8080
+./repoview /path/to/dir # serve a specific directory
+```
+
+### Options
+
+| Flag | Description |
+|------|-------------|
+| `-port` | Port to serve on (default: `8080`) |
+| `-no-browser` | Don't auto-open the browser on startup |
+
+## API
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/tree?path=` | Returns immediate children of a directory as JSON |
+| `GET /api/file?path=` | Returns rendered file content as JSON (`content`, `name`, `path`, `isMarkdown`, `isCSV`) |
+| `GET /api/files` | Returns a flat list of all file paths (uses `git ls-files` when available) |
+| `WS /ws` | WebSocket for file change notifications |
+
+## Development
+
+```bash
+# Run tests
+go test -v ./...
+
+# Build
+go build -o repoview .
+```
+
+### Project Structure
+
+```
+main.go              # Server, API handlers, WebSocket hub, file watchers
+static/index.html    # Single-page frontend (embedded at build time)
+static/index_test.html # Frontend test harness
+main_test.go         # Backend unit and integration tests
+testdata/            # Sample files used by tests
+```
+
+## License
+
+MIT

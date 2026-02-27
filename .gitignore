@@ -1,0 +1,19 @@
+# Binary
+repoview
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Mise
+.mise.toml
+mise.toml
+
+# MCP
+.mcp.json
