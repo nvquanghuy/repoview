@@ -279,7 +279,7 @@ function renderTree(items, container, depth) {
       row.innerHTML = '<span class="caret ' + (isOpen ? 'open' : '') + '">' + SVG.caret + '</span>' +
         '<span class="icon">' + (isOpen ? SVG.folderOpen : SVG.folderClosed) + '</span>' +
         '<span class="label">' + esc(item.name) + '</span>';
-      row.onclick = (function(p) { return function(e) { e.stopPropagation(); toggleDir(p); }; })(item.path);
+      row.onclick = (function(p) { return function(e) { e.stopPropagation(); navigateTo(p); }; })(item.path);
     } else {
       row.innerHTML = '<span class="caret hidden">' + SVG.caret + '</span>' +
         '<span class="icon">' + SVG.file + '</span>' +
@@ -320,12 +320,18 @@ async function refreshTree() {
 }
 
 /* ── Dir listing in main area ─────────────────────────────── */
-function renderDirListing(items) {
+function renderDirListing(items, dirPath) {
   items.sort(function(a, b) {
     if (a.isDir !== b.isDir) return a.isDir ? -1 : 1;
     return a.name.localeCompare(b.name);
   });
   var html = '<div class="dir-listing">';
+  if (dirPath) {
+    var parent = dirPath.includes('/') ? dirPath.substring(0, dirPath.lastIndexOf('/')) : '';
+    html += '<div class="dir-listing-row" data-path="' + escAttr(parent) + '" data-isdir="true">' +
+      '<span class="icon folder">' + SVG.folderClosed + '</span>' +
+      '<span class="name">..</span></div>';
+  }
   for (var i = 0; i < items.length; i++) {
     var item = items[i];
     var icon = item.isDir
@@ -353,7 +359,7 @@ async function navigateTo(path, skipPush) {
   }
   refreshTree();
 
-  document.getElementById('content-area').innerHTML = renderDirListing(items);
+  document.getElementById('content-area').innerHTML = renderDirListing(items, path);
   bindDirListingClicks();
 }
 
