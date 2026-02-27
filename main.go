@@ -32,6 +32,8 @@ import (
 //go:embed static/index.html
 var staticFiles embed.FS
 
+const version = "6"
+
 var rootDir string
 
 // TreeEntry represents a single item in the file tree.
@@ -45,7 +47,13 @@ type TreeEntry struct {
 func main() {
 	port := flag.Int("port", 8080, "port to serve on")
 	noBrowser := flag.Bool("no-browser", false, "don't open browser on startup")
+	showVersion := flag.Bool("version", false, "print version and exit")
 	flag.Parse()
+
+	if *showVersion {
+		fmt.Println("repoview v" + version)
+		os.Exit(0)
+	}
 
 	if flag.NArg() > 0 {
 		rootDir = flag.Arg(0)
@@ -97,7 +105,7 @@ func main() {
 
 	addr := fmt.Sprintf("0.0.0.0:%d", *port)
 	url := fmt.Sprintf("http://%s", addr)
-	fmt.Printf("repoview serving %s at %s\n", rootDir, url)
+	fmt.Printf("repoview v%s serving %s at %s\n", version, rootDir, url)
 
 	if !*noBrowser {
 		_ = browser.OpenURL(url)
