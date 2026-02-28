@@ -1,5 +1,9 @@
 # Changelog
 
+## [v23] - 2026-02-28
+
+- [fixed] Sidebar scroll-to-active now centers the item instead of placing it at the bottom edge
+
 ## [v22] - 2026-02-28
 
 - [fixed] Sidebar now scrolls to the active file when using "Go to file" search or navigating to deeply nested files
