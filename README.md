@@ -2,6 +2,9 @@
 
 A lightweight, single-binary local folder viewer that replicates the GitHub UI for browsing files, rendering Markdown, and viewing CSV data.
 
+![repoview-demo](https://github.com/user-attachments/assets/940a295f-bbc4-4949-b1a1-770f39781b2c)
+
+
 ## Features
 
 - **GitHub-style UI** — familiar layout with resizable sidebar, breadcrumb navigation, and file tree
