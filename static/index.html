@@ -207,6 +207,31 @@ a:hover { text-decoration: underline; }
 .view-toggle button:hover { background: #eaeef2; }
 .view-toggle button.active { background: #fff; color: #1f2328; font-weight: 600; }
 
+/* ── Binary file info ─────────────────────────────────────── */
+.binary-info {
+  text-align: center; padding: 48px 24px;
+  border: 1px solid #d0d7de; border-radius: 6px; background: #f6f8fa;
+}
+.binary-info .binary-icon { font-size: 48px; margin-bottom: 16px; color: #656d76; }
+.binary-info .binary-filename { font-size: 18px; font-weight: 600; margin-bottom: 8px; }
+.binary-info .binary-meta { color: #656d76; font-size: 13px; margin-bottom: 16px; }
+.binary-info .binary-meta span { margin: 0 8px; }
+.binary-info .binary-download {
+  display: inline-block; padding: 8px 20px; font-size: 14px;
+  border: 1px solid #d0d7de; border-radius: 6px; background: #fff;
+  color: #0969da; text-decoration: none; font-weight: 500;
+}
+.binary-info .binary-download:hover { background: #f3f4f6; text-decoration: none; }
+.binary-preview { text-align: center; margin-bottom: 16px; }
+.binary-preview img { max-width: 100%; max-height: 70vh; border: 1px solid #d0d7de; border-radius: 6px; }
+.binary-preview video, .binary-preview audio { max-width: 100%; }
+.svg-preview {
+  text-align: center; padding: 24px;
+  border: 1px solid #d0d7de; border-radius: 6px; background: #f6f8fa;
+  overflow: auto;
+}
+.svg-preview svg { max-width: 100%; max-height: 70vh; }
+
 /* ── Scrollbar ────────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: transparent; }
@@ -464,13 +489,59 @@ async function loadFile(path, skipPush) {
   var data = await res.json();
 
   var area = document.getElementById('content-area');
-  if (data.isMarkdown) {
-    var previewHTML = '<div class="markdown-body">' + data.content + '</div>';
-    var codeHTML = '<div class="source-code">' + data.rawContent + '</div>';
+  if (data.isBinary) {
+    // Strip ?view param for binary files
+    if (getViewParam()) setViewParam(null);
+    var rawURL = '/api/raw?path=' + encodeURIComponent(path);
+    var sizeStr = formatFileSize(data.size);
+    var mime = data.mimeType || 'application/octet-stream';
+    var html = '';
+    if (mime.startsWith('image/')) {
+      html = '<div class="binary-preview"><img src="' + escAttr(rawURL) + '" alt="' + escAttr(data.name) + '"></div>';
+      html += '<div class="binary-info">';
+      html += '<div class="binary-meta"><span>' + esc(sizeStr) + '</span><span>' + esc(mime) + '</span></div>';
+      html += '<a class="binary-download" href="' + escAttr(rawURL) + '" download="' + escAttr(data.name) + '">Download</a>';
+      html += '</div>';
+    } else if (mime.startsWith('video/')) {
+      html = '<div class="binary-preview"><video controls src="' + escAttr(rawURL) + '"></video></div>';
+      html += '<div class="binary-info">';
+      html += '<div class="binary-meta"><span>' + esc(sizeStr) + '</span><span>' + esc(mime) + '</span></div>';
+      html += '<a class="binary-download" href="' + escAttr(rawURL) + '" download="' + escAttr(data.name) + '">Download</a>';
+      html += '</div>';
+    } else if (mime.startsWith('audio/')) {
+      html = '<div class="binary-preview"><audio controls src="' + escAttr(rawURL) + '"></audio></div>';
+      html += '<div class="binary-info">';
+      html += '<div class="binary-meta"><span>' + esc(sizeStr) + '</span><span>' + esc(mime) + '</span></div>';
+      html += '<a class="binary-download" href="' + escAttr(rawURL) + '" download="' + escAttr(data.name) + '">Download</a>';
+      html += '</div>';
+    } else {
+      html = '<div class="binary-info">';
+      html += '<div class="binary-icon">&#128462;</div>';
+      html += '<div class="binary-filename">' + esc(data.name) + '</div>';
+      html += '<div class="binary-meta"><span>' + esc(sizeStr) + '</span><span>' + esc(mime) + '</span></div>';
+      html += '<p>Binary file not displayed</p>';
+      html += '<a class="binary-download" href="' + escAttr(rawURL) + '" download="' + escAttr(data.name) + '">Download</a>';
+      html += '</div>';
+    }
+    area.innerHTML = html;
+    wsWatch(path);
+    refreshTree();
+    var filename = path.split('/').pop();
+    document.title = filename + ' - RepoView';
+    return;
+  }
+  if (data.isMarkdown || data.isSVG) {
+    var previewHTML, codeHTML;
+    if (data.isMarkdown) {
+      previewHTML = '<div class="markdown-body">' + data.content + '</div>';
+    } else {
+      previewHTML = '<div class="svg-preview">' + data.rawSVG + '</div>';
+    }
+    codeHTML = '<div class="source-code">' + data.rawContent + '</div>';
     var wantCode = getViewParam() === 'code';
 
     area.innerHTML = wantCode ? codeHTML : previewHTML;
-    if (!wantCode) bindAnchorLinks(area);
+    if (!wantCode && data.isMarkdown) bindAnchorLinks(area);
 
     // Inject toggle
     var toggle = document.createElement('span');
@@ -489,7 +560,7 @@ async function loadFile(path, skipPush) {
 
     btnPreview.onclick = function() {
       area.innerHTML = previewHTML;
-      bindAnchorLinks(area);
+      if (data.isMarkdown) bindAnchorLinks(area);
       btnPreview.className = 'active';
       btnCode.className = '';
       setViewParam(null);
@@ -501,7 +572,7 @@ async function loadFile(path, skipPush) {
       setViewParam('code');
     };
   } else {
-    // Strip ?view param for non-markdown files
+    // Strip ?view param for non-toggle files
     if (getViewParam()) setViewParam(null);
     if (data.isCSV) {
       area.innerHTML = '<div class="csv-table">' + data.content + '</div>';
@@ -720,6 +791,14 @@ function wsUnwatch(path) {
 }
 
 /* ── Helpers ──────────────────────────────────────────────── */
+function formatFileSize(bytes) {
+  if (bytes === 0) return '0 B';
+  var units = ['B', 'KB', 'MB', 'GB'];
+  var i = Math.floor(Math.log(bytes) / Math.log(1024));
+  if (i >= units.length) i = units.length - 1;
+  var val = bytes / Math.pow(1024, i);
+  return (i === 0 ? val : val.toFixed(1)) + ' ' + units[i];
+}
 function esc(s) {
   var d = document.createElement('div');
   d.textContent = s;

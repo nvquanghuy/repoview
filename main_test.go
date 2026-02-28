@@ -573,6 +573,7 @@ func newTestServer(t *testing.T) *httptest.Server {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/tree", handleTree)
 	mux.HandleFunc("/api/file", handleFile)
+	mux.HandleFunc("/api/raw", handleRaw)
 	sub, _ := fs.Sub(staticFiles, "static")
 	indexHTML, _ := fs.ReadFile(sub, "index.html")
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -722,6 +723,144 @@ func TestHandleTree_SpecialNames(t *testing.T) {
 		if !found {
 			t.Errorf("expected %q in tree listing", name)
 		}
+	}
+}
+
+// ── Binary file tests ────────────────────────────────────────
+
+func TestHandleFile_BinaryImage(t *testing.T) {
+	setRoot(t, "testdata")
+
+	req := httptest.NewRequest("GET", "/api/file?path=pixel.png", nil)
+	w := httptest.NewRecorder()
+	handleFile(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+
+	var resp FileResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+
+	if !resp.IsBinary {
+		t.Error("expected isBinary to be true")
+	}
+	if resp.MimeType != "image/png" {
+		t.Errorf("expected mimeType image/png, got %s", resp.MimeType)
+	}
+	if resp.Content != "" {
+		t.Error("expected empty content for binary file")
+	}
+	if resp.Size == 0 {
+		t.Error("expected non-zero size for binary file")
+	}
+}
+
+func TestHandleFile_BinaryExecutable(t *testing.T) {
+	setRoot(t, "testdata")
+
+	req := httptest.NewRequest("GET", "/api/file?path=tiny.bin", nil)
+	w := httptest.NewRecorder()
+	handleFile(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+
+	var resp FileResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+
+	if !resp.IsBinary {
+		t.Error("expected isBinary to be true")
+	}
+	if resp.Content != "" {
+		t.Error("expected empty content for binary file")
+	}
+}
+
+func TestHandleFile_SVG(t *testing.T) {
+	setRoot(t, "testdata")
+
+	req := httptest.NewRequest("GET", "/api/file?path=icon.svg", nil)
+	w := httptest.NewRecorder()
+	handleFile(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+
+	var resp FileResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+
+	if !resp.IsSVG {
+		t.Error("expected isSVG to be true")
+	}
+	if resp.IsBinary {
+		t.Error("expected isBinary to be false for SVG")
+	}
+	// Content should be syntax-highlighted code (same as default rendering)
+	if !strings.Contains(resp.Content, "<span") {
+		t.Error("expected syntax-highlighted <span> tokens in SVG content")
+	}
+	// RawContent should also be present (for code view toggle)
+	if resp.RawContent == "" {
+		t.Error("expected non-empty rawContent for SVG file")
+	}
+	if !strings.Contains(resp.Content, "circle") {
+		t.Error("expected SVG source content in response")
+	}
+	// RawSVG should contain the original SVG markup for inline rendering
+	if resp.RawSVG == "" {
+		t.Error("expected non-empty rawSVG for SVG file")
+	}
+	if !strings.Contains(resp.RawSVG, "<svg") {
+		t.Error("expected raw SVG markup in rawSVG field")
+	}
+}
+
+func TestHandleRaw_SVG(t *testing.T) {
+	setRoot(t, "testdata")
+
+	req := httptest.NewRequest("GET", "/api/raw?path=icon.svg", nil)
+	w := httptest.NewRecorder()
+	handleRaw(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+
+	ct := w.Header().Get("Content-Type")
+	if !strings.Contains(ct, "svg") && !strings.Contains(ct, "xml") {
+		t.Errorf("expected Content-Type containing svg or xml, got %s", ct)
+	}
+	if w.Body.Len() == 0 {
+		t.Error("expected non-empty body for raw SVG file")
+	}
+}
+
+func TestHandleRaw(t *testing.T) {
+	setRoot(t, "testdata")
+
+	req := httptest.NewRequest("GET", "/api/raw?path=pixel.png", nil)
+	w := httptest.NewRecorder()
+	handleRaw(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+
+	ct := w.Header().Get("Content-Type")
+	if !strings.Contains(ct, "image/png") {
+		t.Errorf("expected Content-Type containing image/png, got %s", ct)
+	}
+	if w.Body.Len() == 0 {
+		t.Error("expected non-empty body for raw file")
 	}
 }
 

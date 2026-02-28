@@ -248,6 +248,51 @@ test.describe("Markdown raw/preview toggle", () => {
   });
 });
 
+test.describe("Binary file handling", () => {
+  test("binary image shows inline img with correct src", async ({ page }) => {
+    await page.goto("/");
+    await page.locator(".tree-item .label", { hasText: "pixel.png" }).click();
+    const content = page.locator("#content-area");
+    await expect(content.locator(".binary-preview img")).toBeVisible();
+    const src = await content.locator(".binary-preview img").getAttribute("src");
+    expect(src).toContain("/api/raw?path=pixel.png");
+    await expect(content.locator(".binary-download")).toBeVisible();
+  });
+
+  test("SVG shows inline preview with toggle to code view", async ({ page }) => {
+    await page.goto("/");
+    await page.locator(".tree-item .label", { hasText: "icon.svg" }).click();
+    const content = page.locator("#content-area");
+    // Preview mode: shows inline SVG element
+    await expect(content.locator(".svg-preview svg")).toBeVisible();
+    // Toggle should be visible
+    await expect(page.locator(".view-toggle")).toBeVisible();
+    await expect(page.locator(".view-toggle button", { hasText: "Preview" })).toBeVisible();
+    await expect(page.locator(".view-toggle button", { hasText: "Code" })).toBeVisible();
+
+    // Switch to code view
+    await page.locator(".view-toggle button", { hasText: "Code" }).click();
+    await expect(content.locator(".source-code")).toBeVisible();
+    await expect(content.locator(".svg-preview")).not.toBeVisible();
+
+    // Switch back to preview
+    await page.locator(".view-toggle button", { hasText: "Preview" }).click();
+    await expect(content.locator(".svg-preview svg")).toBeVisible();
+    await expect(content.locator(".source-code")).not.toBeVisible();
+  });
+
+  test("non-image binary shows 'Binary file not displayed' with download link", async ({ page }) => {
+    await page.goto("/");
+    await page.locator(".tree-item .label", { hasText: "tiny.bin" }).click();
+    const content = page.locator("#content-area");
+    await expect(content.locator(".binary-info")).toBeVisible();
+    await expect(content.locator("text=Binary file not displayed")).toBeVisible();
+    await expect(content.locator(".binary-download")).toBeVisible();
+    const href = await content.locator(".binary-download").getAttribute("href");
+    expect(href).toContain("/api/raw?path=tiny.bin");
+  });
+});
+
 test.describe("URL routing", () => {
   test("direct navigation to a file URL loads the file", async ({ page }) => {
     await page.goto("/hello.md");

@@ -34,7 +34,7 @@ import (
 //go:embed static/index.html
 var staticFiles embed.FS
 
-const version = "19"
+const version = "21"
 
 var rootDir string
 
@@ -88,6 +88,7 @@ func main() {
 	http.HandleFunc("/api/tree", handleTree)
 	http.HandleFunc("/api/file", handleFile)
 	http.HandleFunc("/api/files", handleFiles)
+	http.HandleFunc("/api/raw", handleRaw)
 	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
 		handleWS(w, r, hub, watcher)
 	})
@@ -178,6 +179,11 @@ type FileResponse struct {
 	Path       string `json:"path"`
 	IsMarkdown bool   `json:"isMarkdown"`
 	IsCSV      bool   `json:"isCSV"`
+	IsSVG      bool   `json:"isSVG,omitempty"`
+	RawSVG     string `json:"rawSVG,omitempty"`
+	IsBinary   bool   `json:"isBinary,omitempty"`
+	MimeType   string `json:"mimeType,omitempty"`
+	Size       int64  `json:"size,omitempty"`
 }
 
 // handleFile returns rendered file content as JSON.
@@ -206,9 +212,24 @@ func handleFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Detect binary files and return metadata instead of content.
+	if isBinaryContent(data) {
+		resp := FileResponse{
+			Name:     filepath.Base(filePath),
+			Path:     reqPath,
+			IsBinary: true,
+			MimeType: http.DetectContentType(data),
+			Size:     info.Size(),
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(resp)
+		return
+	}
+
 	ext := strings.ToLower(filepath.Ext(filePath))
 	isMarkdown := ext == ".md" || ext == ".markdown"
 	isCSV := ext == ".csv"
+	isSVG := ext == ".svg"
 
 	var buf bytes.Buffer
 	switch {
@@ -227,12 +248,17 @@ func handleFile(w http.ResponseWriter, r *http.Request) {
 		Path:       reqPath,
 		IsMarkdown: isMarkdown,
 		IsCSV:      isCSV,
+		IsSVG:      isSVG,
 	}
 
-	if isMarkdown {
+	if isMarkdown || isSVG {
 		var rawBuf bytes.Buffer
 		renderCode(&rawBuf, data, filepath.Base(filePath))
 		resp.RawContent = rawBuf.String()
+	}
+
+	if isSVG {
+		resp.RawSVG = string(data)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -379,6 +405,50 @@ func prettyPrint(data []byte, ext string) []byte {
 		}
 	}
 	return data
+}
+
+// isBinaryContent returns true if the data appears to be binary (non-text).
+func isBinaryContent(data []byte) bool {
+	if len(data) == 0 {
+		return false
+	}
+	sample := data
+	if len(sample) > 512 {
+		sample = sample[:512]
+	}
+	mime := http.DetectContentType(sample)
+	if strings.HasPrefix(mime, "text/") {
+		return false
+	}
+	for _, t := range []string{"application/json", "application/xml", "application/javascript"} {
+		if strings.HasPrefix(mime, t) {
+			return false
+		}
+	}
+	return true
+}
+
+// handleRaw serves raw file bytes with proper Content-Type for inline display.
+func handleRaw(w http.ResponseWriter, r *http.Request) {
+	reqPath := r.URL.Query().Get("path")
+	if reqPath == "" {
+		http.Error(w, "path required", http.StatusBadRequest)
+		return
+	}
+
+	filePath, err := safePath(reqPath)
+	if err != nil {
+		http.Error(w, "invalid path", http.StatusBadRequest)
+		return
+	}
+
+	info, err := os.Stat(filePath)
+	if err != nil || info.IsDir() {
+		http.Error(w, "file not found", http.StatusNotFound)
+		return
+	}
+
+	http.ServeFile(w, r, filePath)
 }
 
 // handleFiles returns a flat list of all file paths for fuzzy search.

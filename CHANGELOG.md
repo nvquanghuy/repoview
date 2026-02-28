@@ -1,5 +1,15 @@
 # Changelog
 
+## [v21] - 2026-02-28
+
+- [added] SVG files now have a Preview/Code toggle like markdown: preview renders the image inline, code view shows syntax-highlighted SVG source
+
+## [v20] - 2026-02-28
+
+- [added] Binary file handling: images display inline with preview, non-image binaries show metadata panel with file size, MIME type, and download link
+- [added] `/api/raw` endpoint for serving raw file bytes (used for inline `<img>`, `<video>`, `<audio>` tags and downloads)
+- [added] Binary detection via `net/http.DetectContentType` — prevents browser hang when opening large binary files
+
 ## [v19] - 2026-02-28
 
 - [changed] Moved "Go to file" button from breadcrumb bar to sidebar, above the file tree, where it's closer to the files it searches
