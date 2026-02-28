@@ -1,5 +1,9 @@
 # Changelog
 
+## [v16] - 2026-02-28
+
+- [fixed] Fuzzy search now treats spaces as term separators (like GitHub/VSCode): typing "nes agg" matches "nested_aggregation.go" by matching each term independently
+
 ## [v15] - 2026-02-28
 
 - [added] `--host` flag to control bind address (default `127.0.0.1` instead of `0.0.0.0` for safer localhost-only access)

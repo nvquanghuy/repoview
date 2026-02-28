@@ -543,27 +543,41 @@ function renderSearchResults(items, isHighlighted) {
 }
 
 /* ── Minimal fuzzysort implementation ─────────────────────── */
+function fuzzyMatchTerm(term, tl, target, startFrom) {
+  var qi = 0, score = 0, consecutive = 0, lastIdx = -1;
+  var indices = [];
+  for (var ti = startFrom; ti < tl.length && qi < term.length; ti++) {
+    if (tl[ti] === term[qi]) {
+      indices.push(ti);
+      consecutive = (ti === lastIdx + 1) ? consecutive + 1 : 1;
+      score += consecutive + (ti === 0 ? 2 : 0);
+      if (ti > 0 && (target[ti-1] === '/' || target[ti-1] === '.' || target[ti-1] === '-' || target[ti-1] === '_')) score += 2;
+      lastIdx = ti;
+      qi++;
+    }
+  }
+  if (qi < term.length) return null;
+  return { score: score, indices: indices };
+}
+
 function fuzzysort(query, targets, limit) {
-  var ql = query.toLowerCase();
+  var terms = query.toLowerCase().split(/\s+/).filter(function(t) { return t.length > 0; });
+  if (terms.length === 0) return [];
   var scored = [];
   for (var t = 0; t < targets.length; t++) {
     var target = targets[t];
     var tl = target.toLowerCase();
-    var qi = 0, score = 0, consecutive = 0, lastIdx = -1;
-    var indices = [];
-    for (var ti = 0; ti < tl.length && qi < ql.length; ti++) {
-      if (tl[ti] === ql[qi]) {
-        indices.push(ti);
-        consecutive = (ti === lastIdx + 1) ? consecutive + 1 : 1;
-        score += consecutive + (ti === 0 ? 2 : 0);
-        if (ti > 0 && (target[ti-1] === '/' || target[ti-1] === '.' || target[ti-1] === '-' || target[ti-1] === '_')) score += 2;
-        lastIdx = ti;
-        qi++;
-      }
+    var totalScore = 0, allIndices = [], matched = true;
+    for (var ti = 0; ti < terms.length; ti++) {
+      var m = fuzzyMatchTerm(terms[ti], tl, target, 0);
+      if (!m) { matched = false; break; }
+      totalScore += m.score;
+      for (var k = 0; k < m.indices.length; k++) allIndices.push(m.indices[k]);
     }
-    if (qi === ql.length) {
-      score -= target.length * 0.1;
-      scored.push({ target: target, score: score, indices: indices });
+    if (matched) {
+      totalScore -= target.length * 0.1;
+      allIndices.sort(function(a, b) { return a - b; });
+      scored.push({ target: target, score: totalScore, indices: allIndices });
     }
   }
   scored.sort(function(a, b) { return b.score - a.score; });
@@ -571,8 +585,12 @@ function fuzzysort(query, targets, limit) {
   return results.map(function(r) {
     var highlighted = '';
     var last = 0;
+    var seen = {};
     for (var j = 0; j < r.indices.length; j++) {
       var idx = r.indices[j];
+      if (seen[idx]) continue;
+      seen[idx] = true;
+      if (idx < last) continue;
       highlighted += esc(r.target.substring(last, idx)) + '<mark>' + esc(r.target[idx]) + '</mark>';
       last = idx + 1;
     }

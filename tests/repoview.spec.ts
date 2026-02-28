@@ -116,6 +116,17 @@ test.describe("Fuzzy search", () => {
     await expect(page.locator("#search-overlay")).not.toHaveClass(/open/);
     await expect(page.locator("#content-area .markdown-body")).toBeVisible();
   });
+
+  test("spaces in query act as separate terms", async ({ page }) => {
+    await page.goto("/");
+    await expect(page.locator("#tree-container .tree-item")).not.toHaveCount(0);
+    await page.keyboard.press("t");
+    await expect(page.locator("#search-overlay")).toHaveClass(/open/);
+    // "sub nes" should match "subdir/nested.md" — each term matched independently
+    await page.locator("#search-input").fill("sub nes");
+    await expect(page.locator(".search-result").first()).toBeVisible();
+    await expect(page.locator(".search-result .sr-path", { hasText: "nested" })).toBeVisible();
+  });
 });
 
 test.describe("Anchor links", () => {
