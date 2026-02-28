@@ -52,9 +52,10 @@ a:hover { text-decoration: underline; }
 #breadcrumb-bar .crumb.current { color: #1f2328; font-weight: 600; cursor: default; }
 #breadcrumb-bar .crumb.current:hover { text-decoration: none; }
 #go-to-file-btn {
-  margin-left: auto; padding: 3px 12px; font-size: 12px;
-  border: 1px solid #d0d7de; border-radius: 6px; background: #f6f8fa;
-  color: #1f2328; cursor: pointer; display: flex; align-items: center; gap: 6px;
+  margin: 8px 12px 4px; padding: 5px 12px; font-size: 12px; width: calc(100% - 24px);
+  border: 1px solid #d0d7de; border-radius: 6px; background: #fff;
+  color: #656d76; cursor: pointer; display: flex; align-items: center; gap: 6px;
+  flex-shrink: 0;
 }
 #go-to-file-btn:hover { background: #eaeef2; }
 #go-to-file-btn kbd {
@@ -195,7 +196,7 @@ a:hover { text-decoration: underline; }
 
 /* ── View toggle (markdown raw/preview) ──────────────────── */
 .view-toggle {
-  display: inline-flex; margin-left: 12px; border: 1px solid #d0d7de;
+  display: inline-flex; margin-left: auto; border: 1px solid #d0d7de;
   border-radius: 6px; overflow: hidden; font-size: 12px; flex-shrink: 0;
 }
 .view-toggle button {
@@ -220,6 +221,9 @@ a:hover { text-decoration: underline; }
       <svg class="repo-icon" width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M2 2.5A2.5 2.5 0 0 1 4.5 0h8.75a.75.75 0 0 1 .75.75v12.5a.75.75 0 0 1-.75.75h-2.5a.75.75 0 0 1 0-1.5h1.75v-2h-8a1 1 0 0 0-.714 1.7.75.75 0 1 1-1.072 1.05A2.495 2.495 0 0 1 2 11.5Zm10.5-1h-8a1 1 0 0 0-1 1v6.708A2.486 2.486 0 0 1 4.5 9h8ZM5 12.25a.25.25 0 0 1 .25-.25h3.5a.25.25 0 0 1 .25.25v3.25a.25.25 0 0 1-.4.2l-1.45-1.087a.249.249 0 0 0-.3 0L5.4 15.7a.25.25 0 0 1-.4-.2Z"/></svg>
       <span id="repo-name">Files</span>
     </div>
+    <button id="go-to-file-btn" onclick="openSearch()">
+      Go to file <kbd>t</kbd>
+    </button>
     <div id="tree-container"></div>
     <div id="resize-handle"></div>
   </div>
@@ -227,9 +231,6 @@ a:hover { text-decoration: underline; }
     <div id="breadcrumb-bar">
       <span class="crumb root" onclick="navigateTo('')">root</span>
       <span id="breadcrumb-path"></span>
-      <button id="go-to-file-btn" onclick="openSearch()">
-        Go to file <kbd>t</kbd>
-      </button>
     </div>
     <div id="content-area">
       <div class="welcome">
@@ -484,7 +485,7 @@ async function loadFile(path, skipPush) {
     toggle.appendChild(btnCode);
 
     var bar = document.getElementById('breadcrumb-bar');
-    bar.insertBefore(toggle, document.getElementById('go-to-file-btn'));
+    bar.appendChild(toggle);
 
     btnPreview.onclick = function() {
       area.innerHTML = previewHTML;

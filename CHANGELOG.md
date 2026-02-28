@@ -1,5 +1,9 @@
 # Changelog
 
+## [v19] - 2026-02-28
+
+- [changed] Moved "Go to file" button from breadcrumb bar to sidebar, above the file tree, where it's closer to the files it searches
+
 ## [v18] - 2026-02-28
 
 - [added] Markdown raw/preview toggle: switch between rendered preview and syntax-highlighted source code, like GitHub's "Code" / "Preview" tabs
