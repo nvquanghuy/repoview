@@ -4,12 +4,8 @@
 
 - [added] README.md is rendered below directory listings (like GitHub) when present in a directory
 
-## [v0.1.0] - 2026-02-28
-
 ## 2026-02-28
 
-- [fixed] Sidebar only scrolls to center the active item when it's outside the visible area, preventing unwanted view shifts when clicking items already on screen
-- [fixed] Sidebar scroll-to-active now centers the item instead of placing it at the bottom edge
 - [fixed] Sidebar now scrolls to the active file when using "Go to file" search or navigating to deeply nested files
 - [added] SVG files now have a Preview/Code toggle like markdown: preview renders the image inline, code view shows syntax-highlighted SVG source
 - [added] Binary file handling: images display inline with preview, non-image binaries show metadata panel with file size, MIME type, and download link

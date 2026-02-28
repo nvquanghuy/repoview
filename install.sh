@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPO="holistics/repoview"
+REPO="nvquanghuy/repoview"
 INSTALL_DIR="$HOME/.local/bin"
 
 # Detect OS

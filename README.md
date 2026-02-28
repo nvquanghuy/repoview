@@ -20,7 +20,7 @@ A lightweight, single-binary local folder viewer that replicates the GitHub UI f
 ### One-liner (macOS / Linux)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/holistics/repoview/master/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/nvquanghuy/repoview/master/install.sh | bash
 ```
 
 Downloads the latest release binary for your OS/architecture to `~/.local/bin`.
@@ -28,7 +28,7 @@ Downloads the latest release binary for your OS/architecture to `~/.local/bin`.
 ### From source
 
 ```bash
-go install github.com/holistics/repoview@latest
+go install github.com/nvquanghuy/repoview@latest
 ```
 
 Or build locally:
