@@ -9,6 +9,25 @@ test.describe("Sidebar tree", () => {
     await expect(sidebar.locator(".tree-item .label", { hasText: "data.csv" })).toBeVisible();
     await expect(sidebar.locator(".tree-item .label", { hasText: "subdir" })).toBeVisible();
   });
+
+  test("clicking chevron collapses an expanded folder", async ({ page }) => {
+    await page.goto("/");
+    const sidebar = page.locator("#tree-container");
+    await expect(sidebar.locator(".tree-item")).not.toHaveCount(0);
+
+    // Click the subdir label to expand it
+    await sidebar.locator(".tree-item .label", { hasText: "subdir" }).click();
+    const subdirRow = sidebar.locator(".tree-item", { hasText: "subdir" }).first();
+    await expect(subdirRow.locator(".caret")).toHaveClass(/open/);
+    // nested.md should be visible inside expanded subdir
+    await expect(sidebar.locator(".tree-item .label", { hasText: "nested.md" })).toBeVisible();
+
+    // Click the chevron to collapse
+    await subdirRow.locator(".caret").click();
+    await expect(subdirRow.locator(".caret")).not.toHaveClass(/open/);
+    // nested.md should no longer be visible
+    await expect(sidebar.locator(".tree-item .label", { hasText: "nested.md" })).not.toBeVisible();
+  });
 });
 
 test.describe("File viewing", () => {

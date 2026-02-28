@@ -279,6 +279,7 @@ function renderTree(items, container, depth) {
       row.innerHTML = '<span class="caret ' + (isOpen ? 'open' : '') + '">' + SVG.caret + '</span>' +
         '<span class="icon">' + (isOpen ? SVG.folderOpen : SVG.folderClosed) + '</span>' +
         '<span class="label">' + esc(item.name) + '</span>';
+      row.querySelector('.caret').onclick = (function(p) { return function(e) { e.stopPropagation(); toggleDir(p); }; })(item.path);
       row.onclick = (function(p) { return function(e) { e.stopPropagation(); navigateTo(p); }; })(item.path);
     } else {
       row.innerHTML = '<span class="caret hidden">' + SVG.caret + '</span>' +

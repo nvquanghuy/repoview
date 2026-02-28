@@ -1,5 +1,9 @@
 # Changelog
 
+## [v17] - 2026-02-28
+
+- [fixed] Clicking the chevron icon on an expanded folder now collapses it (chevron toggles open/closed, clicking the folder name still navigates)
+
 ## [v16] - 2026-02-28
 
 - [fixed] Fuzzy search now treats spaces as term separators (like GitHub/VSCode): typing "nes agg" matches "nested_aggregation.go" by matching each term independently
