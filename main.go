@@ -126,7 +126,8 @@ func safePath(reqPath string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if !strings.HasPrefix(abs, rootDir) {
+	// Ensure path is exactly rootDir or inside rootDir (not a sibling with similar prefix)
+	if abs != rootDir && !strings.HasPrefix(abs, rootDir+string(os.PathSeparator)) {
 		return "", fmt.Errorf("path outside root")
 	}
 	return abs, nil

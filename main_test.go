@@ -510,6 +510,27 @@ func TestSafePath_Traversal(t *testing.T) {
 	}
 }
 
+func TestSafePath_SiblingPrefix(t *testing.T) {
+	// Ensure a sibling directory with a similar prefix cannot be accessed.
+	// If rootDir is "/tmp/repo", a path resolving to "/tmp/repo2" should be rejected.
+	tmpDir := t.TempDir()
+	target := filepath.Join(tmpDir, "repo")
+	sibling := filepath.Join(tmpDir, "repo2")
+	os.MkdirAll(target, 0755)
+	os.MkdirAll(sibling, 0755)
+	os.WriteFile(filepath.Join(sibling, "secret.txt"), []byte("secret"), 0644)
+
+	oldRoot := rootDir
+	rootDir = target
+	t.Cleanup(func() { rootDir = oldRoot })
+
+	// Attempt to access sibling via prefix confusion
+	_, err := safePath("../repo2/secret.txt")
+	if err == nil {
+		t.Error("expected error when accessing sibling directory with similar prefix, got nil")
+	}
+}
+
 func TestSafePath_Valid(t *testing.T) {
 	setRoot(t, "testdata")
 
