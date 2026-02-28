@@ -1,5 +1,10 @@
 # Changelog
 
+## [v14] - 2026-02-28
+
+- [added] GitHub Actions release workflow: cross-compiles for macOS and Linux (amd64/arm64) on `v*` tags and uploads tarballs to GitHub Releases
+- [added] One-liner install script (`install.sh`) for teammates: detects OS/arch, downloads the right binary, installs to `~/.local/bin`
+
 ## [v13] - 2026-02-27
 
 - [changed] Show dotfiles and dotfolders (e.g. `.github`, `.gitignore`) in the sidebar file tree
