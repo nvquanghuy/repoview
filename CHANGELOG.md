@@ -1,5 +1,10 @@
 # Changelog
 
+## [v15] - 2026-02-28
+
+- [added] `--host` flag to control bind address (default `127.0.0.1` instead of `0.0.0.0` for safer localhost-only access)
+- [fixed] Browser now opens `http://localhost:<port>` instead of `http://0.0.0.0:<port>` which isn't browsable on all OSes
+
 ## [v14] - 2026-02-28
 
 - [added] GitHub Actions release workflow: cross-compiles for macOS and Linux (amd64/arm64) on `v*` tags and uploads tarballs to GitHub Releases

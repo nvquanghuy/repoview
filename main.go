@@ -34,7 +34,7 @@ import (
 //go:embed static/index.html
 var staticFiles embed.FS
 
-const version = "14"
+const version = "15"
 
 var rootDir string
 
@@ -47,6 +47,7 @@ type TreeEntry struct {
 }
 
 func main() {
+	host := flag.String("host", "127.0.0.1", "host/IP to bind to")
 	port := flag.Int("port", 8080, "port to serve on")
 	noBrowser := flag.Bool("no-browser", false, "don't open browser on startup")
 	showVersion := flag.Bool("version", false, "print version and exit")
@@ -105,9 +106,9 @@ func main() {
 		w.Write(indexHTML)
 	})
 
-	addr := fmt.Sprintf("0.0.0.0:%d", *port)
-	url := fmt.Sprintf("http://%s", addr)
-	fmt.Printf("repoview v%s serving %s at %s\n", version, rootDir, url)
+	addr := fmt.Sprintf("%s:%d", *host, *port)
+	url := fmt.Sprintf("http://localhost:%d", *port)
+	fmt.Printf("repoview v%s serving %s at http://%s\n", version, rootDir, addr)
 
 	if !*noBrowser {
 		_ = browser.OpenURL(url)
