@@ -40,9 +40,13 @@ if ! grep -q '^\## \[Unreleased\]' CHANGELOG.md; then
   exit 1
 fi
 
-sed -i "s/^## \[Unreleased\]/## [${TAG}] - ${DATE}/" CHANGELOG.md
-sed -i "/^# Changelog/a\\
-\\n## [Unreleased]" CHANGELOG.md
+# Portable in-place edit (works on both macOS and Linux)
+TMP=$(mktemp)
+sed "s/^## \[Unreleased\]/## [${TAG}] - ${DATE}/" CHANGELOG.md > "$TMP" && mv "$TMP" CHANGELOG.md
+
+# Insert new [Unreleased] section after the Changelog header
+TMP=$(mktemp)
+awk '/^# Changelog/ { print; print ""; print "## [Unreleased]"; print ""; next } 1' CHANGELOG.md > "$TMP" && mv "$TMP" CHANGELOG.md
 
 # Commit and tag
 git add CHANGELOG.md
