@@ -353,6 +353,64 @@ func TestHandleFile_YAML(t *testing.T) {
 	}
 }
 
+func TestHandleFile_MarkdownRawContent(t *testing.T) {
+	setRoot(t, "testdata")
+
+	req := httptest.NewRequest("GET", "/api/file?path=hello.md", nil)
+	w := httptest.NewRecorder()
+	handleFile(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+
+	var resp FileResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+
+	if !resp.IsMarkdown {
+		t.Error("expected isMarkdown to be true")
+	}
+	if resp.RawContent == "" {
+		t.Error("expected non-empty rawContent for markdown file")
+	}
+	// rawContent should be syntax-highlighted (contains Chroma <span> tokens)
+	if !strings.Contains(resp.RawContent, "<span") {
+		t.Error("expected syntax-highlighted <span> tokens in rawContent")
+	}
+	// rawContent should contain the original markdown source text
+	if !strings.Contains(resp.RawContent, "Hello World") {
+		t.Error("expected raw markdown source in rawContent")
+	}
+}
+
+func TestHandleFile_NonMarkdownNoRawContent(t *testing.T) {
+	setRoot(t, "testdata")
+
+	cases := []string{"example.txt", "data.csv", "sample.go"}
+	for _, path := range cases {
+		t.Run(path, func(t *testing.T) {
+			req := httptest.NewRequest("GET", "/api/file?path="+url.QueryEscape(path), nil)
+			w := httptest.NewRecorder()
+			handleFile(w, req)
+
+			if w.Code != http.StatusOK {
+				t.Fatalf("expected 200, got %d", w.Code)
+			}
+
+			var resp FileResponse
+			if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+				t.Fatalf("invalid JSON: %v", err)
+			}
+
+			if resp.RawContent != "" {
+				t.Errorf("expected empty rawContent for %s, got non-empty", path)
+			}
+		})
+	}
+}
+
 func TestHandleFile_PlainText(t *testing.T) {
 	setRoot(t, "testdata")
 

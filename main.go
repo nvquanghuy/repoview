@@ -34,7 +34,7 @@ import (
 //go:embed static/index.html
 var staticFiles embed.FS
 
-const version = "17"
+const version = "18"
 
 var rootDir string
 
@@ -173,6 +173,7 @@ func handleTree(w http.ResponseWriter, r *http.Request) {
 // FileResponse is the JSON envelope returned by the /api/file endpoint.
 type FileResponse struct {
 	Content    string `json:"content"`
+	RawContent string `json:"rawContent,omitempty"`
 	Name       string `json:"name"`
 	Path       string `json:"path"`
 	IsMarkdown bool   `json:"isMarkdown"`
@@ -226,6 +227,12 @@ func handleFile(w http.ResponseWriter, r *http.Request) {
 		Path:       reqPath,
 		IsMarkdown: isMarkdown,
 		IsCSV:      isCSV,
+	}
+
+	if isMarkdown {
+		var rawBuf bytes.Buffer
+		renderCode(&rawBuf, data, filepath.Base(filePath))
+		resp.RawContent = rawBuf.String()
 	}
 
 	w.Header().Set("Content-Type", "application/json")

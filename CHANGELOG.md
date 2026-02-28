@@ -1,5 +1,10 @@
 # Changelog
 
+## [v18] - 2026-02-28
+
+- [added] Markdown raw/preview toggle: switch between rendered preview and syntax-highlighted source code, like GitHub's "Code" / "Preview" tabs
+- [added] View state persists in URL via `?view=code` query param (shareable and survives refresh)
+
 ## [v17] - 2026-02-28
 
 - [fixed] Clicking the chevron icon on an expanded folder now collapses it (chevron toggles open/closed, clicking the folder name still navigates)

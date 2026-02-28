@@ -186,6 +186,68 @@ test.describe("Page title", () => {
   });
 });
 
+test.describe("Markdown raw/preview toggle", () => {
+  test("toggle appears for markdown files, not for non-markdown", async ({ page }) => {
+    await page.goto("/");
+    await page.locator(".tree-item .label", { hasText: "hello.md" }).click();
+    await expect(page.locator(".view-toggle")).toBeVisible();
+    await expect(page.locator(".view-toggle button", { hasText: "Preview" })).toBeVisible();
+    await expect(page.locator(".view-toggle button", { hasText: "Code" })).toBeVisible();
+
+    // Navigate to a non-markdown file — toggle should disappear
+    await page.locator(".tree-item .label", { hasText: "sample.go" }).click();
+    await expect(page.locator(".source-code")).toBeVisible();
+    await expect(page.locator(".view-toggle")).not.toBeVisible();
+  });
+
+  test("clicking Code shows source, clicking Preview restores rendered markdown", async ({ page }) => {
+    await page.goto("/");
+    await page.locator(".tree-item .label", { hasText: "hello.md" }).click();
+    await expect(page.locator("#content-area .markdown-body")).toBeVisible();
+
+    // Switch to code view
+    await page.locator(".view-toggle button", { hasText: "Code" }).click();
+    await expect(page.locator("#content-area .source-code")).toBeVisible();
+    await expect(page.locator("#content-area .markdown-body")).not.toBeVisible();
+
+    // Switch back to preview
+    await page.locator(".view-toggle button", { hasText: "Preview" }).click();
+    await expect(page.locator("#content-area .markdown-body")).toBeVisible();
+    await expect(page.locator("#content-area .source-code")).not.toBeVisible();
+  });
+
+  test("toggle disappears when navigating to non-markdown file", async ({ page }) => {
+    await page.goto("/");
+    await page.locator(".tree-item .label", { hasText: "hello.md" }).click();
+    await expect(page.locator(".view-toggle")).toBeVisible();
+
+    await page.locator(".tree-item .label", { hasText: "data.csv" }).click();
+    await expect(page.locator(".csv-table")).toBeVisible();
+    await expect(page.locator(".view-toggle")).not.toBeVisible();
+  });
+
+  test("URL updates with ?view=code when switching to code view", async ({ page }) => {
+    await page.goto("/");
+    await page.locator(".tree-item .label", { hasText: "hello.md" }).click();
+    await expect(page.locator(".view-toggle")).toBeVisible();
+
+    await page.locator(".view-toggle button", { hasText: "Code" }).click();
+    expect(page.url()).toContain("?view=code");
+
+    // Switch back — param should be gone
+    await page.locator(".view-toggle button", { hasText: "Preview" }).click();
+    expect(page.url()).not.toContain("view=code");
+  });
+
+  test("direct navigation with ?view=code loads code view", async ({ page }) => {
+    await page.goto("/hello.md?view=code");
+    await expect(page.locator("#content-area .source-code")).toBeVisible();
+    await expect(page.locator("#content-area .markdown-body")).not.toBeVisible();
+    // Toggle should show Code as active
+    await expect(page.locator(".view-toggle button.active", { hasText: "Code" })).toBeVisible();
+  });
+});
+
 test.describe("URL routing", () => {
   test("direct navigation to a file URL loads the file", async ({ page }) => {
     await page.goto("/hello.md");

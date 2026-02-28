@@ -193,6 +193,19 @@ a:hover { text-decoration: underline; }
 .csv-table th, .csv-table td { padding: 6px 13px; border: 1px solid #d0d7de; font-size: 13px; }
 .csv-table th { background: #f6f8fa; font-weight: 600; position: sticky; top: 0; }
 
+/* ── View toggle (markdown raw/preview) ──────────────────── */
+.view-toggle {
+  display: inline-flex; margin-left: 12px; border: 1px solid #d0d7de;
+  border-radius: 6px; overflow: hidden; font-size: 12px; flex-shrink: 0;
+}
+.view-toggle button {
+  padding: 3px 12px; border: none; background: #f6f8fa;
+  color: #656d76; cursor: pointer; font-family: inherit; font-size: 12px;
+}
+.view-toggle button:not(:last-child) { border-right: 1px solid #d0d7de; }
+.view-toggle button:hover { background: #eaeef2; }
+.view-toggle button.active { background: #fff; color: #1f2328; font-weight: 600; }
+
 /* ── Scrollbar ────────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: transparent; }
@@ -349,6 +362,10 @@ function renderDirListing(items, dirPath) {
 async function navigateTo(path, skipPush) {
   currentPath = path;
   currentFilePath = '';
+  // Remove toggle and view param when navigating to a directory
+  var oldToggle = document.querySelector('.view-toggle');
+  if (oldToggle) oldToggle.remove();
+  if (getViewParam()) setViewParam(null);
   if (!skipPush) pushURL(path);
   updateBreadcrumb(path);
   var items = await fetchTree(path);
@@ -387,6 +404,36 @@ function bindDirListingClicks() {
 }
 
 /* ── File loading ─────────────────────────────────────────── */
+function bindAnchorLinks(container) {
+  container.querySelectorAll('a[href^="#"]').forEach(function(link) {
+    link.onclick = function(e) {
+      var id = link.getAttribute('href').slice(1);
+      var target = document.getElementById(id);
+      if (target) {
+        e.preventDefault();
+        target.scrollIntoView({ behavior: 'smooth' });
+      }
+    };
+  });
+}
+
+function getViewParam() {
+  var params = new URLSearchParams(location.search);
+  return params.get('view');
+}
+
+function setViewParam(view) {
+  var params = new URLSearchParams(location.search);
+  if (view) {
+    params.set('view', view);
+  } else {
+    params.delete('view');
+  }
+  var qs = params.toString();
+  var url = location.pathname + (qs ? '?' + qs : '');
+  history.replaceState(null, '', url);
+}
+
 async function loadFile(path, skipPush) {
   // Unwatch old file
   if (currentFilePath) wsUnwatch(currentFilePath);
@@ -395,6 +442,10 @@ async function loadFile(path, skipPush) {
   currentPath = path.includes('/') ? path.substring(0, path.lastIndexOf('/')) : '';
   if (!skipPush) pushURL(path);
   updateBreadcrumb(path);
+
+  // Remove any existing toggle
+  var oldToggle = document.querySelector('.view-toggle');
+  if (oldToggle) oldToggle.remove();
 
   // Expand parent dirs in sidebar
   var parts = path.split('/');
@@ -413,11 +464,49 @@ async function loadFile(path, skipPush) {
 
   var area = document.getElementById('content-area');
   if (data.isMarkdown) {
-    area.innerHTML = '<div class="markdown-body">' + data.content + '</div>';
-  } else if (data.isCSV) {
-    area.innerHTML = '<div class="csv-table">' + data.content + '</div>';
+    var previewHTML = '<div class="markdown-body">' + data.content + '</div>';
+    var codeHTML = '<div class="source-code">' + data.rawContent + '</div>';
+    var wantCode = getViewParam() === 'code';
+
+    area.innerHTML = wantCode ? codeHTML : previewHTML;
+    if (!wantCode) bindAnchorLinks(area);
+
+    // Inject toggle
+    var toggle = document.createElement('span');
+    toggle.className = 'view-toggle';
+    var btnPreview = document.createElement('button');
+    btnPreview.textContent = 'Preview';
+    btnPreview.className = wantCode ? '' : 'active';
+    var btnCode = document.createElement('button');
+    btnCode.textContent = 'Code';
+    btnCode.className = wantCode ? 'active' : '';
+    toggle.appendChild(btnPreview);
+    toggle.appendChild(btnCode);
+
+    var bar = document.getElementById('breadcrumb-bar');
+    bar.insertBefore(toggle, document.getElementById('go-to-file-btn'));
+
+    btnPreview.onclick = function() {
+      area.innerHTML = previewHTML;
+      bindAnchorLinks(area);
+      btnPreview.className = 'active';
+      btnCode.className = '';
+      setViewParam(null);
+    };
+    btnCode.onclick = function() {
+      area.innerHTML = codeHTML;
+      btnCode.className = 'active';
+      btnPreview.className = '';
+      setViewParam('code');
+    };
   } else {
-    area.innerHTML = '<div class="source-code">' + data.content + '</div>';
+    // Strip ?view param for non-markdown files
+    if (getViewParam()) setViewParam(null);
+    if (data.isCSV) {
+      area.innerHTML = '<div class="csv-table">' + data.content + '</div>';
+    } else {
+      area.innerHTML = '<div class="source-code">' + data.content + '</div>';
+    }
   }
 
   // Update page title
@@ -426,18 +515,6 @@ async function loadFile(path, skipPush) {
 
   wsWatch(path);
   refreshTree();
-
-  // Handle hash anchor scrolling within the content area.
-  area.querySelectorAll('a[href^="#"]').forEach(function(link) {
-    link.onclick = function(e) {
-      var id = link.getAttribute('href').slice(1);
-      var target = document.getElementById(id);
-      if (target) {
-        e.preventDefault();
-        target.scrollIntoView({ behavior: 'smooth' });
-      }
-    };
-  });
 }
 
 /* ── Breadcrumb ───────────────────────────────────────────── */
