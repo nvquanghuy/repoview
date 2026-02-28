@@ -40,6 +40,14 @@ go build -o repoview .
 ## Usage
 
 ```bash
+cd ~/projects/myrepo && repoview
+```
+
+This starts a local server at http://localhost:8080 and opens your browser to browse the repo with a GitHub-style UI.
+
+### Options
+
+```bash
 repoview                    # serve current directory on http://localhost:8080
 repoview /path/to/dir       # serve a specific directory
 repoview --port 3000        # use a custom port
@@ -69,12 +77,26 @@ repoview --version          # print version and exit
 ## Development
 
 ```bash
+# Run locally
+go run . /path/to/dir
+
 # Run tests
 go test -v ./...
 
 # Build
 go build -o repoview .
 ```
+
+### Releasing
+
+```bash
+./release.sh          # bump patch: v0.1.0 → v0.1.1
+./release.sh minor    # bump minor: v0.1.0 → v0.2.0
+./release.sh major    # bump major: v0.1.0 → v1.0.0
+./release.sh 2.0.0    # explicit version
+```
+
+This updates `CHANGELOG.md`, commits, tags, and pushes. GitHub Actions builds the release binaries.
 
 ### Project Structure
 
