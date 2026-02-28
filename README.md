@@ -12,20 +12,47 @@ A lightweight, single-binary local folder viewer that replicates the GitHub UI f
 - **Single binary** — all HTML/CSS/JS embedded via `go:embed`, no external dependencies at runtime
 - **Lazy-loading tree** — sidebar fetches directory contents on demand for fast startup on large repos
 
-## Quick Start
+## Install
+
+### One-liner (macOS / Linux)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/holistics/repoview/master/install.sh | bash
+```
+
+Downloads the latest release binary for your OS/architecture to `~/.local/bin`.
+
+### From source
+
+```bash
+go install github.com/holistics/repoview@latest
+```
+
+Or build locally:
 
 ```bash
 go build -o repoview .
-./repoview              # serves current directory at http://localhost:8080
-./repoview /path/to/dir # serve a specific directory
 ```
 
-### Options
+## Usage
 
-| Flag | Description |
-|------|-------------|
-| `-port` | Port to serve on (default: `8080`) |
-| `-no-browser` | Don't auto-open the browser on startup |
+```bash
+repoview                    # serve current directory on http://localhost:8080
+repoview /path/to/dir       # serve a specific directory
+repoview --port 3000        # use a custom port
+repoview --host 0.0.0.0     # expose to the network (default: 127.0.0.1)
+repoview --no-browser       # don't auto-open the browser
+repoview --version          # print version and exit
+```
+
+### Flags
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--host` | `127.0.0.1` | Host/IP to bind to |
+| `--port` | `8080` | Port to serve on |
+| `--no-browser` | `false` | Don't auto-open the browser on startup |
+| `--version` | | Print version and exit |
 
 ## API
 
