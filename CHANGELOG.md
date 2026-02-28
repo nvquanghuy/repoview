@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v0.1.0] - 2026-02-28
+
 ## 2026-02-28
 
 - [fixed] Sidebar only scrolls to center the active item when it's outside the visible area, preventing unwanted view shifts when clicking items already on screen
