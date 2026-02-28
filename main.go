@@ -34,7 +34,7 @@ import (
 //go:embed static/index.html
 var staticFiles embed.FS
 
-const version = "24"
+var version = "dev"
 
 var rootDir string
 

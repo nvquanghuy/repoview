@@ -3,8 +3,7 @@
 ## Workflow
 - **Always write tests** for new features and changes. Don't skip tests unless explicitly told to.
 - Run tests before considering work complete.
-- **Update CHANGELOG.md** when adding new features or making user-facing changes. Add an entry under the appropriate version/section describing the change.
-- **Bump version** on every commit: increment the `const version` serial number in `main.go` (e.g. `"1"` → `"2"`). This is a simple sequential integer, not semver.
+- **Update CHANGELOG.md** when adding new features or making user-facing changes. Add entries under the `[Unreleased]` section.
 
 ## Build & Test
 - Build: `go build -o repoview .`
