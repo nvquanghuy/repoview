@@ -358,7 +358,13 @@ async function refreshTree() {
   container.innerHTML = '';
   renderTree(root, container, 0);
   var active = container.querySelector('.tree-item.active');
-  if (active) active.scrollIntoView({ block: 'center' });
+  if (active) {
+    var cr = container.getBoundingClientRect();
+    var ar = active.getBoundingClientRect();
+    if (ar.top < cr.top || ar.bottom > cr.bottom) {
+      active.scrollIntoView({ block: 'center' });
+    }
+  }
 }
 
 /* ── Dir listing in main area ─────────────────────────────── */

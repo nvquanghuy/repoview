@@ -1,5 +1,9 @@
 # Changelog
 
+## [v24] - 2026-02-28
+
+- [fixed] Sidebar only scrolls to center the active item when it's outside the visible area, preventing unwanted view shifts when clicking items already on screen
+
 ## [v23] - 2026-02-28
 
 - [fixed] Sidebar scroll-to-active now centers the item instead of placing it at the bottom edge
