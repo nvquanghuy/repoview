@@ -357,6 +357,8 @@ async function refreshTree() {
   var container = document.getElementById('tree-container');
   container.innerHTML = '';
   renderTree(root, container, 0);
+  var active = container.querySelector('.tree-item.active');
+  if (active) active.scrollIntoView({ block: 'nearest' });
 }
 
 /* ── Dir listing in main area ─────────────────────────────── */

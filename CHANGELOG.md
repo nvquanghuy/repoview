@@ -1,5 +1,9 @@
 # Changelog
 
+## [v22] - 2026-02-28
+
+- [fixed] Sidebar now scrolls to the active file when using "Go to file" search or navigating to deeply nested files
+
 ## [v21] - 2026-02-28
 
 - [added] SVG files now have a Preview/Code toggle like markdown: preview renders the image inline, code view shows syntax-highlighted SVG source
