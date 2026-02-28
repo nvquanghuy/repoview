@@ -224,6 +224,16 @@ a:hover { text-decoration: underline; }
 .binary-info .binary-download:hover { background: #f3f4f6; text-decoration: none; }
 .binary-preview { text-align: center; margin-bottom: 16px; }
 .binary-preview img { max-width: 100%; max-height: 70vh; border: 1px solid #d0d7de; border-radius: 6px; }
+
+/* ── README container (below dir listing) ────────────────── */
+.readme-container {
+  margin-top: 16px; border: 1px solid #d0d7de; border-radius: 6px; overflow: hidden;
+}
+.readme-header {
+  padding: 8px 16px; background: #f6f8fa; border-bottom: 1px solid #d0d7de;
+  font-size: 14px; font-weight: 600;
+}
+.readme-body { padding: 24px 32px; }
 .binary-preview video, .binary-preview audio { max-width: 100%; }
 .svg-preview {
   text-align: center; padding: 24px;
@@ -421,6 +431,24 @@ async function navigateTo(path, skipPush) {
 
   document.getElementById('content-area').innerHTML = renderDirListing(items, path);
   bindDirListingClicks();
+
+  // Check for README.md in this directory and render it below the listing
+  var readme = items.find(function(item) {
+    return !item.isDir && item.name.toLowerCase() === 'readme.md';
+  });
+  if (readme) {
+    fetch('/api/file?path=' + encodeURIComponent(readme.path))
+      .then(function(res) { return res.json(); })
+      .then(function(data) {
+        if (data.content) {
+          var container = document.createElement('div');
+          container.className = 'readme-container';
+          container.innerHTML = '<div class="readme-header">' + esc(readme.name) + '</div>' +
+            '<div class="readme-body markdown-body">' + data.content + '</div>';
+          document.getElementById('content-area').appendChild(container);
+        }
+      });
+  }
 }
 
 function bindDirListingClicks() {
@@ -878,15 +906,8 @@ function navigateFromURL(skipPush) {
 window.addEventListener('popstate', function() {
   if (!navigateFromURL(true)) {
     // Back to root
-    currentPath = '';
-    currentFilePath = '';
-    document.title = 'RepoView';
-    updateBreadcrumb('');
-    fetchTree('').then(function(root) {
-      document.getElementById('content-area').innerHTML = renderDirListing(root);
-      bindDirListingClicks();
-      refreshTree();
-    });
+    navigateTo('', true);
+    refreshTree();
   }
 });
 
@@ -895,9 +916,7 @@ window.addEventListener('popstate', function() {
   await refreshTree();
   connectWS();
   if (!navigateFromURL(true)) {
-    var root = await fetchTree('');
-    document.getElementById('content-area').innerHTML = renderDirListing(root);
-    bindDirListingClicks();
+    await navigateTo('', true);
   }
 })();
 </script>

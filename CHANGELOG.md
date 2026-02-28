@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- [added] README.md is rendered below directory listings (like GitHub) when present in a directory
+
 ## [v0.1.0] - 2026-02-28
 
 ## 2026-02-28

@@ -153,7 +153,8 @@ test.describe("Anchor links", () => {
     await page.goto("/");
     await page.locator(".tree-item .label", { hasText: "hello.md" }).click();
     const content = page.locator("#content-area .markdown-body");
-    await expect(content.locator("h1")).toBeVisible();
+    // Wait for hello.md's specific h1 content, not just any h1
+    await expect(content.locator("h1", { hasText: "Hello World" })).toBeVisible();
     const h2s = content.locator("h2");
     const count = await h2s.count();
     expect(count).toBeGreaterThan(0);
@@ -290,6 +291,51 @@ test.describe("Binary file handling", () => {
     await expect(content.locator(".binary-download")).toBeVisible();
     const href = await content.locator(".binary-download").getAttribute("href");
     expect(href).toContain("/api/raw?path=tiny.bin");
+  });
+});
+
+test.describe("README below directory listing", () => {
+  test("renders README.md below the file listing in a directory", async ({ page }) => {
+    await page.goto("/");
+    await page.locator(".tree-item .label", { hasText: "subdir" }).click();
+    const content = page.locator("#content-area");
+    await expect(content.locator(".dir-listing")).toBeVisible();
+    await expect(content.locator(".readme-container")).toBeVisible();
+    await expect(content.locator(".readme-header")).toHaveText("README.md");
+    await expect(content.locator(".readme-body h1", { hasText: "Subdir README" })).toBeVisible();
+  });
+
+  test("renders README.md on initial page load at root", async ({ page }) => {
+    await page.goto("/");
+    const content = page.locator("#content-area");
+    await expect(content.locator(".dir-listing")).toBeVisible();
+    await expect(content.locator(".readme-container")).toBeVisible();
+    await expect(content.locator(".readme-header")).toHaveText("README.md");
+    await expect(content.locator(".readme-body h1", { hasText: "Root README" })).toBeVisible();
+  });
+
+  test("renders README.md after browser back navigation", async ({ page }) => {
+    // Navigate directly to subdir via URL
+    await page.goto("/subdir");
+    await expect(page.locator("#content-area .readme-body h1", { hasText: "Subdir README" })).toBeVisible();
+    // Navigate to a file within the directory listing
+    await page.locator(".dir-listing-row .name", { hasText: "nested.md" }).click();
+    await expect(page.locator("#content-area .markdown-body h1", { hasText: "Nested" })).toBeVisible();
+    // Go back to subdir using browser back
+    await page.goBack();
+    const content = page.locator("#content-area");
+    await expect(content.locator(".dir-listing")).toBeVisible();
+    await expect(content.locator(".readme-container")).toBeVisible();
+    await expect(content.locator(".readme-body h1", { hasText: "Subdir README" })).toBeVisible();
+  });
+
+  test("renders README.md on direct URL navigation to directory", async ({ page }) => {
+    await page.goto("/subdir");
+    const content = page.locator("#content-area");
+    await expect(content.locator(".dir-listing")).toBeVisible();
+    await expect(content.locator(".readme-container")).toBeVisible();
+    await expect(content.locator(".readme-header")).toHaveText("README.md");
+    await expect(content.locator(".readme-body h1", { hasText: "Subdir README" })).toBeVisible();
   });
 });
 
