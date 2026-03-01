@@ -428,3 +428,61 @@ test.describe("URL routing", () => {
     await expect(content.locator("h1", { hasText: "Hello World" })).toBeVisible();
   });
 });
+
+test.describe("Connection error handling", () => {
+  test("connection banner is hidden by default", async ({ page }) => {
+    await page.goto("/");
+    await expect(page.locator("#connection-banner")).not.toHaveClass(/show/);
+  });
+
+  test("connection banner exists with retry button", async ({ page }) => {
+    await page.goto("/");
+    // Banner element exists but is hidden
+    await expect(page.locator("#connection-banner")).toBeAttached();
+    await expect(page.locator("#connection-banner .retry-btn")).toBeAttached();
+    await expect(page.locator("#connection-banner .banner-message")).toBeAttached();
+  });
+
+  test("failed file fetch shows connection error banner", async ({ page }) => {
+    await page.goto("/");
+    // Wait for initial load
+    await expect(page.locator("#tree-container .tree-item")).not.toHaveCount(0);
+
+    // Mock fetch to fail
+    await page.evaluate(() => {
+      (window as any).originalFetch = window.fetch;
+      window.fetch = () => Promise.reject(new Error("Network error"));
+    });
+
+    // Try to load a file - should show error
+    await page.locator(".tree-item .label", { hasText: "hello.md" }).click();
+    await expect(page.locator("#connection-banner")).toHaveClass(/show/);
+    await expect(page.locator("#content-area")).toContainText("Unable to load file");
+
+    // Restore fetch
+    await page.evaluate(() => {
+      window.fetch = (window as any).originalFetch;
+    });
+  });
+
+  test("failed tree fetch shows connection error banner", async ({ page }) => {
+    await page.goto("/");
+    // Wait for initial load
+    await expect(page.locator("#tree-container .tree-item")).not.toHaveCount(0);
+
+    // Mock fetch to fail
+    await page.evaluate(() => {
+      (window as any).originalFetch = window.fetch;
+      window.fetch = () => Promise.reject(new Error("Network error"));
+    });
+
+    // Click a folder to trigger tree fetch - should show error
+    await page.locator(".tree-item .label", { hasText: "subdir" }).click();
+    await expect(page.locator("#connection-banner")).toHaveClass(/show/);
+
+    // Restore fetch
+    await page.evaluate(() => {
+      window.fetch = (window as any).originalFetch;
+    });
+  });
+});

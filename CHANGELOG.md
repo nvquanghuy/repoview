@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 - [added] Automatically find another port if default port is not available.
+- [added] Add connection error banner when API fails
 
 ## [v0.1.0] - 2026-03-01
 

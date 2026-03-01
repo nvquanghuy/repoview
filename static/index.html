@@ -101,6 +101,26 @@ a:hover { text-decoration: underline; }
 .tree-children { padding-left: 12px; }
 .tree-children.collapsed { display: none; }
 
+/* ── Connection Banner ────────────────────────────────────── */
+#connection-banner {
+  display: none; position: fixed; top: 0; left: 0; right: 0; z-index: 200;
+  padding: 10px 16px; background: #ffebe9; border-bottom: 1px solid #ffcecb;
+  color: #cf222e; font-size: 14px; text-align: center;
+  animation: slideDown 0.2s ease-out;
+}
+#connection-banner.show { display: block; }
+#connection-banner .banner-icon { margin-right: 8px; }
+#connection-banner .retry-btn {
+  margin-left: 12px; padding: 4px 12px; font-size: 12px;
+  background: #cf222e; color: #fff; border: none; border-radius: 4px;
+  cursor: pointer;
+}
+#connection-banner .retry-btn:hover { background: #a40e26; }
+@keyframes slideDown {
+  from { transform: translateY(-100%); }
+  to { transform: translateY(0); }
+}
+
 /* ── Fuzzy Search Modal ───────────────────────────────────── */
 #search-overlay {
   display: none; position: fixed; inset: 0; z-index: 100;
@@ -284,6 +304,11 @@ a:hover { text-decoration: underline; }
 </style>
 </head>
 <body>
+<div id="connection-banner">
+  <span class="banner-icon">⚠</span>
+  <span class="banner-message">Connection lost. The server may have stopped.</span>
+  <button class="retry-btn" onclick="retryConnection()">Retry</button>
+</div>
 <div id="app">
   <div id="sidebar">
     <div id="sidebar-header">
@@ -340,14 +365,50 @@ let allFiles = null;
 let searchIdx = 0;
 let ws = null;
 let watchedPaths = new Set();
+let connectionLost = false;
+
+/* ── Connection Status ───────────────────────────────────── */
+function showConnectionError(message) {
+  connectionLost = true;
+  var banner = document.getElementById('connection-banner');
+  banner.querySelector('.banner-message').textContent = message || 'Connection lost. The server may have stopped.';
+  banner.classList.add('show');
+}
+
+function hideConnectionError() {
+  connectionLost = false;
+  document.getElementById('connection-banner').classList.remove('show');
+}
+
+async function retryConnection() {
+  try {
+    var res = await fetch('/api/tree?path=.');
+    if (res.ok) {
+      hideConnectionError();
+      treeCache = {};
+      allFiles = null;
+      await refreshTree();
+      connectWS();
+    }
+  } catch(e) {
+    // Still disconnected
+  }
+}
 
 /* ── Tree ─────────────────────────────────────────────────── */
 async function fetchTree(path) {
   if (treeCache[path]) return treeCache[path];
-  const res = await fetch('/api/tree?path=' + encodeURIComponent(path));
-  const data = await res.json();
-  treeCache[path] = data;
-  return data;
+  try {
+    const res = await fetch('/api/tree?path=' + encodeURIComponent(path));
+    if (!res.ok) throw new Error('Server error');
+    const data = await res.json();
+    treeCache[path] = data;
+    hideConnectionError();
+    return data;
+  } catch(e) {
+    showConnectionError();
+    throw e;
+  }
 }
 
 function renderTree(items, container, depth) {
@@ -593,8 +654,18 @@ async function loadFile(path, skipPush) {
     }
   }
 
-  var res = await fetch('/api/file?path=' + encodeURIComponent(path));
-  var data = await res.json();
+  var res, data;
+  try {
+    res = await fetch('/api/file?path=' + encodeURIComponent(path));
+    if (!res.ok) throw new Error('Server error');
+    data = await res.json();
+    hideConnectionError();
+  } catch(e) {
+    showConnectionError();
+    document.getElementById('content-area').innerHTML =
+      '<div class="welcome"><h2>Unable to load file</h2><p>The server may have stopped. Click Retry above to reconnect.</p></div>';
+    return;
+  }
 
   var area = document.getElementById('content-area');
   if (data.isBinary) {
@@ -814,8 +885,16 @@ async function openSearch() {
   input.value = '';
   input.focus();
   if (!allFiles) {
-    var res = await fetch('/api/files');
-    allFiles = await res.json();
+    try {
+      var res = await fetch('/api/files');
+      if (!res.ok) throw new Error('Server error');
+      allFiles = await res.json();
+      hideConnectionError();
+    } catch(e) {
+      showConnectionError();
+      closeSearch();
+      return;
+    }
   }
   renderSearchResults(allFiles.slice(0, 50), false);
   searchIdx = 0;
@@ -944,10 +1023,13 @@ function fuzzysort(query, targets, limit) {
 }
 
 /* ── WebSocket ────────────────────────────────────────────── */
+var wsRetryCount = 0;
 function connectWS() {
   var proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
   ws = new WebSocket(proto + '//' + location.host + '/ws');
   ws.onopen = function() {
+    wsRetryCount = 0;
+    hideConnectionError();
     for (var p of watchedPaths) {
       ws.send(JSON.stringify({ action: 'watch', path: p }));
     }
@@ -966,7 +1048,13 @@ function connectWS() {
       }
     } catch(err) {}
   };
-  ws.onclose = function() { setTimeout(connectWS, 2000); };
+  ws.onclose = function() {
+    wsRetryCount++;
+    if (wsRetryCount >= 2) {
+      showConnectionError();
+    }
+    setTimeout(connectWS, 2000);
+  };
   ws.onerror = function() { ws.close(); };
 }
 
