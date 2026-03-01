@@ -1,6 +1,8 @@
 # Changelog
 
 ## [Unreleased]
+- [changed] Folder click behavior: clicking a non-selected folder navigates to it; clicking an already-selected folder toggles expand/collapse. Caret always toggles.
+- [added] Active folder highlighting in sidebar when viewing a directory
 - [added] Automatically find another port if default port is not available.
 - [added] Add connection error banner when API fails
 

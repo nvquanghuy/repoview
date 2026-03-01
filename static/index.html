@@ -418,32 +418,34 @@ function renderTree(items, container, depth) {
   });
   for (const item of items) {
     const row = document.createElement('div');
-    row.className = 'tree-item' + (item.path === currentFilePath ? ' active' : '');
+    // Highlight active file OR active directory (only when viewing directory, not a file inside it)
+    const isActive = item.isDir
+      ? (item.path === currentPath && !currentFilePath)
+      : (item.path === currentFilePath);
+    row.className = 'tree-item' + (isActive ? ' active' : '');
     row.style.paddingLeft = (8 + depth * 12) + 'px';
     row.dataset.path = item.path;
     row.dataset.isDir = item.isDir;
 
     const isOpen = expandedDirs.has(item.path);
     if (item.isDir) {
-      row.innerHTML = '<span class="caret ' + (isOpen ? 'open' : '') + '">' + SVG.caret + '</span>' +
-        '<span class="icon">' + (isOpen ? SVG.folderOpen : SVG.folderClosed) + '</span>' +
-        '<span class="label">' + esc(item.name) + '</span>';
-      row.onclick = (function(p) { return function(e) {
+      row.innerHTML = `<span class="caret ${isOpen ? 'open' : ''}">${SVG.caret}</span>` +
+        `<span class="icon">${isOpen ? SVG.folderOpen : SVG.folderClosed}</span>` +
+        `<span class="label">${esc(item.name)}</span>`;
+      row.onclick = (e) => {
         e.stopPropagation();
-        var target = e.target;
-        var isCaret = target.closest('.caret');
-        var isIcon = target.closest('.icon');
-        if (isCaret || isIcon) {
-          toggleDir(p);
+        // Caret click or already-selected folder: toggle expand/collapse
+        if (e.target.closest('.caret') || item.path === currentPath) {
+          toggleDir(item.path);
         } else {
-          navigateTo(p);
+          navigateTo(item.path);
         }
-      }; })(item.path);
+      };
     } else {
-      row.innerHTML = '<span class="caret hidden">' + SVG.caret + '</span>' +
-        '<span class="icon">' + SVG.file + '</span>' +
-        '<span class="label">' + esc(item.name) + '</span>';
-      row.onclick = (function(p) { return function(e) { e.stopPropagation(); loadFile(p); }; })(item.path);
+      row.innerHTML = `<span class="caret hidden">${SVG.caret}</span>` +
+        `<span class="icon">${SVG.file}</span>` +
+        `<span class="label">${esc(item.name)}</span>`;
+      row.onclick = (e) => { e.stopPropagation(); loadFile(item.path); };
     }
     container.appendChild(row);
 

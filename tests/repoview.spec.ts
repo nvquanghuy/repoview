@@ -47,6 +47,44 @@ test.describe("Sidebar tree", () => {
     await expect(subdirRow.locator(".caret")).not.toHaveClass(/open/);
     await expect(sidebar.locator(".tree-item .label", { hasText: "nested.md" })).not.toBeVisible();
   });
+
+  test("clicking selected folder toggles expand/collapse instead of navigating", async ({ page }) => {
+    await page.goto("/");
+    const sidebar = page.locator("#tree-container");
+    const subdirRow = sidebar.locator(".tree-item", { hasText: "subdir" }).first();
+
+    // Click folder label to navigate (folder becomes selected and expanded)
+    await subdirRow.locator(".label").click();
+    await expect(subdirRow).toHaveClass(/active/);
+    await expect(subdirRow.locator(".caret")).toHaveClass(/open/);
+    await expect(page.locator("#content-area .dir-listing")).toBeVisible();
+
+    // Click folder label again - should collapse (since already selected)
+    await subdirRow.locator(".label").click();
+    await expect(subdirRow.locator(".caret")).not.toHaveClass(/open/);
+
+    // Click folder label again - should expand
+    await subdirRow.locator(".label").click();
+    await expect(subdirRow.locator(".caret")).toHaveClass(/open/);
+  });
+
+  test("active folder is highlighted in sidebar", async ({ page }) => {
+    await page.goto("/");
+    const sidebar = page.locator("#tree-container");
+    const subdirRow = sidebar.locator(".tree-item", { hasText: "subdir" }).first();
+
+    // Initially no folder is active
+    await expect(subdirRow).not.toHaveClass(/active/);
+
+    // Navigate to folder
+    await subdirRow.locator(".label").click();
+    await expect(subdirRow).toHaveClass(/active/);
+
+    // Navigate to a file - folder should no longer be active
+    await sidebar.locator(".tree-item .label", { hasText: "nested.md" }).click();
+    await expect(subdirRow).not.toHaveClass(/active/);
+    await expect(sidebar.locator(".tree-item", { hasText: "nested.md" })).toHaveClass(/active/);
+  });
 });
 
 test.describe("File viewing", () => {
