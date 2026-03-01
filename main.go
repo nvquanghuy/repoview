@@ -11,6 +11,7 @@ import (
 	"io"
 	"io/fs"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -52,6 +53,14 @@ func main() {
 	noBrowser := flag.Bool("no-browser", false, "don't open browser on startup")
 	showVersion := flag.Bool("version", false, "print version and exit")
 	flag.Parse()
+
+	// Check if port was explicitly set by the user
+	portExplicitlySet := false
+	flag.Visit(func(f *flag.Flag) {
+		if f.Name == "port" {
+			portExplicitlySet = true
+		}
+	})
 
 	if *showVersion {
 		fmt.Println("repoview v" + version)
@@ -107,8 +116,14 @@ func main() {
 		w.Write(indexHTML)
 	})
 
-	addr := fmt.Sprintf("%s:%d", *host, *port)
-	url := fmt.Sprintf("http://localhost:%d", *port)
+	// Find an available port (auto-increment if default port is taken)
+	actualPort := *port
+	if !portExplicitlySet {
+		actualPort = findAvailablePort(*host, *port, 100)
+	}
+
+	addr := fmt.Sprintf("%s:%d", *host, actualPort)
+	url := fmt.Sprintf("http://localhost:%d", actualPort)
 	fmt.Printf("RepoView v%s · %s\n→ http://%s\n\nPress Ctrl+C to stop\n", version, rootDir, addr)
 
 	if !*noBrowser {
@@ -116,6 +131,21 @@ func main() {
 	}
 
 	log.Fatal(http.ListenAndServe(addr, nil))
+}
+
+// findAvailablePort tries to find an available port starting from startPort.
+// It tries up to maxAttempts ports, incrementing by 1 each time.
+// Returns the first available port, or startPort + maxAttempts - 1 if none found.
+func findAvailablePort(host string, startPort, maxAttempts int) int {
+	for i := 0; i < maxAttempts; i++ {
+		port := startPort + i
+		ln, err := net.Listen("tcp", fmt.Sprintf("%s:%d", host, port))
+		if err == nil {
+			ln.Close()
+			return port
+		}
+	}
+	return startPort + maxAttempts - 1
 }
 
 // safePath resolves a request path within rootDir and rejects traversal.

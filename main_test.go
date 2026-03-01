@@ -2,8 +2,10 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"io/fs"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -946,5 +948,54 @@ func TestSPARoute_EncodedPaths(t *testing.T) {
 		if string(body) != indexBody {
 			t.Errorf("GET %s: response body does not match index.html", p)
 		}
+	}
+}
+
+
+// ── Port finding tests ─────────────────────────────────────────
+
+func TestFindAvailablePort_FirstPortAvailable(t *testing.T) {
+	// When the starting port is available, it should return that port
+	port := findAvailablePort("127.0.0.1", 19000, 10)
+	if port != 19000 {
+		t.Errorf("expected port 19000, got %d", port)
+	}
+}
+
+func TestFindAvailablePort_SkipsOccupiedPorts(t *testing.T) {
+	// Occupy a port
+	ln, err := net.Listen("tcp", "127.0.0.1:19100")
+	if err != nil {
+		t.Fatalf("failed to occupy port: %v", err)
+	}
+	defer ln.Close()
+
+	// Should skip 19100 and return 19101
+	port := findAvailablePort("127.0.0.1", 19100, 10)
+	if port != 19101 {
+		t.Errorf("expected port 19101, got %d", port)
+	}
+}
+
+func TestFindAvailablePort_SkipsMultipleOccupiedPorts(t *testing.T) {
+	// Occupy multiple consecutive ports
+	var listeners []net.Listener
+	for i := 0; i < 3; i++ {
+		ln, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", 19200+i))
+		if err != nil {
+			t.Fatalf("failed to occupy port %d: %v", 19200+i, err)
+		}
+		listeners = append(listeners, ln)
+	}
+	defer func() {
+		for _, ln := range listeners {
+			ln.Close()
+		}
+	}()
+
+	// Should skip 19200, 19201, 19202 and return 19203
+	port := findAvailablePort("127.0.0.1", 19200, 10)
+	if port != 19203 {
+		t.Errorf("expected port 19203, got %d", port)
 	}
 }
