@@ -28,10 +28,21 @@ jobs:
             rm repoview
           done
 
+      - name: Extract changelog for this version
+        id: changelog
+        run: |
+          # Extract section between current version header and next version header (or EOF)
+          VERSION="${GITHUB_REF_NAME}"
+          NOTES=$(awk "/^## \[${VERSION}\]/{flag=1; next} /^## \[v[0-9]/{flag=0} flag" CHANGELOG.md | sed '/^$/N;/^\n$/d')
+          # Handle multi-line output for GitHub Actions
+          echo "notes<<EOF" >> $GITHUB_OUTPUT
+          echo "$NOTES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
-          generate_release_notes: true
+          body: ${{ steps.changelog.outputs.notes }}
           files: |
             repoview-*.tar.gz
             install.sh
