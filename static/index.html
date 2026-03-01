@@ -159,12 +159,11 @@ a:hover { text-decoration: underline; }
 .markdown-body h1, .markdown-body h2, .markdown-body h3,
 .markdown-body h4, .markdown-body h5, .markdown-body h6 {
   margin-top: 24px; margin-bottom: 16px; font-weight: 600; line-height: 1.25;
-  position: relative;
 }
 .markdown-body .heading-anchor {
-  position: absolute; left: -24px; padding-right: 8px;
-  color: #1f2328; opacity: 0; transition: opacity 0.1s;
-  text-decoration: none; line-height: inherit;
+  display: inline-block; vertical-align: middle;
+  margin-right: 8px; color: #656d76; opacity: 0;
+  transition: opacity 0.1s; text-decoration: none;
 }
 .markdown-body h1:hover .heading-anchor,
 .markdown-body h2:hover .heading-anchor,
