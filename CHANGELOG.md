@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- [changed] Treeview: Clicking on folder icon also trigger collapse/expand of items. This allows easier toggle (wider surface click area).
 - [added] CSV row-to-record navigation: click the arrow icon (→) in any table row to jump directly to that record in Records view. The URL updates to `?view=records&r=N` for easy sharing.
 - [added] CSV Records view mode: toggle between Table and Records views for CSV files. Records view displays data as vertical cards, making wide CSV files easier to read. URL supports `?view=records` and `?view=records&r=N` for direct linking to specific records.
 - [changed] Moved view toggle (Preview/Code, Table/Records) from breadcrumb bar to a new file header bar below the breadcrumb, following GitHub's layout. The file header bar also displays file metadata like size and MIME type for binary files.
