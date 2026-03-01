@@ -110,6 +110,28 @@ test.describe("File viewing", () => {
     await expect(page.locator(".view-toggle button", { hasText: "Records" })).toHaveClass(/active/);
   });
 
+  test("CSV — clicking row link switches to Records view and scrolls to that record", async ({ page }) => {
+    await page.goto("/data.csv");
+    const content = page.locator("#content-area");
+
+    // Table view should be visible with row link buttons
+    await expect(content.locator(".csv-table")).toBeVisible();
+    await expect(content.locator(".csv-record-link-btn").first()).toBeVisible();
+
+    // Click the second row's link button (data-row="2")
+    await content.locator('.csv-record-link-btn[data-row="2"]').click();
+
+    // Should switch to Records view
+    await expect(content.locator(".csv-records")).toBeVisible();
+    await expect(page.locator(".view-toggle button", { hasText: "Records" })).toHaveClass(/active/);
+
+    // URL should have ?view=records&r=2
+    await expect(page).toHaveURL(/\?view=records&r=2/);
+
+    // Record 2 should be visible
+    await expect(content.locator(".csv-record-card#record-2")).toBeVisible();
+  });
+
   test("code — syntax-highlighted source", async ({ page }) => {
     await page.goto("/");
     await page.locator(".tree-item .label", { hasText: "sample.go" }).click();

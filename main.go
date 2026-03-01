@@ -354,12 +354,14 @@ func renderCSV(w io.Writer, data []byte) {
 	for _, cell := range records[0] {
 		fmt.Fprintf(w, "<th>%s</th>", html.EscapeString(cell))
 	}
+	fmt.Fprint(w, `<th class="csv-row-link-header"></th>`)
 	fmt.Fprint(w, "</tr></thead><tbody>")
-	for _, row := range records[1:] {
+	for rowIdx, row := range records[1:] {
 		fmt.Fprint(w, "<tr>")
 		for _, cell := range row {
 			fmt.Fprintf(w, "<td>%s</td>", html.EscapeString(cell))
 		}
+		fmt.Fprintf(w, `<td class="csv-row-link"><button class="csv-record-link-btn" data-row="%d" title="View record">→</button></td>`, rowIdx+1)
 		fmt.Fprint(w, "</tr>")
 	}
 	fmt.Fprint(w, "</tbody></table>")

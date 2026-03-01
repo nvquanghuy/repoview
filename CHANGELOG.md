@@ -2,15 +2,13 @@
 
 ## [Unreleased]
 
+- [added] CSV row-to-record navigation: click the arrow icon (→) in any table row to jump directly to that record in Records view. The URL updates to `?view=records&r=N` for easy sharing.
 - [added] CSV Records view mode: toggle between Table and Records views for CSV files. Records view displays data as vertical cards, making wide CSV files easier to read. URL supports `?view=records` and `?view=records&r=N` for direct linking to specific records.
 - [changed] Moved view toggle (Preview/Code, Table/Records) from breadcrumb bar to a new file header bar below the breadcrumb, following GitHub's layout. The file header bar also displays file metadata like size and MIME type for binary files.
 
 ## [v0.0.1] - 2026-02-28
 
 - [added] README.md is rendered below directory listings (like GitHub) when present in a directory
-
-## 2026-02-28
-
 - [fixed] Sidebar now scrolls to the active file when using "Go to file" search or navigating to deeply nested files
 - [added] SVG files now have a Preview/Code toggle like markdown: preview renders the image inline, code view shows syntax-highlighted SVG source
 - [added] Binary file handling: images display inline with preview, non-image binaries show metadata panel with file size, MIME type, and download link

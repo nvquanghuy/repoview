@@ -203,6 +203,16 @@ a:hover { text-decoration: underline; }
 .csv-record-card .field-label { width: 30%; min-width: 120px; padding: 6px 13px; background: #f6f8fa; font-weight: 500; font-size: 13px; border-right: 1px solid #d0d7de; }
 .csv-record-card .field-value { flex: 1; padding: 6px 13px; font-size: 13px; word-break: break-word; }
 
+/* ── CSV row-to-record link ──────────────────────────────── */
+.csv-row-link-header { width: 40px; }
+.csv-row-link { width: 40px; text-align: center; }
+.csv-record-link-btn {
+  background: none; border: none; cursor: pointer;
+  color: #0969da; font-size: 14px; padding: 4px 8px;
+  border-radius: 4px;
+}
+.csv-record-link-btn:hover { background: #f6f8fa; }
+
 /* ── File header bar (GitHub-style) ──────────────────────── */
 #file-header-bar {
   display: none; padding: 8px 16px;
@@ -714,10 +724,34 @@ async function loadFile(path, skipPush) {
       }
     }
 
-    btnTable.onclick = function() {
+    function showTable() {
       area.innerHTML = tableHTML;
       btnTable.className = 'active';
       btnRecords.className = '';
+      bindRowLinkClicks();
+    }
+
+    function switchToRecordsView(recordIndex) {
+      showRecords();
+      btnRecords.className = 'active';
+      btnTable.className = '';
+      setViewParam('records');
+      setRecordParam(recordIndex);
+      setTimeout(function() { scrollToRecord(recordIndex); }, 50);
+    }
+
+    function bindRowLinkClicks() {
+      area.querySelectorAll('.csv-record-link-btn').forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+          e.stopPropagation();
+          var rowIndex = parseInt(btn.dataset.row, 10);
+          switchToRecordsView(rowIndex);
+        });
+      });
+    }
+
+    btnTable.onclick = function() {
+      showTable();
       setViewParam(null);
       setRecordParam(null);
     };
@@ -730,6 +764,8 @@ async function loadFile(path, skipPush) {
 
     if (wantRecords) {
       showRecords();
+    } else {
+      bindRowLinkClicks();
     }
   } else {
     // Strip ?view param for non-toggle files
