@@ -17,6 +17,7 @@ I noticed my marketing team, when working with Claude Code and lots of markdown 
 - **Live reload** — WebSocket-based file watching with fsnotify; changes appear instantly
 - **Single binary** — all HTML/CSS/JS embedded via `go:embed`, no external dependencies at runtime
 - **Lazy-loading tree** — sidebar fetches directory contents on demand for fast startup on large repos
+- **Auto-update** — checks for updates daily and can self-update with `repoview update`
 
 ## Install
 
@@ -57,6 +58,8 @@ repoview --port 3000        # use a custom port
 repoview --host 0.0.0.0     # expose to the network (default: 127.0.0.1)
 repoview --no-browser       # don't auto-open the browser
 repoview --version          # print version and exit
+repoview update             # download and install the latest version
+repoview update --check     # check for updates without installing
 ```
 
 ### Flags
@@ -67,6 +70,19 @@ repoview --version          # print version and exit
 | `--port` | `8080` | Port to serve on |
 | `--no-browser` | `false` | Don't auto-open the browser on startup |
 | `--version` | | Print version and exit |
+
+### Updating
+
+RepoView checks for updates automatically once per day on startup. If a new version is available, you'll see a notification in the terminal.
+
+To manually update:
+
+```bash
+repoview update           # download and install the latest version
+repoview update --check   # check for updates without installing
+```
+
+The update command downloads the latest release from GitHub, shows release notes, and replaces the current binary.
 
 ## API
 
