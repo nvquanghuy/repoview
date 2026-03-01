@@ -109,7 +109,7 @@ func main() {
 
 	addr := fmt.Sprintf("%s:%d", *host, *port)
 	url := fmt.Sprintf("http://localhost:%d", *port)
-	fmt.Printf("repoview v%s serving %s at http://%s\n", version, rootDir, addr)
+	fmt.Printf("RepoView v%s · %s\n→ http://%s\n\nPress Ctrl+C to stop\n", version, rootDir, addr)
 
 	if !*noBrowser {
 		_ = browser.OpenURL(url)
