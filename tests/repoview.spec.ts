@@ -28,6 +28,25 @@ test.describe("Sidebar tree", () => {
     // nested.md should no longer be visible
     await expect(sidebar.locator(".tree-item .label", { hasText: "nested.md" })).not.toBeVisible();
   });
+
+  test("clicking folder icon toggles expand/collapse", async ({ page }) => {
+    await page.goto("/");
+    const sidebar = page.locator("#tree-container");
+    const subdirRow = sidebar.locator(".tree-item", { hasText: "subdir" }).first();
+
+    // Initially collapsed
+    await expect(subdirRow.locator(".caret")).not.toHaveClass(/open/);
+
+    // Click the folder icon to expand
+    await subdirRow.locator(".icon").click();
+    await expect(subdirRow.locator(".caret")).toHaveClass(/open/);
+    await expect(sidebar.locator(".tree-item .label", { hasText: "nested.md" })).toBeVisible();
+
+    // Click the folder icon again to collapse
+    await subdirRow.locator(".icon").click();
+    await expect(subdirRow.locator(".caret")).not.toHaveClass(/open/);
+    await expect(sidebar.locator(".tree-item .label", { hasText: "nested.md" })).not.toBeVisible();
+  });
 });
 
 test.describe("File viewing", () => {
@@ -50,6 +69,45 @@ test.describe("File viewing", () => {
     await expect(content.locator("th", { hasText: "name" })).toBeVisible();
     await expect(content.locator("td", { hasText: "Alice" })).toBeVisible();
     await expect(content.locator("td", { hasText: "Tokyo" })).toBeVisible();
+  });
+
+  test("CSV — toggle between Table and Records view", async ({ page }) => {
+    await page.goto("/");
+    await page.locator(".tree-item .label", { hasText: "data.csv" }).click();
+    const content = page.locator("#content-area");
+
+    // Toggle should be visible with Table and Records buttons
+    await expect(page.locator(".view-toggle")).toBeVisible();
+    await expect(page.locator(".view-toggle button", { hasText: "Table" })).toBeVisible();
+    await expect(page.locator(".view-toggle button", { hasText: "Records" })).toBeVisible();
+
+    // Table view is active by default
+    await expect(page.locator(".view-toggle button", { hasText: "Table" })).toHaveClass(/active/);
+    await expect(content.locator(".csv-table")).toBeVisible();
+
+    // Click Records to switch to records view
+    await page.locator(".view-toggle button", { hasText: "Records" }).click();
+    await expect(content.locator(".csv-records")).toBeVisible();
+    await expect(content.locator(".csv-record-card")).toHaveCount(3); // Alice, Bob, Charlie
+    await expect(content.locator(".csv-record-card .record-header", { hasText: "Record 1" })).toBeVisible();
+    // Each record card has field labels and values - check at least one exists
+    await expect(content.locator(".csv-record-card .field-label", { hasText: "name" }).first()).toBeVisible();
+    await expect(content.locator(".csv-record-card .field-value", { hasText: "Alice" })).toBeVisible();
+
+    // URL should have ?view=records
+    await expect(page).toHaveURL(/\?view=records/);
+
+    // Click Table to switch back
+    await page.locator(".view-toggle button", { hasText: "Table" }).click();
+    await expect(content.locator(".csv-table")).toBeVisible();
+    await expect(content.locator(".csv-records")).not.toBeVisible();
+  });
+
+  test("CSV — direct navigation with ?view=records loads records view", async ({ page }) => {
+    await page.goto("/data.csv?view=records");
+    const content = page.locator("#content-area");
+    await expect(content.locator(".csv-records")).toBeVisible();
+    await expect(page.locator(".view-toggle button", { hasText: "Records" })).toHaveClass(/active/);
   });
 
   test("code — syntax-highlighted source", async ({ page }) => {
@@ -217,13 +275,14 @@ test.describe("Markdown raw/preview toggle", () => {
     await expect(page.locator("#content-area .source-code")).not.toBeVisible();
   });
 
-  test("toggle disappears when navigating to non-markdown file", async ({ page }) => {
+  test("toggle disappears when navigating to non-toggle file", async ({ page }) => {
     await page.goto("/");
     await page.locator(".tree-item .label", { hasText: "hello.md" }).click();
     await expect(page.locator(".view-toggle")).toBeVisible();
 
-    await page.locator(".tree-item .label", { hasText: "data.csv" }).click();
-    await expect(page.locator(".csv-table")).toBeVisible();
+    // Navigate to a plain text file (no toggle) - CSV files now have Table/Records toggle
+    await page.locator(".tree-item .label", { hasText: "example.txt" }).click();
+    await expect(page.locator(".source-code")).toBeVisible();
     await expect(page.locator(".view-toggle")).not.toBeVisible();
   });
 

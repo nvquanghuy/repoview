@@ -176,6 +176,7 @@ func handleTree(w http.ResponseWriter, r *http.Request) {
 type FileResponse struct {
 	Content    string `json:"content"`
 	RawContent string `json:"rawContent,omitempty"`
+	RawCSV     string `json:"rawCSV,omitempty"`
 	Name       string `json:"name"`
 	Path       string `json:"path"`
 	IsMarkdown bool   `json:"isMarkdown"`
@@ -250,6 +251,10 @@ func handleFile(w http.ResponseWriter, r *http.Request) {
 		IsMarkdown: isMarkdown,
 		IsCSV:      isCSV,
 		IsSVG:      isSVG,
+	}
+
+	if isCSV {
+		resp.RawCSV = string(data)
 	}
 
 	if isMarkdown || isSVG {

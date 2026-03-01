@@ -245,6 +245,37 @@ func TestHandleFile_CSV(t *testing.T) {
 	}
 }
 
+func TestHandleFile_CSVRawCSV(t *testing.T) {
+	setRoot(t, "testdata")
+
+	req := httptest.NewRequest("GET", "/api/file?path=data.csv", nil)
+	w := httptest.NewRecorder()
+	handleFile(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+
+	var resp FileResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+
+	if !resp.IsCSV {
+		t.Error("expected isCSV to be true")
+	}
+	if resp.RawCSV == "" {
+		t.Error("expected non-empty rawCSV for CSV file")
+	}
+	// rawCSV should contain the original CSV data
+	if !strings.Contains(resp.RawCSV, "name") {
+		t.Error("expected CSV header 'name' in rawCSV")
+	}
+	if !strings.Contains(resp.RawCSV, "Alice") {
+		t.Error("expected CSV data 'Alice' in rawCSV")
+	}
+}
+
 func TestHandleFile_GoSyntax(t *testing.T) {
 	setRoot(t, "testdata")
 

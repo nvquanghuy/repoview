@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- [added] CSV Records view mode: toggle between Table and Records views for CSV files. Records view displays data as vertical cards, making wide CSV files easier to read. URL supports `?view=records` and `?view=records&r=N` for direct linking to specific records.
+- [changed] Moved view toggle (Preview/Code, Table/Records) from breadcrumb bar to a new file header bar below the breadcrumb, following GitHub's layout. The file header bar also displays file metadata like size and MIME type for binary files.
 
 ## [v0.0.1] - 2026-02-28
 
