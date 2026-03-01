@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+
+## [v0.3.0] - 2026-03-01
+
 - [added] Add update command and auto-update check
   - `repoview update` command to download and install the latest version
   - `repoview update --check` to check for updates without installing
