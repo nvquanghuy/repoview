@@ -5,6 +5,7 @@
 - [fixed] Live reload now works when files are added/removed in expanded folders. Fixed two issues: (1) backend now notifies clients watching parent directories, not just exact paths; (2) frontend now re-fetches all expanded directories during refresh so they stay expanded.
 - [changed] Improved error messages: "Connection lost" banner now only shows for actual network failures. HTTP errors (e.g., file not found) show specific inline messages instead of the misleading connection error.
 - [added] Outline sidebar for markdown files: click "Outline" button (next to Preview/Code toggle) to open a right sidebar with document headings. State persists in localStorage.
+- [added] Clickable anchor links on markdown headings: hover over any heading to see the link icon, click to copy the URL with hash. Outline links also update the URL hash.
 
 ## [v0.3.1] - 2026-03-01
 
