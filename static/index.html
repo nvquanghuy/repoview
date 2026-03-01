@@ -474,7 +474,17 @@ async function toggleDir(path) {
 }
 
 async function refreshTree() {
-  var root = await fetchTree('');
+  // Fetch root and all expanded directories in parallel
+  var pathsToFetch = [''];
+  for (var dir of expandedDirs) {
+    pathsToFetch.push(dir);
+  }
+  await Promise.all(pathsToFetch.map(function(p) {
+    delete treeCache[p]; // Force re-fetch
+    return fetchTree(p);
+  }));
+
+  var root = treeCache[''];
   var container = document.getElementById('tree-container');
   container.innerHTML = '';
   renderTree(root, container, 0);
@@ -1040,9 +1050,6 @@ function connectWS() {
     try {
       var msg = JSON.parse(e.data);
       if (msg.path) {
-        var parent = msg.path.includes('/') ? msg.path.substring(0, msg.path.lastIndexOf('/')) : '';
-        delete treeCache[parent];
-        delete treeCache[msg.path];
         refreshTree();
         if (msg.path === currentFilePath) {
           loadFile(currentFilePath);

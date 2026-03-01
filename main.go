@@ -583,14 +583,35 @@ func (h *hub) broadcast(msg []byte) {
 	}
 }
 
-// notifyFile sends a change notification only to clients watching a given path.
+// notifyFile sends a change notification to clients watching a given path
+// or any of its parent directories.
 func (h *hub) notifyFile(relPath string) {
 	msg, _ := json.Marshal(map[string]string{"type": "change", "path": relPath})
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	for c := range h.clients {
 		c.mu.Lock()
+		// Check if client is watching the exact path or any parent directory
 		watching := c.watched[relPath]
+		if !watching {
+			// Check parent directories using filepath.Dir for cross-platform support
+			p := relPath
+			for {
+				parent := filepath.Dir(p)
+				if parent == p || parent == "." {
+					// Reached root - check root directory (empty string or ".")
+					if c.watched[""] || c.watched["."] {
+						watching = true
+					}
+					break
+				}
+				p = parent
+				if c.watched[p] {
+					watching = true
+					break
+				}
+			}
+		}
 		c.mu.Unlock()
 		if watching {
 			select {

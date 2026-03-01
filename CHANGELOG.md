@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- [fixed] Live reload now works when files are added/removed in expanded folders. Fixed two issues: (1) backend now notifies clients watching parent directories, not just exact paths; (2) frontend now re-fetches all expanded directories during refresh so they stay expanded.
 
 ## [v0.3.1] - 2026-03-01
 

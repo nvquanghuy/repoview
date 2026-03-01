@@ -619,6 +619,120 @@ func TestWebSocket(t *testing.T) {
 	}
 }
 
+func TestNotifyFile_ParentDirectoryWatch(t *testing.T) {
+	h := newHub()
+
+	// Create a mock client watching a directory
+	client := &wsClient{
+		hub:     h,
+		send:    make(chan []byte, 64),
+		watched: map[string]bool{"subdir": true},
+	}
+	h.register(client)
+	defer h.unregister(client)
+
+	// Notify about a file inside the watched directory
+	h.notifyFile(filepath.Join("subdir", "nested.md"))
+
+	// Should receive the notification
+	select {
+	case msg := <-client.send:
+		var data map[string]string
+		if err := json.Unmarshal(msg, &data); err != nil {
+			t.Fatalf("invalid JSON: %v", err)
+		}
+		if data["type"] != "change" {
+			t.Errorf("expected type=change, got %s", data["type"])
+		}
+	default:
+		t.Error("expected to receive notification for file in watched directory")
+	}
+}
+
+func TestNotifyFile_RootWatch(t *testing.T) {
+	h := newHub()
+
+	// Create a mock client watching the root directory
+	client := &wsClient{
+		hub:     h,
+		send:    make(chan []byte, 64),
+		watched: map[string]bool{"": true},
+	}
+	h.register(client)
+	defer h.unregister(client)
+
+	// Notify about a file in the root
+	h.notifyFile("newfile.txt")
+
+	// Should receive the notification
+	select {
+	case msg := <-client.send:
+		var data map[string]string
+		if err := json.Unmarshal(msg, &data); err != nil {
+			t.Fatalf("invalid JSON: %v", err)
+		}
+		if data["type"] != "change" {
+			t.Errorf("expected type=change, got %s", data["type"])
+		}
+	default:
+		t.Error("expected to receive notification for file when watching root")
+	}
+}
+
+func TestNotifyFile_NestedDirectoryWatch(t *testing.T) {
+	h := newHub()
+
+	// Create a mock client watching a parent directory
+	client := &wsClient{
+		hub:     h,
+		send:    make(chan []byte, 64),
+		watched: map[string]bool{"src": true},
+	}
+	h.register(client)
+	defer h.unregister(client)
+
+	// Notify about a deeply nested file
+	h.notifyFile(filepath.Join("src", "components", "Button.tsx"))
+
+	// Should receive the notification
+	select {
+	case msg := <-client.send:
+		var data map[string]string
+		if err := json.Unmarshal(msg, &data); err != nil {
+			t.Fatalf("invalid JSON: %v", err)
+		}
+		if data["type"] != "change" {
+			t.Errorf("expected type=change, got %s", data["type"])
+		}
+	default:
+		t.Error("expected to receive notification for nested file in watched directory")
+	}
+}
+
+func TestNotifyFile_NoMatchingWatch(t *testing.T) {
+	h := newHub()
+
+	// Create a mock client watching a different directory
+	client := &wsClient{
+		hub:     h,
+		send:    make(chan []byte, 64),
+		watched: map[string]bool{"other": true},
+	}
+	h.register(client)
+	defer h.unregister(client)
+
+	// Notify about a file in a different directory
+	h.notifyFile(filepath.Join("src", "main.go"))
+
+	// Should NOT receive the notification
+	select {
+	case <-client.send:
+		t.Error("should not receive notification for unwatched directory")
+	default:
+		// Expected: no notification
+	}
+}
+
 // ── Static file serving test ────────────────────────────────
 
 // newTestServer creates a test server with the same routing as production.
