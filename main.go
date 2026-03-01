@@ -48,6 +48,12 @@ type TreeEntry struct {
 }
 
 func main() {
+	// Handle subcommands before flag parsing
+	if len(os.Args) > 1 && os.Args[1] == "update" {
+		runUpdate(os.Args[2:])
+		return
+	}
+
 	host := flag.String("host", "127.0.0.1", "host/IP to bind to")
 	port := flag.Int("port", 8080, "port to serve on")
 	noBrowser := flag.Bool("no-browser", false, "don't open browser on startup")
@@ -66,6 +72,9 @@ func main() {
 		fmt.Println("repoview v" + version)
 		os.Exit(0)
 	}
+
+	// Check for updates in background (at most once per day)
+	maybeCheckForUpdates()
 
 	if flag.NArg() > 0 {
 		rootDir = flag.Arg(0)

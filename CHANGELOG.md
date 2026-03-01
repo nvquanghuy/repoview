@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- [added] Add update command and auto-update check
+  - `repoview update` command to download and install the latest version
+  - `repoview update --check` to check for updates without installing
+  - Background update check on startup (at most once per day) with notification when update available
+  - Update command shows release notes and link to GitHub release page
 
 ## [v0.2.0] - 2026-03-01
 - [changed] Folder click behavior: clicking a non-selected folder navigates to it; clicking an already-selected folder toggles expand/collapse. Caret always toggles.
@@ -34,9 +39,6 @@
 - [added] GitHub Actions release workflow: cross-compiles for macOS and Linux (amd64/arm64) on `v*` tags and uploads tarballs to GitHub Releases
 - [added] One-liner install script (`install.sh`) for teammates: detects OS/arch, downloads the right binary, installs to `~/.local/bin`
 - [added] Tag-based versioning with ldflags injection and `release.sh` script
-
-## 2026-02-27
-
 - [changed] Show dotfiles and dotfolders (e.g. `.github`, `.gitignore`) in the sidebar file tree
 - [added] Pretty-print support for JSON and YAML files: minified/compact files are automatically formatted with proper indentation before syntax highlighting. Gracefully falls back to raw content if parsing fails.
 - [added] Dynamic page title: shows `filename - RepoView` when viewing a file, `dirname - RepoView` for subdirectories, and `RepoView` at root
