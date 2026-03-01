@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+
+## [v0.1.0] - 2026-03-01
+
 - [changed] Treeview: Clicking on folder icon also trigger collapse/expand of items. This allows easier toggle (wider surface click area).
 - [added] CSV row-to-record navigation: click the arrow icon (→) in any table row to jump directly to that record in Records view. The URL updates to `?view=records&r=N` for easy sharing.
 - [added] CSV Records view mode: toggle between Table and Records views for CSV files. Records view displays data as vertical cards, making wide CSV files easier to read. URL supports `?view=records` and `?view=records&r=N` for direct linking to specific records.
