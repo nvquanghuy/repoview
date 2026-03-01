@@ -395,20 +395,36 @@ async function retryConnection() {
   }
 }
 
+/* ── API helpers ──────────────────────────────────────────── */
+// Returns {ok, data, status, error} - distinguishes network vs HTTP errors
+async function apiFetch(url) {
+  try {
+    var res = await fetch(url);
+    hideConnectionError();
+    if (!res.ok) {
+      var errorText = await res.text().catch(function() { return res.statusText; });
+      return { ok: false, status: res.status, error: errorText };
+    }
+    var data = await res.json();
+    return { ok: true, data: data };
+  } catch(e) {
+    // Network error - server unreachable
+    showConnectionError();
+    return { ok: false, status: 0, error: 'network', isNetworkError: true };
+  }
+}
+
 /* ── Tree ─────────────────────────────────────────────────── */
 async function fetchTree(path) {
   if (treeCache[path]) return treeCache[path];
-  try {
-    const res = await fetch('/api/tree?path=' + encodeURIComponent(path));
-    if (!res.ok) throw new Error('Server error');
-    const data = await res.json();
-    treeCache[path] = data;
-    hideConnectionError();
-    return data;
-  } catch(e) {
-    showConnectionError();
-    throw e;
+  var result = await apiFetch('/api/tree?path=' + encodeURIComponent(path));
+  if (!result.ok) {
+    if (result.isNetworkError) throw new Error('Network error');
+    // HTTP error (e.g., directory not found) - return empty array, don't break tree
+    return [];
   }
+  treeCache[path] = result.data;
+  return result.data;
 }
 
 function renderTree(items, container, depth) {
@@ -666,18 +682,19 @@ async function loadFile(path, skipPush) {
     }
   }
 
-  var res, data;
-  try {
-    res = await fetch('/api/file?path=' + encodeURIComponent(path));
-    if (!res.ok) throw new Error('Server error');
-    data = await res.json();
-    hideConnectionError();
-  } catch(e) {
-    showConnectionError();
-    document.getElementById('content-area').innerHTML =
-      '<div class="welcome"><h2>Unable to load file</h2><p>The server may have stopped. Click Retry above to reconnect.</p></div>';
+  var result = await apiFetch('/api/file?path=' + encodeURIComponent(path));
+  if (!result.ok) {
+    var area = document.getElementById('content-area');
+    if (result.isNetworkError) {
+      area.innerHTML = '<div class="welcome"><h2>Unable to load file</h2><p>The server may have stopped. Click Retry above to reconnect.</p></div>';
+    } else if (result.status === 404) {
+      area.innerHTML = '<div class="welcome"><h2>File not found</h2><p>The file <code>' + esc(path) + '</code> does not exist or was removed.</p></div>';
+    } else {
+      area.innerHTML = '<div class="welcome"><h2>Error loading file</h2><p>' + esc(result.error || 'Unknown error') + '</p></div>';
+    }
     return;
   }
+  var data = result.data;
 
   var area = document.getElementById('content-area');
   if (data.isBinary) {
@@ -897,16 +914,15 @@ async function openSearch() {
   input.value = '';
   input.focus();
   if (!allFiles) {
-    try {
-      var res = await fetch('/api/files');
-      if (!res.ok) throw new Error('Server error');
-      allFiles = await res.json();
-      hideConnectionError();
-    } catch(e) {
-      showConnectionError();
-      closeSearch();
+    var result = await apiFetch('/api/files');
+    if (!result.ok) {
+      if (!result.isNetworkError) {
+        // API error - just close search, don't show connection banner
+        closeSearch();
+      }
       return;
     }
+    allFiles = result.data;
   }
   renderSearchResults(allFiles.slice(0, 50), false);
   searchIdx = 0;
