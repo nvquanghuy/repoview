@@ -200,6 +200,39 @@ a:hover { text-decoration: underline; }
 .markdown-body .task-list-item { list-style: none; }
 .markdown-body .task-list-item input { margin-right: .5em; }
 
+/* ── Table of Contents ────────────────────────────────────── */
+.toc-container {
+  margin-bottom: 24px; border: 1px solid #d0d7de; border-radius: 6px;
+  background: #f6f8fa; overflow: hidden;
+}
+.toc-header {
+  display: flex; align-items: center; gap: 8px; padding: 12px 16px;
+  font-weight: 600; font-size: 14px; cursor: pointer; user-select: none;
+  border-bottom: 1px solid transparent;
+}
+.toc-header:hover { background: #eaeef2; }
+.toc-container.open .toc-header { border-bottom-color: #d0d7de; }
+.toc-caret {
+  width: 16px; height: 16px; transition: transform 0.15s ease;
+  color: #656d76;
+}
+.toc-container.open .toc-caret { transform: rotate(90deg); }
+.toc-content {
+  display: none; padding: 12px 16px; font-size: 14px;
+}
+.toc-container.open .toc-content { display: block; }
+.toc-list { list-style: none; margin: 0; padding: 0; }
+.toc-list .toc-list { padding-left: 16px; }
+.toc-item { margin: 4px 0; }
+.toc-link {
+  color: #0969da; text-decoration: none; display: block;
+  padding: 2px 0; line-height: 1.4;
+}
+.toc-link:hover { text-decoration: underline; }
+.toc-h1 { font-weight: 600; }
+.toc-h2 { }
+.toc-h3, .toc-h4, .toc-h5, .toc-h6 { color: #656d76; }
+
 /* ── Source code (non-markdown) ───────────────────────────── */
 .source-code {
   font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
@@ -582,6 +615,15 @@ async function navigateTo(path, skipPush) {
           container.innerHTML = '<div class="readme-header">' + esc(readme.name) + '</div>' +
             '<div class="readme-body markdown-body">' + data.content + '</div>';
           document.getElementById('content-area').appendChild(container);
+          // Add TOC to README
+          var mdBody = container.querySelector('.markdown-body');
+          if (mdBody) {
+            var tocHTML = buildTOC(mdBody);
+            if (tocHTML) {
+              mdBody.insertAdjacentHTML('afterbegin', tocHTML);
+              bindAnchorLinks(container);
+            }
+          }
         }
       });
   }
@@ -639,6 +681,29 @@ function bindAnchorLinks(container) {
       }
     };
   });
+}
+
+function buildTOC(container) {
+  var headings = container.querySelectorAll('h1, h2, h3, h4, h5, h6');
+  if (headings.length < 2) return null; // Don't show TOC for single heading or none
+
+  var tocHTML = '<div class="toc-container open">' +
+    '<div class="toc-header" onclick="this.parentElement.classList.toggle(\'open\')">' +
+    '<svg class="toc-caret" viewBox="0 0 16 16" fill="currentColor"><path d="M6.22 3.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042L9.94 8 6.22 4.28a.75.75 0 0 1 0-1.06Z"/></svg>' +
+    '<span>Table of Contents</span></div>' +
+    '<div class="toc-content"><ul class="toc-list">';
+
+  headings.forEach(function(h) {
+    var level = parseInt(h.tagName.charAt(1));
+    var id = h.id || h.textContent.toLowerCase().replace(/[^\w]+/g, '-');
+    if (!h.id) h.id = id;
+    var text = h.textContent;
+    tocHTML += '<li class="toc-item" style="padding-left: ' + ((level - 1) * 16) + 'px">' +
+      '<a class="toc-link toc-h' + level + '" href="#' + esc(id) + '">' + esc(text) + '</a></li>';
+  });
+
+  tocHTML += '</ul></div></div>';
+  return tocHTML;
 }
 
 function getViewParam() {
@@ -753,8 +818,26 @@ async function loadFile(path, skipPush) {
     codeHTML = '<div class="source-code">' + data.rawContent + '</div>';
     var wantCode = getViewParam() === 'code';
 
-    area.innerHTML = wantCode ? codeHTML : previewHTML;
-    if (!wantCode && data.isMarkdown) bindAnchorLinks(area);
+    function renderMarkdownPreview() {
+      area.innerHTML = previewHTML;
+      if (data.isMarkdown) {
+        bindAnchorLinks(area);
+        var mdBody = area.querySelector('.markdown-body');
+        if (mdBody) {
+          var tocHTML = buildTOC(mdBody);
+          if (tocHTML) {
+            mdBody.insertAdjacentHTML('afterbegin', tocHTML);
+            bindAnchorLinks(area); // Rebind to include TOC links
+          }
+        }
+      }
+    }
+
+    if (wantCode) {
+      area.innerHTML = codeHTML;
+    } else {
+      renderMarkdownPreview();
+    }
 
     // Create toggle
     var toggle = document.createElement('span');
@@ -772,8 +855,7 @@ async function loadFile(path, skipPush) {
     showFileHeaderBar(toggle, null);
 
     btnPreview.onclick = function() {
-      area.innerHTML = previewHTML;
-      if (data.isMarkdown) bindAnchorLinks(area);
+      renderMarkdownPreview();
       btnPreview.className = 'active';
       btnCode.className = '';
       setViewParam(null);

@@ -4,6 +4,7 @@
 
 - [fixed] Live reload now works when files are added/removed in expanded folders. Fixed two issues: (1) backend now notifies clients watching parent directories, not just exact paths; (2) frontend now re-fetches all expanded directories during refresh so they stay expanded.
 - [changed] Improved error messages: "Connection lost" banner now only shows for actual network failures. HTTP errors (e.g., file not found) show specific inline messages instead of the misleading connection error.
+- [added] Table of Contents for markdown files: automatically generated from headings, displayed at the top, collapsible. Also works for README.md in directory listings.
 
 ## [v0.3.1] - 2026-03-01
 
