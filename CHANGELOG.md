@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- [changed] Release script now includes changelog in git tag messages, making them visible on GitHub's tags page
 
 ## [v0.3.0] - 2026-03-01
 
