@@ -63,7 +63,7 @@ a:hover { text-decoration: underline; }
   font-family: inherit; font-size: 11px; padding: 0 4px;
   border: 1px solid #d0d7de; border-radius: 3px; background: #fff;
 }
-#content-area { flex: 1; overflow-y: auto; padding: 24px; min-width: 0; }
+#content-area { flex: 1; overflow-y: auto; padding: 24px 24px 24px 48px; min-width: 0; }
 
 /* ── Welcome ──────────────────────────────────────────────── */
 .welcome { color: #656d76; text-align: center; margin-top: 120px; }
@@ -159,11 +159,12 @@ a:hover { text-decoration: underline; }
 .markdown-body h1, .markdown-body h2, .markdown-body h3,
 .markdown-body h4, .markdown-body h5, .markdown-body h6 {
   margin-top: 24px; margin-bottom: 16px; font-weight: 600; line-height: 1.25;
+  position: relative;
 }
 .markdown-body .heading-anchor {
-  display: inline-block; vertical-align: middle;
-  margin-right: 8px; color: #656d76; opacity: 0;
-  transition: opacity 0.1s; text-decoration: none;
+  position: absolute; left: -24px;
+  color: #656d76; opacity: 0; transition: opacity 0.1s;
+  text-decoration: none; line-height: inherit;
 }
 .markdown-body h1:hover .heading-anchor,
 .markdown-body h2:hover .heading-anchor,
