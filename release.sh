@@ -48,10 +48,15 @@ sed "s/^## \[Unreleased\]/## [${TAG}] - ${DATE}/" CHANGELOG.md > "$TMP" && mv "$
 TMP=$(mktemp)
 awk '/^# Changelog/ { print; print ""; print "## [Unreleased]"; print ""; next } 1' CHANGELOG.md > "$TMP" && mv "$TMP" CHANGELOG.md
 
-# Commit and tag
+# Extract changelog for this version (content between version header and next version header)
+CHANGELOG=$(awk "/^## \[${TAG}\]/{flag=1; next} /^## \[v[0-9]/{flag=0} flag" CHANGELOG.md | sed '/^$/N;/^\n$/d')
+
+# Commit and tag (include changelog in tag message)
 git add CHANGELOG.md
 git commit -m "Release ${TAG}"
-git tag -a "${TAG}" -m "Release ${TAG}"
+git tag -a "${TAG}" -m "${TAG}
+
+${CHANGELOG}"
 
 echo "Pushing commit and tag..."
 git push
