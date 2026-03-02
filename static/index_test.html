@@ -210,39 +210,89 @@ assert(limited.length <= 2, 'fuzzysort respects limit parameter');
   assertEqual(mockTreeJSON[1].extension, 'go', 'Second entry has .go extension');
 })();
 
-// Test: keyboard shortcut handler skips INPUT elements
-(function testKeyboardShortcut() {
+// Test: keyboard shortcut dispatch behavior
+(function testShortcutDispatch() {
+  function isTypingTarget(target) {
+    var tag = target && target.tagName;
+    return tag === 'INPUT' || tag === 'TEXTAREA';
+  }
+
+  function dispatchShortcut(e, state) {
+    if (e.metaKey || e.ctrlKey || e.altKey) return false;
+    if (isTypingTarget(e.target) && e.key !== 'Escape') return false;
+
+    if (e.key === 'Escape') {
+      if (state.searchOpen) {
+        e.preventDefault();
+        state.searchOpen = false;
+        return true;
+      }
+      if (state.shortcutsOpen) {
+        e.preventDefault();
+        state.shortcutsOpen = false;
+        return true;
+      }
+      if (state.outlineOpen) {
+        e.preventDefault();
+        state.outlineOpen = false;
+        return true;
+      }
+      return false;
+    }
+
+    if ((e.key === 't' || e.key === '/') && !state.searchOpen && !state.shortcutsOpen) {
+      e.preventDefault();
+      state.searchOpen = true;
+      return true;
+    }
+    if (e.key === '?' && !state.searchOpen && !state.shortcutsOpen) {
+      e.preventDefault();
+      state.shortcutsOpen = true;
+      return true;
+    }
+    return false;
+  }
+
+  var state = { searchOpen: false, shortcutsOpen: false, outlineOpen: false };
   var prevented = false;
-  var mockEvent = {
+  dispatchShortcut({
+    target: { tagName: 'DIV' },
+    key: '/',
+    preventDefault: function() { prevented = true; }
+  }, state);
+  assertEqual(prevented, true, "Slash shortcut opens search");
+  assertEqual(state.searchOpen, true, "Slash shortcut sets searchOpen");
+
+  state = { searchOpen: false, shortcutsOpen: false, outlineOpen: false };
+  prevented = false;
+  dispatchShortcut({
     target: { tagName: 'INPUT' },
     key: 't',
     preventDefault: function() { prevented = true; }
-  };
+  }, state);
+  assertEqual(prevented, false, "Typing target ignores non-Escape shortcuts");
+  assertEqual(state.searchOpen, false, "Typing target does not open search");
 
-  // Simulate the handler logic from index.html.
-  if (mockEvent.target.tagName === 'INPUT' || mockEvent.target.tagName === 'TEXTAREA') {
-    // Should skip.
-  } else if (mockEvent.key === 't') {
-    mockEvent.preventDefault();
-  }
-
-  assertEqual(prevented, false, 'Keyboard shortcut skips INPUT elements');
-
-  // Now test with a non-input target.
-  var triggered = false;
-  var mockEvent2 = {
+  state = { searchOpen: false, shortcutsOpen: false, outlineOpen: false };
+  prevented = false;
+  dispatchShortcut({
     target: { tagName: 'DIV' },
-    key: 't',
-    preventDefault: function() { triggered = true; }
-  };
+    key: '?',
+    preventDefault: function() { prevented = true; }
+  }, state);
+  assertEqual(prevented, true, "Question mark opens shortcuts");
+  assertEqual(state.shortcutsOpen, true, "Question mark sets shortcutsOpen");
 
-  if (mockEvent2.target.tagName === 'INPUT' || mockEvent2.target.tagName === 'TEXTAREA') {
-    // skip
-  } else if (mockEvent2.key === 't') {
-    mockEvent2.preventDefault();
-  }
-
-  assertEqual(triggered, true, 'Keyboard shortcut triggers for non-input elements');
+  state = { searchOpen: true, shortcutsOpen: true, outlineOpen: true };
+  prevented = false;
+  dispatchShortcut({
+    target: { tagName: 'DIV' },
+    key: 'Escape',
+    preventDefault: function() { prevented = true; }
+  }, state);
+  assertEqual(prevented, true, "Escape prevents default when closing panels");
+  assertEqual(state.searchOpen, false, "Escape closes search first");
+  assertEqual(state.shortcutsOpen, true, "Escape keeps shortcuts open when search was open");
 })();
 
 // Test: live API call to /api/file (only runs when served by repoview)

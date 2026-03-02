@@ -52,17 +52,18 @@ a:hover { text-decoration: underline; }
 #breadcrumb-bar .crumb:hover { text-decoration: underline; }
 #breadcrumb-bar .crumb.current { color: #1f2328; font-weight: 600; cursor: default; }
 #breadcrumb-bar .crumb.current:hover { text-decoration: none; }
-#go-to-file-btn {
+#go-to-file-btn, #shortcuts-btn {
   margin: 8px 12px 4px; padding: 5px 12px; font-size: 12px; width: calc(100% - 24px);
   border: 1px solid #d0d7de; border-radius: 6px; background: #fff;
   color: #656d76; cursor: pointer; display: flex; align-items: center; gap: 6px;
   flex-shrink: 0;
 }
-#go-to-file-btn:hover { background: #eaeef2; }
-#go-to-file-btn kbd {
+#go-to-file-btn:hover, #shortcuts-btn:hover { background: #eaeef2; }
+#go-to-file-btn kbd, #shortcuts-btn kbd {
   font-family: inherit; font-size: 11px; padding: 0 4px;
   border: 1px solid #d0d7de; border-radius: 3px; background: #fff;
 }
+#shortcuts-btn { margin-top: 4px; margin-bottom: 8px; }
 #content-area { flex: 1; overflow-y: auto; padding: 24px 24px 24px 48px; min-width: 0; }
 
 /* ── Welcome ──────────────────────────────────────────────── */
@@ -150,6 +151,45 @@ a:hover { text-decoration: underline; }
 .search-result .sr-path { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .search-result mark { background: none; font-weight: 700; color: #1f2328; }
 #search-empty { padding: 16px; color: #656d76; text-align: center; font-size: 13px; }
+
+/* ── Shortcuts Help Modal ────────────────────────────────── */
+#shortcuts-overlay {
+  display: none; position: fixed; inset: 0; z-index: 110;
+  background: #00000040; justify-content: center; padding-top: 80px;
+}
+#shortcuts-overlay.open { display: flex; }
+#shortcuts-box {
+  width: 640px; max-width: 92vw; background: #fff;
+  border: 1px solid #d0d7de; border-radius: 12px;
+  box-shadow: 0 8px 24px #00000020; overflow: hidden; align-self: flex-start;
+}
+.shortcuts-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 16px; border-bottom: 1px solid #d0d7de;
+}
+.shortcuts-title { font-size: 14px; font-weight: 600; color: #1f2328; }
+.shortcuts-close {
+  border: 1px solid #d0d7de; border-radius: 6px; background: #f6f8fa;
+  color: #1f2328; cursor: pointer; font-size: 12px; padding: 4px 8px;
+}
+.shortcuts-close:hover { background: #eaeef2; }
+#shortcuts-content { max-height: 420px; overflow-y: auto; padding: 12px 16px 16px; }
+.shortcuts-group { margin-top: 8px; }
+.shortcuts-group h4 {
+  margin: 8px 0; color: #656d76; font-size: 12px; text-transform: uppercase; letter-spacing: .04em;
+}
+.shortcuts-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 0; border-bottom: 1px solid #f0f2f4; gap: 12px;
+}
+.shortcuts-row:last-child { border-bottom: none; }
+.shortcuts-desc { font-size: 13px; color: #1f2328; }
+.shortcuts-keys { display: inline-flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.shortcuts-keys kbd {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 11px; color: #24292f; background: #f6f8fa; border: 1px solid #d0d7de;
+  border-bottom-color: #afb8c1; border-radius: 6px; padding: 2px 6px;
+}
 
 /* ── Markdown body (GitHub-style) ─────────────────────────── */
 .markdown-body {
@@ -262,6 +302,10 @@ a:hover { text-decoration: underline; }
 .outline-btn.active { background: #ddf4ff; border-color: #54aeff; color: #0969da; }
 .outline-btn svg { color: #656d76; }
 .outline-btn.active svg { color: #0969da; }
+.outline-btn kbd {
+  font-family: inherit; font-size: 11px; padding: 0 4px;
+  border: 1px solid #d0d7de; border-radius: 3px; background: #fff;
+}
 
 /* ── Source code (non-markdown) ───────────────────────────── */
 .source-code {
@@ -378,8 +422,11 @@ a:hover { text-decoration: underline; }
       <svg class="repo-icon" width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M2 2.5A2.5 2.5 0 0 1 4.5 0h8.75a.75.75 0 0 1 .75.75v12.5a.75.75 0 0 1-.75.75h-2.5a.75.75 0 0 1 0-1.5h1.75v-2h-8a1 1 0 0 0-.714 1.7.75.75 0 1 1-1.072 1.05A2.495 2.495 0 0 1 2 11.5Zm10.5-1h-8a1 1 0 0 0-1 1v6.708A2.486 2.486 0 0 1 4.5 9h8ZM5 12.25a.25.25 0 0 1 .25-.25h3.5a.25.25 0 0 1 .25.25v3.25a.25.25 0 0 1-.4.2l-1.45-1.087a.249.249 0 0 0-.3 0L5.4 15.7a.25.25 0 0 1-.4-.2Z"/></svg>
       <span id="repo-name">Files</span>
     </div>
-    <button id="go-to-file-btn" onclick="openSearch()">
-      Go to file <kbd>t</kbd>
+    <button id="go-to-file-btn" onclick="openSearch()" title="Go to file (t or /)">
+      Go to file <kbd>t</kbd> <kbd>/</kbd>
+    </button>
+    <button id="shortcuts-btn" onclick="openShortcuts()" title="Show keyboard shortcuts (?)">
+      Shortcuts <kbd>?</kbd>
     </button>
     <div id="tree-container"></div>
     <div id="resize-handle"></div>
@@ -398,7 +445,7 @@ a:hover { text-decoration: underline; }
       <div id="content-area">
         <div class="welcome">
           <h2>Welcome to RepoView</h2>
-          <p>Select a file from the sidebar or press <strong>t</strong> to search.</p>
+          <p>Select a file from the sidebar or press <strong>t</strong>/<strong>/</strong> to search. Press <strong>?</strong> for shortcuts.</p>
         </div>
       </div>
       <div id="outline-sidebar">
@@ -423,6 +470,16 @@ a:hover { text-decoration: underline; }
   </div>
 </div>
 
+<div id="shortcuts-overlay" onclick="if(event.target===this)closeShortcuts()">
+  <div id="shortcuts-box">
+    <div class="shortcuts-header">
+      <span class="shortcuts-title">Keyboard shortcuts</span>
+      <button class="shortcuts-close" onclick="closeShortcuts()">Close</button>
+    </div>
+    <div id="shortcuts-content"></div>
+  </div>
+</div>
+
 <script>
 /* ── SVG helpers ──────────────────────────────────────────── */
 const SVG = {
@@ -442,6 +499,10 @@ let searchIdx = 0;
 let ws = null;
 let watchedPaths = new Set();
 let connectionLost = false;
+
+const SHORTCUTS_CONFIG = {
+  enableP2NavKeys: false,
+};
 
 /* ── Connection Status ───────────────────────────────────── */
 function showConnectionError(message) {
@@ -791,6 +852,14 @@ function toggleOutline() {
   localStorage.setItem('outlineOpen', isOpen ? '1' : '0');
 }
 
+function isOutlineOpen() {
+  return document.getElementById('outline-sidebar').classList.contains('open');
+}
+
+function canToggleOutline() {
+  return !!outlineBtn;
+}
+
 function showOutline() {
   var sidebar = document.getElementById('outline-sidebar');
   sidebar.classList.add('open');
@@ -806,7 +875,8 @@ function hideOutline() {
 function createOutlineButton() {
   var btn = document.createElement('button');
   btn.className = 'outline-btn';
-  btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M7.75 2.5a.75.75 0 0 0 0 1.5h6.5a.75.75 0 0 0 0-1.5h-6.5Zm0 5a.75.75 0 0 0 0 1.5h6.5a.75.75 0 0 0 0-1.5h-6.5Zm0 5a.75.75 0 0 0 0 1.5h6.5a.75.75 0 0 0 0-1.5h-6.5ZM2.5 2.75a.75.75 0 0 1 .75-.75h.5a.75.75 0 0 1 0 1.5h-.5a.75.75 0 0 1-.75-.75Zm.75 4.25a.75.75 0 0 0 0 1.5h.5a.75.75 0 0 0 0-1.5h-.5Zm0 5a.75.75 0 0 0 0 1.5h.5a.75.75 0 0 0 0-1.5h-.5Z"/></svg>Outline';
+  btn.title = 'Toggle outline (o)';
+  btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M7.75 2.5a.75.75 0 0 0 0 1.5h6.5a.75.75 0 0 0 0-1.5h-6.5Zm0 5a.75.75 0 0 0 0 1.5h6.5a.75.75 0 0 0 0-1.5h-6.5Zm0 5a.75.75 0 0 0 0 1.5h6.5a.75.75 0 0 0 0-1.5h-6.5ZM2.5 2.75a.75.75 0 0 1 .75-.75h.5a.75.75 0 0 1 0 1.5h-.5a.75.75 0 0 1-.75-.75Zm.75 4.25a.75.75 0 0 0 0 1.5h.5a.75.75 0 0 0 0-1.5h-.5Zm0 5a.75.75 0 0 0 0 1.5h.5a.75.75 0 0 0 0-1.5h-.5Z"/></svg>Outline <kbd>o</kbd>';
   btn.onclick = toggleOutline;
   return btn;
 }
@@ -1153,6 +1223,23 @@ function closeSearch() {
   document.getElementById('search-overlay').classList.remove('open');
 }
 
+function isSearchOpen() {
+  return document.getElementById('search-overlay').classList.contains('open');
+}
+
+function openShortcuts() {
+  renderShortcutsHelp();
+  document.getElementById('shortcuts-overlay').classList.add('open');
+}
+
+function closeShortcuts() {
+  document.getElementById('shortcuts-overlay').classList.remove('open');
+}
+
+function isShortcutsOpen() {
+  return document.getElementById('shortcuts-overlay').classList.contains('open');
+}
+
 function onSearchInput() {
   var q = document.getElementById('search-input').value.trim();
   if (!allFiles) return;
@@ -1429,10 +1516,263 @@ function escAttr(s) {
   return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-/* ── Keyboard shortcut ────────────────────────────────────── */
+/* ── Keyboard shortcuts ───────────────────────────────────── */
+function isTypingTarget(target) {
+  if (!target) return false;
+  var tag = target.tagName;
+  if (tag === 'INPUT' || tag === 'TEXTAREA') return true;
+  return !!target.closest && !!target.closest('[contenteditable="true"]');
+}
+
+function hasModifier(e) {
+  return e.metaKey || e.ctrlKey || e.altKey;
+}
+
+function closeTopOverlay() {
+  if (isSearchOpen()) {
+    closeSearch();
+    return true;
+  }
+  if (isShortcutsOpen()) {
+    closeShortcuts();
+    return true;
+  }
+  if (isOutlineOpen()) {
+    hideOutline();
+    return true;
+  }
+  return false;
+}
+
+function getViewToggleButtons() {
+  return document.querySelectorAll('#file-header-bar .view-toggle button');
+}
+
+function activateViewToggle(index) {
+  var buttons = getViewToggleButtons();
+  if (buttons[index]) {
+    buttons[index].click();
+    return true;
+  }
+  return false;
+}
+
+function toggleViewMode() {
+  var buttons = getViewToggleButtons();
+  if (buttons.length < 2) return false;
+  if (buttons[0].classList.contains('active')) {
+    buttons[1].click();
+    return true;
+  }
+  if (buttons[1].classList.contains('active')) {
+    buttons[0].click();
+    return true;
+  }
+  return false;
+}
+
+function getShortcutContext() {
+  return {
+    isTyping: isTypingTarget(document.activeElement),
+    searchOpen: isSearchOpen(),
+    shortcutsOpen: isShortcutsOpen(),
+    outlineOpen: isOutlineOpen(),
+    hasViewToggle: getViewToggleButtons().length >= 2,
+    canToggleOutline: canToggleOutline(),
+  };
+}
+
+function isShortcutEnabled(def) {
+  if (!def.enabled) return false;
+  if (def.tier === 'P2' && !SHORTCUTS_CONFIG.enableP2NavKeys) return false;
+  return true;
+}
+
+const SHORTCUTS = [
+  {
+    id: 'open-search-t',
+    keys: ['t'],
+    description: 'Open Go to file',
+    group: 'General',
+    tier: 'P0',
+    enabled: true,
+    when: function(ctx) { return !ctx.searchOpen && !ctx.shortcutsOpen; },
+    run: function() { openSearch(); },
+  },
+  {
+    id: 'open-search-slash',
+    keys: ['/'],
+    description: 'Open Go to file',
+    group: 'General',
+    tier: 'P0',
+    enabled: true,
+    when: function(ctx) { return !ctx.searchOpen && !ctx.shortcutsOpen; },
+    run: function() { openSearch(); },
+  },
+  {
+    id: 'open-shortcuts',
+    keys: ['?'],
+    description: 'Show keyboard shortcuts',
+    group: 'General',
+    tier: 'P0',
+    enabled: true,
+    when: function(ctx) { return !ctx.shortcutsOpen && !ctx.searchOpen; },
+    run: function() { openShortcuts(); },
+  },
+  {
+    id: 'close-top',
+    keys: ['Escape'],
+    description: 'Close open panel',
+    group: 'General',
+    tier: 'P0',
+    enabled: true,
+    when: function() { return true; },
+    run: function() { return closeTopOverlay(); },
+  },
+  {
+    id: 'history-back',
+    keys: ['['],
+    description: 'Go back',
+    group: 'Navigation',
+    tier: 'P0',
+    enabled: true,
+    when: function(ctx) { return !ctx.searchOpen && !ctx.shortcutsOpen; },
+    run: function() { history.back(); return true; },
+  },
+  {
+    id: 'history-forward',
+    keys: [']'],
+    description: 'Go forward',
+    group: 'Navigation',
+    tier: 'P0',
+    enabled: true,
+    when: function(ctx) { return !ctx.searchOpen && !ctx.shortcutsOpen; },
+    run: function() { history.forward(); return true; },
+  },
+  {
+    id: 'toggle-view',
+    keys: ['v'],
+    description: 'Toggle view mode (Preview/Code or Table/Records)',
+    group: 'View',
+    tier: 'P1',
+    enabled: true,
+    when: function(ctx) { return !ctx.searchOpen && !ctx.shortcutsOpen && ctx.hasViewToggle; },
+    run: function() { return toggleViewMode(); },
+  },
+  {
+    id: 'view-first',
+    keys: ['1'],
+    description: 'Switch to first view tab',
+    group: 'View',
+    tier: 'P1',
+    enabled: true,
+    when: function(ctx) { return !ctx.searchOpen && !ctx.shortcutsOpen && ctx.hasViewToggle; },
+    run: function() { return activateViewToggle(0); },
+  },
+  {
+    id: 'view-second',
+    keys: ['2'],
+    description: 'Switch to second view tab',
+    group: 'View',
+    tier: 'P1',
+    enabled: true,
+    when: function(ctx) { return !ctx.searchOpen && !ctx.shortcutsOpen && ctx.hasViewToggle; },
+    run: function() { return activateViewToggle(1); },
+  },
+  {
+    id: 'toggle-outline',
+    keys: ['o'],
+    description: 'Toggle outline sidebar',
+    group: 'View',
+    tier: 'P1',
+    enabled: true,
+    when: function(ctx) { return !ctx.searchOpen && !ctx.shortcutsOpen && ctx.canToggleOutline; },
+    run: function() { toggleOutline(); return true; },
+  },
+  {
+    id: 'p2-j',
+    keys: ['j'],
+    description: 'Move down (power keys)',
+    group: 'Navigation',
+    tier: 'P2',
+    enabled: true,
+    when: function() { return false; },
+    run: function() { return false; },
+  },
+  {
+    id: 'p2-k',
+    keys: ['k'],
+    description: 'Move up (power keys)',
+    group: 'Navigation',
+    tier: 'P2',
+    enabled: true,
+    when: function() { return false; },
+    run: function() { return false; },
+  },
+  {
+    id: 'p2-h',
+    keys: ['h'],
+    description: 'Move parent/collapse (power keys)',
+    group: 'Navigation',
+    tier: 'P2',
+    enabled: true,
+    when: function() { return false; },
+    run: function() { return false; },
+  },
+  {
+    id: 'p2-l',
+    keys: ['l'],
+    description: 'Open/expand (power keys)',
+    group: 'Navigation',
+    tier: 'P2',
+    enabled: true,
+    when: function() { return false; },
+    run: function() { return false; },
+  },
+];
+
+function renderShortcutsHelp() {
+  var content = document.getElementById('shortcuts-content');
+  var groups = ['General', 'Navigation', 'View'];
+  var html = '';
+  groups.forEach(function(group) {
+    var items = SHORTCUTS.filter(function(s) {
+      return s.group === group && isShortcutEnabled(s);
+    });
+    if (items.length === 0) return;
+    html += '<div class="shortcuts-group"><h4>' + group + '</h4>';
+    items.forEach(function(item) {
+      var keysHTML = item.keys.map(function(key) {
+        return '<kbd>' + esc(key) + '</kbd>';
+      }).join('');
+      html += '<div class="shortcuts-row"><span class="shortcuts-desc">' + esc(item.description) + '</span>' +
+        '<span class="shortcuts-keys">' + keysHTML + '</span></div>';
+    });
+    html += '</div>';
+  });
+  content.innerHTML = html;
+}
+
+function dispatchShortcut(e) {
+  if (hasModifier(e)) return false;
+  var key = e.key;
+  var ctx = getShortcutContext();
+  var typing = isTypingTarget(e.target);
+
+  for (var i = 0; i < SHORTCUTS.length; i++) {
+    var s = SHORTCUTS[i];
+    if (!isShortcutEnabled(s)) continue;
+    if (s.keys.indexOf(key) === -1) continue;
+    if (typing && key !== 'Escape') return false;
+    if (s.when && !s.when(ctx)) continue;
+    e.preventDefault();
+    return s.run(ctx) !== false;
+  }
+  return false;
+}
+
 document.addEventListener('keydown', function(e) {
-  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
-  if (e.key === 't') { e.preventDefault(); openSearch(); }
+  dispatchShortcut(e);
 });
 
 /* ── Resize handle ────────────────────────────────────────── */
