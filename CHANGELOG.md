@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- [added] Keyboard shortcuts system with centralized keymap and in-app help modal (`?`): includes `t`/`/` for Go to file, `Esc` to close active panels, `[`/`]` for browser back/forward, `v`/`1`/`2` for file view toggles, and `o` for markdown outline toggle.
+- [changed] Updated search affordance hints in UI (`t` + `/`) and welcome copy to surface shortcut discovery.
+- [tests] Added shortcut coverage in Playwright and frontend test harness for `/`, `?`, `Esc`, view-toggle keys, and outline toggle behavior.
 
 ## [v0.4.0] - 2026-03-01
 

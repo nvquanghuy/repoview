@@ -264,6 +264,33 @@ test.describe("Fuzzy search", () => {
     await expect(page.locator(".search-result").first()).toBeVisible();
     await expect(page.locator(".search-result .sr-path", { hasText: "nested" })).toBeVisible();
   });
+
+  test("press '/' opens search and Escape closes it", async ({ page }) => {
+    await page.goto("/");
+    await expect(page.locator("#tree-container .tree-item")).not.toHaveCount(0);
+    await page.keyboard.press("/");
+    await expect(page.locator("#search-overlay")).toHaveClass(/open/);
+    await page.keyboard.press("Escape");
+    await expect(page.locator("#search-overlay")).not.toHaveClass(/open/);
+  });
+});
+
+test.describe("Shortcut help modal", () => {
+  test("shortcuts button is visible and opens modal on click", async ({ page }) => {
+    await page.goto("/");
+    await expect(page.locator("#shortcuts-btn")).toBeVisible();
+    await page.locator("#shortcuts-btn").click();
+    await expect(page.locator("#shortcuts-overlay")).toHaveClass(/open/);
+  });
+
+  test("press '?' opens shortcuts modal and Escape closes it", async ({ page }) => {
+    await page.goto("/");
+    await page.keyboard.press("Shift+/");
+    await expect(page.locator("#shortcuts-overlay")).toHaveClass(/open/);
+    await expect(page.locator("#shortcuts-content")).toContainText("Open Go to file");
+    await page.keyboard.press("Escape");
+    await expect(page.locator("#shortcuts-overlay")).not.toHaveClass(/open/);
+  });
 });
 
 test.describe("Anchor links", () => {
@@ -365,6 +392,32 @@ test.describe("Markdown raw/preview toggle", () => {
     await expect(page.locator("#content-area .markdown-body")).not.toBeVisible();
     // Toggle should show Code as active
     await expect(page.locator(".view-toggle button.active", { hasText: "Code" })).toBeVisible();
+  });
+
+  test("keyboard shortcuts: v/1/2 switch markdown views", async ({ page }) => {
+    await page.goto("/hello.md");
+    await expect(page.locator("#content-area .markdown-body")).toBeVisible();
+
+    await page.keyboard.press("v");
+    await expect(page.locator("#content-area .source-code")).toBeVisible();
+
+    await page.keyboard.press("1");
+    await expect(page.locator("#content-area .markdown-body")).toBeVisible();
+
+    await page.keyboard.press("2");
+    await expect(page.locator("#content-area .source-code")).toBeVisible();
+  });
+
+  test("keyboard shortcut 'o' toggles outline sidebar", async ({ page }) => {
+    await page.goto("/hello.md");
+    await expect(page.locator(".outline-btn")).toBeVisible();
+    await expect(page.locator("#outline-sidebar")).not.toHaveClass(/open/);
+
+    await page.keyboard.press("o");
+    await expect(page.locator("#outline-sidebar")).toHaveClass(/open/);
+
+    await page.keyboard.press("o");
+    await expect(page.locator("#outline-sidebar")).not.toHaveClass(/open/);
   });
 });
 

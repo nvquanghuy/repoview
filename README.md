@@ -14,6 +14,7 @@ I noticed my marketing team, when working with Claude Code and lots of markdown 
 - **Markdown rendering** — GitHub-Flavored Markdown via goldmark (tables, task lists, code blocks)
 - **CSV rendering** — automatic conversion to styled HTML tables
 - **Fuzzy file search** — press `t` to open a "Go to file" modal with fuzzy matching
+- **Keyboard shortcuts** — GitHub-like shortcuts for search, navigation, and view toggles (`?` for help)
 - **Live reload** — WebSocket-based file watching with fsnotify; changes appear instantly
 - **Single binary** — all HTML/CSS/JS embedded via `go:embed`, no external dependencies at runtime
 - **Lazy-loading tree** — sidebar fetches directory contents on demand for fast startup on large repos
@@ -92,6 +93,22 @@ The update command downloads the latest release from GitHub, shows release notes
 | `GET /api/file?path=` | Returns rendered file content as JSON (`content`, `name`, `path`, `isMarkdown`, `isCSV`) |
 | `GET /api/files` | Returns a flat list of all file paths (uses `git ls-files` when available) |
 | `WS /ws` | WebSocket for file change notifications |
+
+## Keyboard Shortcuts
+
+Press `?` in the app to view all available shortcuts.
+
+| Shortcut | Action |
+|----------|--------|
+| `t` / `/` | Open Go to file search |
+| `Esc` | Close open panel (search, shortcuts, outline) |
+| `?` | Open keyboard shortcuts modal |
+| `[` | Browser back |
+| `]` | Browser forward |
+| `v` | Toggle active view (Preview/Code, Table/Records) |
+| `1` | Activate first view tab |
+| `2` | Activate second view tab |
+| `o` | Toggle markdown outline sidebar (when available) |
 
 ## Development
 
