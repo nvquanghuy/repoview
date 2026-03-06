@@ -379,13 +379,15 @@ a:hover { text-decoration: underline; }
 }
 .edit-dropdown-menu.open { display: block; }
 .edit-dropdown-item {
-  display: block; width: 100%; padding: 8px 12px;
+  display: flex; align-items: center; gap: 8px;
+  width: 100%; padding: 8px 12px;
   font-size: 13px; color: #1f2328; text-align: left;
   background: none; border: none; cursor: pointer;
   font-family: inherit;
 }
 .edit-dropdown-item:hover { background: #f6f8fa; }
 .edit-dropdown-item.preferred { font-weight: 600; }
+.edit-dropdown-item svg { width: 16px; height: 16px; flex-shrink: 0; }
 .edit-dropdown-empty {
   padding: 12px; color: #656d76; font-size: 13px; text-align: center;
 }
@@ -546,6 +548,15 @@ async function apiFetch(url) {
 }
 
 /* ── Editor functions ─────────────────────────────────────── */
+var editorIcons = {
+  vscode: '<svg viewBox="0 0 24 24" fill="none"><path d="M17.5 3L7 12l10.5 9V3z" fill="#0078D4"/><path d="M17.5 3L7 12l3.3 2.8L17.5 8V3z" fill="#0078D4"/><path d="M7 12l-4.3-3.6 1.8-2.1L7 8.5V12z" fill="#1F9CF0"/><path d="M7 12l-4.3 3.6 1.8 2.1L7 15.5V12z" fill="#1F9CF0"/><path d="M17.5 3l3.8 2.3v13.4l-3.8 2.3V3z" fill="#0065A9"/><path d="M4.5 6.3L2.7 8.4 7 12V8.5L4.5 6.3z" fill="#007ACC"/><path d="M4.5 17.7l-1.8-2.1L7 12v3.5l-2.5 2.2z" fill="#007ACC"/></svg>',
+  cursor: '<svg viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="3" fill="#000"/><path d="M8 7v10l3-3h5" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  sublime: '<svg viewBox="0 0 24 24" fill="none"><path d="M3 15.5l9-4.5 9 4.5-9 4.5-9-4.5z" fill="#FF9800"/><path d="M3 11l9-4.5 9 4.5-9 4.5-9-4.5z" fill="#FF9800"/><path d="M3 11l9 4.5v4.5l-9-4.5V11z" fill="#E65100"/><path d="M21 11l-9 4.5v4.5l9-4.5V11z" fill="#F57C00"/></svg>',
+  zed: '<svg viewBox="0 0 24 24" fill="none"><path d="M4 4h16v3H9.5L20 17v3H4v-3h10.5L4 7V4z" fill="#084CCF"/></svg>',
+  idea: '<svg viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="2" fill="#000"/><path d="M6 17h6v1H6v-1z" fill="#fff"/><path d="M6 6h2.5l2 4.5L12.5 6H15l-3.5 7H9.5L6 6z" fill="#fff"/></svg>',
+  vim: '<svg viewBox="0 0 24 24" fill="none"><path d="M3 5l4 7-4 7h4l4-7-4-7H3z" fill="#019833"/><path d="M13 5l4 7-4 7h4l4-7-4-7h-4z" fill="#019833"/></svg>'
+};
+
 async function loadEditors() {
   var result = await apiFetch('/api/editors');
   if (result.ok) {
@@ -609,7 +620,8 @@ function populateEditMenu(menu) {
     if (editor.id === preferredEditor) {
       item.classList.add('preferred');
     }
-    item.textContent = editor.name;
+    var icon = editorIcons[editor.id] || '';
+    item.innerHTML = icon + '<span>' + esc(editor.name) + '</span>';
     item.onclick = function(e) {
       e.stopPropagation();
       menu.classList.remove('open');
