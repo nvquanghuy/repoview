@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+
+## [v0.5.0] - 2026-03-06
+
 - [added] Add "Edit" button with editor selection, open local computer code editors.
 
 ## [v0.4.0] - 2026-03-01
