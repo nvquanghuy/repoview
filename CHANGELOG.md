@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- [added] Edit button with editor selection: GitHub-style dropdown in the file header bar to open files in your preferred code editor (VS Code, Cursor, Sublime Text, Zed, IntelliJ IDEA, Vim). Auto-detects installed editors, remembers your preference, and provides helpful setup instructions if the CLI command isn't configured.
 
 ## [v0.4.0] - 2026-03-01
 

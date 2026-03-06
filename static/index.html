@@ -359,6 +359,59 @@ a:hover { text-decoration: underline; }
 }
 .svg-preview svg { max-width: 100%; max-height: 70vh; }
 
+/* ── Edit dropdown ────────────────────────────────────────── */
+.edit-dropdown { position: relative; display: inline-block; }
+.edit-dropdown-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 12px; font-size: 12px; font-weight: 500;
+  color: #1f2328; background: #f6f8fa;
+  border: 1px solid #d0d7de; border-radius: 6px;
+  cursor: pointer; font-family: inherit;
+}
+.edit-dropdown-btn:hover { background: #eaeef2; }
+.edit-dropdown-btn svg { width: 16px; height: 16px; color: #656d76; }
+.edit-dropdown-menu {
+  display: none; position: absolute; top: 100%; right: 0;
+  margin-top: 4px; min-width: 160px;
+  background: #fff; border: 1px solid #d0d7de; border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12); z-index: 100;
+  overflow: hidden;
+}
+.edit-dropdown-menu.open { display: block; }
+.edit-dropdown-item {
+  display: block; width: 100%; padding: 8px 12px;
+  font-size: 13px; color: #1f2328; text-align: left;
+  background: none; border: none; cursor: pointer;
+  font-family: inherit;
+}
+.edit-dropdown-item:hover { background: #f6f8fa; }
+.edit-dropdown-item.preferred { font-weight: 600; }
+.edit-dropdown-empty {
+  padding: 12px; color: #656d76; font-size: 13px; text-align: center;
+}
+
+/* ── Editor error toast ───────────────────────────────────── */
+.editor-toast {
+  position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+  background: #fff; border: 1px solid #d0d7de; border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.15); padding: 12px 16px;
+  max-width: 400px; z-index: 300; animation: toastSlideUp 0.2s ease-out;
+}
+.editor-toast-content { display: flex; align-items: flex-start; gap: 12px; }
+.editor-toast-icon { color: #cf222e; flex-shrink: 0; }
+.editor-toast-message { flex: 1; font-size: 13px; color: #1f2328; }
+.editor-toast-link { color: #0969da; text-decoration: none; }
+.editor-toast-link:hover { text-decoration: underline; }
+.editor-toast-close {
+  background: none; border: none; padding: 4px; cursor: pointer;
+  color: #656d76; border-radius: 4px; flex-shrink: 0;
+}
+.editor-toast-close:hover { background: #f6f8fa; color: #1f2328; }
+@keyframes toastSlideUp {
+  from { transform: translateX(-50%) translateY(20px); opacity: 0; }
+  to { transform: translateX(-50%) translateY(0); opacity: 1; }
+}
+
 /* ── Scrollbar ────────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: transparent; }
@@ -442,6 +495,8 @@ let searchIdx = 0;
 let ws = null;
 let watchedPaths = new Set();
 let connectionLost = false;
+var availableEditors = [];
+var preferredEditor = localStorage.getItem('preferredEditor');
 
 /* ── Connection Status ───────────────────────────────────── */
 function showConnectionError(message) {
@@ -488,6 +543,115 @@ async function apiFetch(url) {
     showConnectionError();
     return { ok: false, status: 0, error: 'network', isNetworkError: true };
   }
+}
+
+/* ── Editor functions ─────────────────────────────────────── */
+async function loadEditors() {
+  var result = await apiFetch('/api/editors');
+  if (result.ok) {
+    availableEditors = result.data || [];
+  }
+}
+
+function createEditButton() {
+  var container = document.createElement('div');
+  container.className = 'edit-dropdown';
+
+  var btn = document.createElement('button');
+  btn.className = 'edit-dropdown-btn';
+  btn.innerHTML = '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M11.013 1.427a1.75 1.75 0 0 1 2.474 0l1.086 1.086a1.75 1.75 0 0 1 0 2.474l-8.61 8.61c-.21.21-.47.364-.756.445l-3.251.93a.75.75 0 0 1-.927-.928l.929-3.25c.081-.286.235-.547.445-.758l8.61-8.61Zm.176 4.823L9.75 4.81l-6.286 6.287a.253.253 0 0 0-.064.108l-.558 1.953 1.953-.558a.253.253 0 0 0 .108-.064Zm1.238-3.763a.25.25 0 0 0-.354 0L10.811 3.75l1.439 1.44 1.263-1.263a.25.25 0 0 0 0-.354Z"/></svg>Edit';
+
+  var menu = document.createElement('div');
+  menu.className = 'edit-dropdown-menu';
+
+  btn.onclick = function(e) {
+    e.stopPropagation();
+    // Close any other open dropdowns
+    document.querySelectorAll('.edit-dropdown-menu.open').forEach(function(m) {
+      if (m !== menu) m.classList.remove('open');
+    });
+    menu.classList.toggle('open');
+    if (menu.classList.contains('open')) {
+      populateEditMenu(menu);
+    }
+  };
+
+  container.appendChild(btn);
+  container.appendChild(menu);
+
+  // Close on outside click
+  document.addEventListener('click', function(e) {
+    if (!container.contains(e.target)) {
+      menu.classList.remove('open');
+    }
+  });
+
+  return container;
+}
+
+function populateEditMenu(menu) {
+  menu.innerHTML = '';
+  if (availableEditors.length === 0) {
+    menu.innerHTML = '<div class="edit-dropdown-empty">No editors found</div>';
+    return;
+  }
+
+  // Sort editors with preferred first
+  var sorted = availableEditors.slice().sort(function(a, b) {
+    if (a.id === preferredEditor) return -1;
+    if (b.id === preferredEditor) return 1;
+    return a.name.localeCompare(b.name);
+  });
+
+  sorted.forEach(function(editor) {
+    var item = document.createElement('button');
+    item.className = 'edit-dropdown-item';
+    if (editor.id === preferredEditor) {
+      item.classList.add('preferred');
+    }
+    item.textContent = editor.name;
+    item.onclick = function(e) {
+      e.stopPropagation();
+      menu.classList.remove('open');
+      openInEditor(editor.id);
+    };
+    menu.appendChild(item);
+  });
+}
+
+async function openInEditor(editorId) {
+  // Save preference
+  preferredEditor = editorId;
+  localStorage.setItem('preferredEditor', editorId);
+
+  var res = await fetch('/api/open?path=' + encodeURIComponent(currentFilePath) + '&editor=' + encodeURIComponent(editorId), {
+    method: 'POST'
+  });
+  var data = await res.json();
+  if (!data.success) {
+    showEditorError(data.error, data.setupUrl);
+  }
+}
+
+function showEditorError(message, setupUrl) {
+  // Remove existing toast
+  var existing = document.querySelector('.editor-toast');
+  if (existing) existing.remove();
+
+  var toast = document.createElement('div');
+  toast.className = 'editor-toast';
+  var linkHtml = setupUrl ? ' <a class="editor-toast-link" href="' + escAttr(setupUrl) + '" target="_blank">Learn how →</a>' : '';
+  toast.innerHTML = '<div class="editor-toast-content">' +
+    '<svg class="editor-toast-icon" width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M2.343 13.657A8 8 0 1 1 13.658 2.343 8 8 0 0 1 2.343 13.657ZM6.03 4.97a.751.751 0 0 0-1.042.018.751.751 0 0 0-.018 1.042L6.94 8 4.97 9.97a.749.749 0 0 0 .326 1.275.749.749 0 0 0 .734-.215L8 9.06l1.97 1.97a.749.749 0 0 0 1.275-.326.749.749 0 0 0-.215-.734L9.06 8l1.97-1.97a.749.749 0 0 0-.326-1.275.749.749 0 0 0-.734.215L8 6.94Z"/></svg>' +
+    '<span class="editor-toast-message">' + esc(message) + linkHtml + '</span>' +
+    '<button class="editor-toast-close" onclick="this.parentElement.parentElement.remove()"><svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M3.72 3.72a.75.75 0 0 1 1.06 0L8 6.94l3.22-3.22a.749.749 0 0 1 1.275.326.749.749 0 0 1-.215.734L9.06 8l3.22 3.22a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215L8 9.06l-3.22 3.22a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042L6.94 8 3.72 4.78a.75.75 0 0 1 0-1.06Z"/></svg></button>' +
+    '</div>';
+  document.body.appendChild(toast);
+
+  // Auto-remove after 8 seconds
+  setTimeout(function() {
+    if (toast.parentElement) toast.remove();
+  }, 8000);
 }
 
 /* ── Tree ─────────────────────────────────────────────────── */
@@ -685,15 +849,23 @@ function showFileHeaderBar(toggle, meta) {
   var bar = document.getElementById('file-header-bar');
   var left = bar.querySelector('.file-header-left');
   var metaEl = bar.querySelector('.file-header-meta');
+  var actions = bar.querySelector('.file-header-actions');
 
   left.innerHTML = '';
   metaEl.innerHTML = '';
+  actions.innerHTML = '';
 
   if (toggle) {
     left.appendChild(toggle);
   }
   if (meta) {
     metaEl.innerHTML = meta;
+  }
+
+  // Add edit button if editors are available
+  if (availableEditors.length > 0 && currentFilePath) {
+    var editBtn = createEditButton();
+    actions.appendChild(editBtn);
   }
 
   bar.classList.add('visible');
@@ -970,7 +1142,8 @@ async function loadFile(path, skipPush) {
     if (data.isMarkdown && !wantCode) {
       outlineBtn = createOutlineButton();
       var actions = document.querySelector('#file-header-bar .file-header-actions');
-      actions.appendChild(outlineBtn);
+      // Insert outline button before edit button
+      actions.insertBefore(outlineBtn, actions.firstChild);
       if (localStorage.getItem('outlineOpen') === '1') {
         outlineBtn.classList.add('active');
       }
@@ -984,9 +1157,11 @@ async function loadFile(path, skipPush) {
       // Show outline button
       if (data.isMarkdown) {
         var actions = document.querySelector('#file-header-bar .file-header-actions');
-        actions.innerHTML = '';
+        // Remove old outline button if present
+        var oldOutline = actions.querySelector('.outline-btn');
+        if (oldOutline) oldOutline.remove();
         outlineBtn = createOutlineButton();
-        actions.appendChild(outlineBtn);
+        actions.insertBefore(outlineBtn, actions.firstChild);
         if (hasOutline && localStorage.getItem('outlineOpen') === '1') {
           outlineBtn.classList.add('active');
           showOutline();
@@ -999,9 +1174,10 @@ async function loadFile(path, skipPush) {
       btnPreview.className = '';
       setViewParam('code');
       hideOutline();
-      // Hide outline button
+      // Hide outline button (keep edit button)
       var actions = document.querySelector('#file-header-bar .file-header-actions');
-      actions.innerHTML = '';
+      var oldOutline = actions.querySelector('.outline-btn');
+      if (oldOutline) oldOutline.remove();
       outlineBtn = null;
     };
   } else if (data.isCSV) {
@@ -1498,7 +1674,7 @@ window.addEventListener('popstate', function() {
 
 /* ── Init ─────────────────────────────────────────────────── */
 (async function init() {
-  await refreshTree();
+  await Promise.all([refreshTree(), loadEditors()]);
   connectWS();
   if (!navigateFromURL(true)) {
     await navigateTo('', true);
