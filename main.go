@@ -49,7 +49,6 @@ var editorCommands = map[string]struct {
 	"sublime": {"Sublime Text", "subl"},
 	"zed":     {"Zed", "zed"},
 	"idea":    {"IntelliJ IDEA", "idea"},
-	"vim":     {"Vim (Terminal)", "vim"},
 }
 
 var editorSetupURLs = map[string]string{
@@ -561,17 +560,26 @@ func handleFiles(w http.ResponseWriter, r *http.Request) {
 
 // EditorInfo is returned by the /api/editors endpoint.
 type EditorInfo struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	Available bool   `json:"available"`
+	SetupURL  string `json:"setupUrl,omitempty"`
 }
 
-// handleEditors returns a list of installed editors.
+// handleEditors returns a list of all editors with availability status.
 func handleEditors(w http.ResponseWriter, r *http.Request) {
 	var editors []EditorInfo
 	for id, info := range editorCommands {
-		if _, err := exec.LookPath(info.Command); err == nil {
-			editors = append(editors, EditorInfo{ID: id, Name: info.Name})
+		_, err := exec.LookPath(info.Command)
+		editor := EditorInfo{
+			ID:        id,
+			Name:      info.Name,
+			Available: err == nil,
 		}
+		if err != nil {
+			editor.SetupURL = editorSetupURLs[id]
+		}
+		editors = append(editors, editor)
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(editors)

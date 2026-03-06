@@ -391,6 +391,15 @@ a:hover { text-decoration: underline; }
 .edit-dropdown-empty {
   padding: 12px; color: #656d76; font-size: 13px; text-align: center;
 }
+.edit-dropdown-footer {
+  padding: 8px 12px; color: #656d76; font-size: 11px;
+  border-top: 1px solid #d0d7de; line-height: 1.4;
+}
+.edit-dropdown-footer a { color: #0969da; }
+.edit-dropdown-header {
+  padding: 6px 12px; color: #656d76; font-size: 11px;
+  text-transform: uppercase; letter-spacing: 0.5px;
+}
 
 /* ── Editor error toast ───────────────────────────────────── */
 .editor-toast {
@@ -553,8 +562,7 @@ var editorIcons = {
   cursor: '<svg viewBox="0 0 24 24" fill="#000"><path d="M11.503.131 1.891 5.678a.84.84 0 0 0-.42.726v11.188c0 .3.162.575.42.724l9.609 5.55a1 1 0 0 0 .998 0l9.61-5.55a.84.84 0 0 0 .42-.724V6.404a.84.84 0 0 0-.42-.726L12.497.131a1.01 1.01 0 0 0-.996 0M2.657 6.338h18.55c.263 0 .43.287.297.515L12.23 22.918c-.062.107-.229.064-.229-.06V12.335a.59.59 0 0 0-.295-.51l-9.11-5.257c-.109-.063-.064-.23.061-.23"/></svg>',
   sublime: '<svg viewBox="0 0 24 24" fill="#FF9800"><path d="M20.953.004a.397.397 0 0 0-.18.017L3.225 5.585c-.175.055-.323.214-.402.398a.42.42 0 0 0-.06.22v5.726a.42.42 0 0 0 .06.22c.079.183.227.341.402.397l7.454 2.364-7.454 2.363c-.255.08-.463.374-.463.655v5.688c0 .282.208.444.463.363l17.55-5.565c.237-.075.426-.336.452-.6.003-.022.013-.04.013-.065V12.06c0-.281-.208-.575-.463-.656L13.4 9.065l7.375-2.339c.255-.08.462-.375.462-.656V.384c0-.211-.117-.355-.283-.38z"/></svg>',
   zed: '<svg viewBox="0 0 24 24" fill="#084CCF"><path d="M2.25 1.5a.75.75 0 0 0-.75.75v16.5H0V2.25A2.25 2.25 0 0 1 2.25 0h20.095c1.002 0 1.504 1.212.795 1.92L10.764 14.298h3.486V12.75h1.5v1.922a1.125 1.125 0 0 1-1.125 1.125H9.264l-2.578 2.578h11.689V9h1.5v9.375a1.5 1.5 0 0 1-1.5 1.5H5.185L2.562 22.5H21.75a.75.75 0 0 0 .75-.75V5.25H24v16.5A2.25 2.25 0 0 1 21.75 24H1.655C.653 24 .151 22.788.86 22.08L13.19 9.75H9.75v1.5h-1.5V9.375A1.125 1.125 0 0 1 9.375 8.25h5.314l2.625-2.625H5.625V15h-1.5V5.625a1.5 1.5 0 0 1 1.5-1.5h13.19L21.438 1.5z"/></svg>',
-  idea: '<svg viewBox="0 0 24 24" fill="#000"><path d="M0 0v24h24V0zm3.723 3.111h5v1.834h-1.39v6.277h1.39v1.834h-5v-1.834h1.444V4.945H3.723zm11.055 0H17v6.5c0 .612-.055 1.111-.222 1.556-.167.444-.39.777-.723 1.11-.277.279-.666.557-1.11.668a3.933 3.933 0 0 1-1.445.278c-.778 0-1.444-.167-1.944-.445a4.81 4.81 0 0 1-1.279-1.056l1.39-1.555c.277.334.555.555.833.722.277.167.611.278.945.278.389 0 .721-.111 1-.389.221-.278.333-.667.333-1.278zM2.222 19.5h9V21h-9z"/></svg>',
-  vim: '<svg viewBox="0 0 24 24" fill="#019733"><path d="M24 11.986h-.027l-4.318-4.318 4.303-4.414V1.461l-.649-.648h-8.198l-.66.605v1.045L12.015.027V0L12 .014 11.986 0v.027l-1.29 1.291-.538-.539H2.035l-.638.692v1.885l.616.616h.72v5.31L.027 11.987H0L.014 12 0 12.014h.027l2.706 2.706v6.467l.907.523h2.322l1.857-1.904 4.166 4.166V24l.015-.014.014.014v-.028l2.51-2.509h.485c.111 0 .211-.07.25-.179l.146-.426c.028-.084.012-.172-.037-.239l1.462-1.462-.612 1.962c-.043.141.036.289.177.332.025.008.052.012.078.012h1.824c.106-.001.201-.064.243-.163l.165-.394c.025-.065.024-.138-.004-.203-.027-.065-.08-.116-.146-.142-.029-.012-.062-.019-.097-.02h-.075l.84-2.644h1.232l-1.016 3.221c-.043.141.036.289.176.332.025.008.052.012.079.012h2.002c.11 0 .207-.066.248-.17l.164-.428c.051-.138-.021-.29-.158-.341-.029-.011-.06-.017-.091-.017h-.145l1.131-3.673c.027-.082.012-.173-.039-.24l-.375-.504-.003-.005c-.051-.064-.127-.102-.209-.102h-1.436c-.071 0-.141.03-.19.081l-.4.439h-.624l-.042-.046 4.445-4.445H24L23.986 12l.014-.014zM9.838 21.139l1.579-4.509h-.501l.297-.304h1.659l-1.563 4.555h.623l-.079.258H9.838zm3.695-7.516l.15.151-.269.922-.225.226h-.969l-.181-.181.311-.871.288-.247h.895zM5.59 20.829H3.877l-.262-.15V3.091H2.379l-.1-.1V1.815l.143-.154h7.371l.213.214v1.108l-.142.173H8.785v8.688l8.807-8.688h-2.086l-.175-.188V1.805l.121-.111h7.49l.132.133v1.07L12.979 13.25h-.373c-.015-.001-.028 0-.042.001l-.02.003c-.045.01-.086.03-.119.06l-.343.295-.004.003c-.033.031-.059.069-.073.111l-.296.83-6.119 6.276zm14.768-3.952l.474-.519h1.334l.309.415-1.265 4.107h.493l-.08.209H19.84l1.124-3.564h-2.015l-1.077 3.391h.424l-.073.174h-1.605l1.107-3.548h-2.096l-1.062 3.339h.436l-.072.209H13.27l1.514-4.46H14.198l.091-.271h1.65l.519.537h.906l.491-.554h1.061l.489.535h.953z"/></svg>'
+  idea: '<svg viewBox="0 0 24 24" fill="#000"><path d="M0 0v24h24V0zm3.723 3.111h5v1.834h-1.39v6.277h1.39v1.834h-5v-1.834h1.444V4.945H3.723zm11.055 0H17v6.5c0 .612-.055 1.111-.222 1.556-.167.444-.39.777-.723 1.11-.277.279-.666.557-1.11.668a3.933 3.933 0 0 1-1.445.278c-.778 0-1.444-.167-1.944-.445a4.81 4.81 0 0 1-1.279-1.056l1.39-1.555c.277.334.555.555.833.722.277.167.611.278.945.278.389 0 .721-.111 1-.389.221-.278.333-.667.333-1.278zM2.222 19.5h9V21h-9z"/></svg>'
 };
 
 async function loadEditors() {
@@ -602,33 +610,55 @@ function createEditButton() {
 
 function populateEditMenu(menu) {
   menu.innerHTML = '';
-  if (availableEditors.length === 0) {
+
+  // Filter editors into installed and not installed
+  var installed = availableEditors.filter(function(e) { return e.available; });
+  var notInstalled = availableEditors.filter(function(e) { return !e.available; });
+
+  if (installed.length === 0) {
     menu.innerHTML = '<div class="edit-dropdown-empty">No editors found</div>';
-    return;
+  } else {
+    // Add header
+    var header = document.createElement('div');
+    header.className = 'edit-dropdown-header';
+    header.textContent = 'Installed editors';
+    menu.appendChild(header);
+
+    // Sort: preferred first, then alphabetically
+    var sorted = installed.slice().sort(function(a, b) {
+      if (a.id === preferredEditor) return -1;
+      if (b.id === preferredEditor) return 1;
+      return a.name.localeCompare(b.name);
+    });
+
+    sorted.forEach(function(editor) {
+      var item = document.createElement('button');
+      item.className = 'edit-dropdown-item';
+      if (editor.id === preferredEditor) {
+        item.classList.add('preferred');
+      }
+      var icon = editorIcons[editor.id] || '';
+      item.innerHTML = icon + '<span>' + esc(editor.name) + '</span>';
+      item.onclick = function(e) {
+        e.stopPropagation();
+        menu.classList.remove('open');
+        openInEditor(editor.id);
+      };
+      menu.appendChild(item);
+    });
   }
 
-  // Sort editors with preferred first
-  var sorted = availableEditors.slice().sort(function(a, b) {
-    if (a.id === preferredEditor) return -1;
-    if (b.id === preferredEditor) return 1;
-    return a.name.localeCompare(b.name);
-  });
-
-  sorted.forEach(function(editor) {
-    var item = document.createElement('button');
-    item.className = 'edit-dropdown-item';
-    if (editor.id === preferredEditor) {
-      item.classList.add('preferred');
-    }
-    var icon = editorIcons[editor.id] || '';
-    item.innerHTML = icon + '<span>' + esc(editor.name) + '</span>';
-    item.onclick = function(e) {
-      e.stopPropagation();
-      menu.classList.remove('open');
-      openInEditor(editor.id);
-    };
-    menu.appendChild(item);
-  });
+  // Show footer with uninstalled editors as links
+  if (notInstalled.length > 0) {
+    notInstalled.sort(function(a, b) { return a.name.localeCompare(b.name); });
+    var links = notInstalled.map(function(e) {
+      return '<a href="' + escAttr(e.setupUrl) + '" target="_blank">' + esc(e.name) + '</a>';
+    });
+    var footer = document.createElement('div');
+    footer.className = 'edit-dropdown-footer';
+    footer.innerHTML = 'Also supports: ' + links.join(', ') + '.<br>Requires shell command installation.';
+    menu.appendChild(footer);
+  }
 }
 
 async function openInEditor(editorId) {
@@ -874,8 +904,9 @@ function showFileHeaderBar(toggle, meta) {
     metaEl.innerHTML = meta;
   }
 
-  // Add edit button if editors are available
-  if (availableEditors.length > 0 && currentFilePath) {
+  // Add edit button if installed editors are available
+  var hasInstalledEditors = availableEditors.some(function(e) { return e.available; });
+  if (hasInstalledEditors && currentFilePath) {
     var editBtn = createEditButton();
     actions.appendChild(editBtn);
   }
