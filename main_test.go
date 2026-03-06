@@ -1066,6 +1066,130 @@ func TestSPARoute_EncodedPaths(t *testing.T) {
 }
 
 
+// ── Editor endpoints tests ─────────────────────────────────────
+
+func TestHandleEditors(t *testing.T) {
+	req := httptest.NewRequest("GET", "/api/editors", nil)
+	w := httptest.NewRecorder()
+	handleEditors(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+
+	var editors []EditorInfo
+	if err := json.NewDecoder(w.Body).Decode(&editors); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+
+	// Should return an array (may be empty if no editors installed)
+	if editors == nil {
+		t.Error("expected non-nil array")
+	}
+}
+
+func TestHandleOpen_InvalidEditor(t *testing.T) {
+	setRoot(t, "testdata")
+
+	req := httptest.NewRequest("POST", "/api/open?path=hello.md&editor=nonexistent", nil)
+	w := httptest.NewRecorder()
+	handleOpen(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+
+	var resp OpenResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+
+	if resp.Success {
+		t.Error("expected success=false for unknown editor")
+	}
+	if resp.Error != "unknown editor" {
+		t.Errorf("expected 'unknown editor' error, got %q", resp.Error)
+	}
+}
+
+func TestHandleOpen_MissingPath(t *testing.T) {
+	req := httptest.NewRequest("POST", "/api/open?editor=vscode", nil)
+	w := httptest.NewRecorder()
+	handleOpen(w, req)
+
+	var resp OpenResponse
+	json.NewDecoder(w.Body).Decode(&resp)
+
+	if resp.Success {
+		t.Error("expected success=false for missing path")
+	}
+	if resp.Error != "path required" {
+		t.Errorf("expected 'path required' error, got %q", resp.Error)
+	}
+}
+
+func TestHandleOpen_MissingEditor(t *testing.T) {
+	req := httptest.NewRequest("POST", "/api/open?path=hello.md", nil)
+	w := httptest.NewRecorder()
+	handleOpen(w, req)
+
+	var resp OpenResponse
+	json.NewDecoder(w.Body).Decode(&resp)
+
+	if resp.Success {
+		t.Error("expected success=false for missing editor")
+	}
+	if resp.Error != "editor required" {
+		t.Errorf("expected 'editor required' error, got %q", resp.Error)
+	}
+}
+
+func TestHandleOpen_PathTraversal(t *testing.T) {
+	setRoot(t, "testdata")
+
+	req := httptest.NewRequest("POST", "/api/open?path=../../../etc/passwd&editor=vscode", nil)
+	w := httptest.NewRecorder()
+	handleOpen(w, req)
+
+	var resp OpenResponse
+	json.NewDecoder(w.Body).Decode(&resp)
+
+	if resp.Success {
+		t.Error("expected success=false for path traversal")
+	}
+	if resp.Error != "invalid path" {
+		t.Errorf("expected 'invalid path' error, got %q", resp.Error)
+	}
+}
+
+func TestHandleOpen_FileNotFound(t *testing.T) {
+	setRoot(t, "testdata")
+
+	req := httptest.NewRequest("POST", "/api/open?path=nonexistent.txt&editor=vscode", nil)
+	w := httptest.NewRecorder()
+	handleOpen(w, req)
+
+	var resp OpenResponse
+	json.NewDecoder(w.Body).Decode(&resp)
+
+	if resp.Success {
+		t.Error("expected success=false for nonexistent file")
+	}
+	if resp.Error != "file not found" {
+		t.Errorf("expected 'file not found' error, got %q", resp.Error)
+	}
+}
+
+func TestHandleOpen_MethodNotAllowed(t *testing.T) {
+	req := httptest.NewRequest("GET", "/api/open?path=hello.md&editor=vscode", nil)
+	w := httptest.NewRecorder()
+	handleOpen(w, req)
+
+	if w.Code != http.StatusMethodNotAllowed {
+		t.Errorf("expected 405, got %d", w.Code)
+	}
+}
+
 // ── Port finding tests ─────────────────────────────────────────
 
 func TestFindAvailablePort_FirstPortAvailable(t *testing.T) {

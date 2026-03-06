@@ -39,6 +39,24 @@ var version = "dev"
 
 var rootDir string
 
+// Editor configuration for the edit button feature.
+var editorCommands = map[string]struct {
+	Name    string
+	Command string
+}{
+	"vscode":  {"VS Code", "code"},
+	"cursor":  {"Cursor", "cursor"},
+	"sublime": {"Sublime Text", "subl"},
+	"zed":     {"Zed", "zed"},
+}
+
+var editorSetupURLs = map[string]string{
+	"vscode":  "https://code.visualstudio.com/docs/setup/mac#_launch-vs-code-from-the-command-line",
+	"cursor":  "https://cursor.com/docs/cli/installation",
+	"sublime": "https://www.sublimetext.com/docs/command_line.html",
+	"zed":     "https://zed.dev/features#cli",
+}
+
 // TreeEntry represents a single item in the file tree.
 type TreeEntry struct {
 	Name      string `json:"name"`
@@ -107,6 +125,8 @@ func main() {
 	http.HandleFunc("/api/file", handleFile)
 	http.HandleFunc("/api/files", handleFiles)
 	http.HandleFunc("/api/raw", handleRaw)
+	http.HandleFunc("/api/editors", handleEditors)
+	http.HandleFunc("/api/open", handleOpen)
 	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
 		handleWS(w, r, hub, watcher)
 	})
@@ -534,6 +554,99 @@ func handleFiles(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(files)
+}
+
+// EditorInfo is returned by the /api/editors endpoint.
+type EditorInfo struct {
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	Available bool   `json:"available"`
+	SetupURL  string `json:"setupUrl,omitempty"`
+}
+
+// handleEditors returns a list of all editors with availability status.
+func handleEditors(w http.ResponseWriter, r *http.Request) {
+	var editors []EditorInfo
+	for id, info := range editorCommands {
+		_, err := exec.LookPath(info.Command)
+		editor := EditorInfo{
+			ID:        id,
+			Name:      info.Name,
+			Available: err == nil,
+		}
+		if err != nil {
+			editor.SetupURL = editorSetupURLs[id]
+		}
+		editors = append(editors, editor)
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(editors)
+}
+
+// OpenResponse is returned by the /api/open endpoint.
+type OpenResponse struct {
+	Success  bool   `json:"success"`
+	Error    string `json:"error,omitempty"`
+	SetupURL string `json:"setupUrl,omitempty"`
+}
+
+// handleOpen opens a file in the specified editor.
+func handleOpen(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	reqPath := r.URL.Query().Get("path")
+	editorID := r.URL.Query().Get("editor")
+
+	if reqPath == "" {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(OpenResponse{Success: false, Error: "path required"})
+		return
+	}
+	if editorID == "" {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(OpenResponse{Success: false, Error: "editor required"})
+		return
+	}
+
+	editor, ok := editorCommands[editorID]
+	if !ok {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(OpenResponse{Success: false, Error: "unknown editor"})
+		return
+	}
+
+	filePath, err := safePath(reqPath)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(OpenResponse{Success: false, Error: "invalid path"})
+		return
+	}
+
+	// Verify file exists
+	if _, err := os.Stat(filePath); err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(OpenResponse{Success: false, Error: "file not found"})
+		return
+	}
+
+	// Try to run the editor command
+	cmd := exec.Command(editor.Command, filePath)
+	if err := cmd.Start(); err != nil {
+		setupURL := editorSetupURLs[editorID]
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(OpenResponse{
+			Success:  false,
+			Error:    fmt.Sprintf("Could not open in %s. Make sure the '%s' CLI command is set up.", editor.Name, editor.Command),
+			SetupURL: setupURL,
+		})
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(OpenResponse{Success: true})
 }
 
 // --- WebSocket hub and client ---
