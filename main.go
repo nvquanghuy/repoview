@@ -48,15 +48,13 @@ var editorCommands = map[string]struct {
 	"cursor":  {"Cursor", "cursor"},
 	"sublime": {"Sublime Text", "subl"},
 	"zed":     {"Zed", "zed"},
-	"idea":    {"IntelliJ IDEA", "idea"},
 }
 
 var editorSetupURLs = map[string]string{
-	"vscode":  "https://code.visualstudio.com/docs/setup/mac#_launching-from-the-command-line",
-	"cursor":  "https://docs.cursor.com/get-started/install#command-line",
+	"vscode":  "https://code.visualstudio.com/docs/setup/mac#_launch-vs-code-from-the-command-line",
+	"cursor":  "https://cursor.com/docs/cli/installation",
 	"sublime": "https://www.sublimetext.com/docs/command_line.html",
-	"zed":     "https://zed.dev/docs/getting-started#command-palette",
-	"idea":    "https://www.jetbrains.com/help/idea/working-with-the-ide-features-from-command-line.html",
+	"zed":     "https://zed.dev/features#cli",
 }
 
 // TreeEntry represents a single item in the file tree.
