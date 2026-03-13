@@ -1113,3 +1113,173 @@ func TestFindAvailablePort_SkipsMultipleOccupiedPorts(t *testing.T) {
 		t.Errorf("expected port 19203, got %d", port)
 	}
 }
+
+// ── Symlink tests ────────────────────────────────────────────
+
+func TestHandleTree_SymlinkDirectory(t *testing.T) {
+	// Create a temp directory structure with a symlink to a directory
+	tmpDir := t.TempDir()
+	realDir := filepath.Join(tmpDir, "realdir")
+	if err := os.Mkdir(realDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	// Create a file inside the real directory
+	if err := os.WriteFile(filepath.Join(realDir, "file.txt"), []byte("content"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	// Create a symlink to the directory
+	linkDir := filepath.Join(tmpDir, "linkdir")
+	if err := os.Symlink(realDir, linkDir); err != nil {
+		t.Skipf("symlinks not supported: %v", err)
+	}
+
+	setRoot(t, tmpDir)
+
+	req := httptest.NewRequest("GET", "/api/tree", nil)
+	w := httptest.NewRecorder()
+	handleTree(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+
+	var entries []TreeEntry
+	if err := json.NewDecoder(w.Body).Decode(&entries); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+
+	// Find the symlinked directory entry
+	var linkEntry *TreeEntry
+	for i, e := range entries {
+		if e.Name == "linkdir" {
+			linkEntry = &entries[i]
+			break
+		}
+	}
+
+	if linkEntry == nil {
+		t.Fatal("expected to find linkdir in tree entries")
+	}
+	if !linkEntry.IsDir {
+		t.Error("expected symlinked directory to have IsDir=true")
+	}
+}
+
+func TestHandleTree_SymlinkFile(t *testing.T) {
+	// Create a temp directory with a symlink to a file
+	tmpDir := t.TempDir()
+	realFile := filepath.Join(tmpDir, "realfile.txt")
+	if err := os.WriteFile(realFile, []byte("content"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	linkFile := filepath.Join(tmpDir, "linkfile.txt")
+	if err := os.Symlink(realFile, linkFile); err != nil {
+		t.Skipf("symlinks not supported: %v", err)
+	}
+
+	setRoot(t, tmpDir)
+
+	req := httptest.NewRequest("GET", "/api/tree", nil)
+	w := httptest.NewRecorder()
+	handleTree(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+
+	var entries []TreeEntry
+	if err := json.NewDecoder(w.Body).Decode(&entries); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+
+	var linkEntry *TreeEntry
+	for i, e := range entries {
+		if e.Name == "linkfile.txt" {
+			linkEntry = &entries[i]
+			break
+		}
+	}
+
+	if linkEntry == nil {
+		t.Fatal("expected to find linkfile.txt in tree entries")
+	}
+	if linkEntry.IsDir {
+		t.Error("expected symlinked file to have IsDir=false")
+	}
+	if linkEntry.Extension != "txt" {
+		t.Errorf("expected extension txt, got %s", linkEntry.Extension)
+	}
+}
+
+func TestHandleFile_ThroughSymlink(t *testing.T) {
+	// Create a temp directory with a symlinked subdirectory containing a file
+	tmpDir := t.TempDir()
+	realDir := filepath.Join(tmpDir, "realdir")
+	if err := os.Mkdir(realDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(realDir, "test.md"), []byte("# Hello"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	linkDir := filepath.Join(tmpDir, "linkdir")
+	if err := os.Symlink(realDir, linkDir); err != nil {
+		t.Skipf("symlinks not supported: %v", err)
+	}
+
+	setRoot(t, tmpDir)
+
+	req := httptest.NewRequest("GET", "/api/file?path=linkdir/test.md", nil)
+	w := httptest.NewRecorder()
+	handleFile(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+
+	var resp FileResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+	if !resp.IsMarkdown {
+		t.Error("expected IsMarkdown to be true")
+	}
+	if !strings.Contains(resp.Content, "Hello") {
+		t.Error("expected content to contain Hello")
+	}
+}
+
+func TestSafePath_SymlinkRoot(t *testing.T) {
+	// Create a temp directory and symlink to it
+	tmpDir := t.TempDir()
+	realDir := filepath.Join(tmpDir, "real")
+	if err := os.Mkdir(realDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(realDir, "file.txt"), []byte("content"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	linkDir := filepath.Join(tmpDir, "link")
+	if err := os.Symlink(realDir, linkDir); err != nil {
+		t.Skipf("symlinks not supported: %v", err)
+	}
+
+	// Set root to the symlink - it should be resolved
+	abs, err := filepath.Abs(linkDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resolved, err := filepath.EvalSymlinks(abs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rootDir = resolved
+
+	// Access a file through the resolved path should work
+	path, err := safePath("file.txt")
+	if err != nil {
+		t.Fatalf("safePath failed: %v", err)
+	}
+	if !strings.HasPrefix(path, rootDir) {
+		t.Errorf("resolved path %q not under root %q", path, rootDir)
+	}
+}

@@ -91,6 +91,11 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	// Resolve symlinks so path comparisons are consistent
+	rootDir, err = filepath.EvalSymlinks(rootDir)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	hub := newHub()
 	go hub.run()
@@ -165,8 +170,16 @@ func safePath(reqPath string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+
+	// Resolve symlinks if the path exists to ensure consistent security checks.
+	// If the path doesn't exist, use the non-resolved path for the check.
+	resolved := abs
+	if r, err := filepath.EvalSymlinks(abs); err == nil {
+		resolved = r
+	}
+
 	// Ensure path is exactly rootDir or inside rootDir (not a sibling with similar prefix)
-	if abs != rootDir && !strings.HasPrefix(abs, rootDir+string(os.PathSeparator)) {
+	if resolved != rootDir && !strings.HasPrefix(resolved, rootDir+string(os.PathSeparator)) {
 		return "", fmt.Errorf("path outside root")
 	}
 	return abs, nil
@@ -194,15 +207,25 @@ func handleTree(w http.ResponseWriter, r *http.Request) {
 	result := make([]TreeEntry, 0, len(entries))
 	for _, e := range entries {
 		name := e.Name()
-		relPath, _ := filepath.Rel(rootDir, filepath.Join(dirPath, name))
+		fullPath := filepath.Join(dirPath, name)
+		relPath, _ := filepath.Rel(rootDir, fullPath)
+
+		// Use os.Stat to follow symlinks and determine the true type
+		isDir := e.IsDir()
+		if e.Type()&os.ModeSymlink != 0 {
+			if info, err := os.Stat(fullPath); err == nil {
+				isDir = info.IsDir()
+			}
+		}
+
 		ext := ""
-		if !e.IsDir() {
+		if !isDir {
 			ext = strings.TrimPrefix(filepath.Ext(name), ".")
 		}
 		result = append(result, TreeEntry{
 			Name:      name,
 			Path:      relPath,
-			IsDir:     e.IsDir(),
+			IsDir:     isDir,
 			Extension: ext,
 		})
 	}

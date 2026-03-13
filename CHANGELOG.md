@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- [fixed] Symlink folder support: symlinked directories now appear as folders in the tree view (not files). Also fixed path resolution when the root directory itself is a symlink.
 
 ## [v0.4.0] - 2026-03-01
 
