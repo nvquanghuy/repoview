@@ -29,6 +29,7 @@ import (
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/extension"
 	"github.com/yuin/goldmark/parser"
+	gmhtml "github.com/yuin/goldmark/renderer/html"
 	"gopkg.in/yaml.v3"
 )
 
@@ -366,6 +367,9 @@ func renderMarkdown(w io.Writer, data []byte) {
 		),
 		goldmark.WithParserOptions(
 			parser.WithAutoHeadingID(),
+		),
+		goldmark.WithRendererOptions(
+			gmhtml.WithHardWraps(),
 		),
 	)
 	var buf bytes.Buffer
