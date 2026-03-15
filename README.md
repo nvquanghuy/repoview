@@ -47,12 +47,12 @@ go build -o repoview .
 cd ~/projects/myrepo && repoview
 ```
 
-This starts a local server at http://localhost:8080 and opens your browser to browse the repo with a GitHub-style UI.
+This starts a local server at http://localhost:7777 and opens your browser to browse the repo with a GitHub-style UI.
 
 ### Options
 
 ```bash
-repoview                    # serve current directory on http://localhost:8080
+repoview                    # serve current directory on http://localhost:7777
 repoview /path/to/dir       # serve a specific directory
 repoview --port 3000        # use a custom port
 repoview --host 0.0.0.0     # expose to the network (default: 127.0.0.1)
@@ -67,7 +67,7 @@ repoview update --check     # check for updates without installing
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--host` | `127.0.0.1` | Host/IP to bind to |
-| `--port` | `8080` | Port to serve on |
+| `--port` | `7777` | Port to serve on |
 | `--no-browser` | `false` | Don't auto-open the browser on startup |
 | `--version` | | Print version and exit |
 

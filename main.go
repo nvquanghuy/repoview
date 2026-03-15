@@ -73,7 +73,7 @@ func main() {
 	}
 
 	host := flag.String("host", "127.0.0.1", "host/IP to bind to")
-	port := flag.Int("port", 8080, "port to serve on")
+	port := flag.Int("port", 7777, "port to serve on")
 	noBrowser := flag.Bool("no-browser", false, "don't open browser on startup")
 	showVersion := flag.Bool("version", false, "print version and exit")
 	flag.Parse()
