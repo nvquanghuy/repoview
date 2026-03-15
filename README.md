@@ -29,6 +29,14 @@ curl -fsSL https://raw.githubusercontent.com/nvquanghuy/repoview/master/install.
 
 Downloads the latest release binary for your OS/architecture to `~/.local/bin`.
 
+### One-liner (Windows PowerShell)
+
+```powershell
+irm https://raw.githubusercontent.com/nvquanghuy/repoview/master/install.ps1 | iex
+```
+
+Downloads the latest release binary to `%LOCALAPPDATA%\Programs\repoview`.
+
 ### From source
 
 ```bash

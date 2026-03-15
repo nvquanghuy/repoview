@@ -1,5 +1,10 @@
 import { defineConfig } from "@playwright/test";
 
+const command =
+  process.platform === "win32"
+    ? "go run .. -port 3123 -no-browser ../testdata"
+    : "mise x go -- go run .. -port 3123 -no-browser ../testdata";
+
 export default defineConfig({
   testDir: ".",
   testMatch: "*.spec.ts",
@@ -10,7 +15,7 @@ export default defineConfig({
   },
   projects: [{ name: "chromium", use: { browserName: "chromium" } }],
   webServer: {
-    command: "mise x go -- go run .. -port 3123 -no-browser ../testdata",
+    command,
     url: "http://localhost:3123",
     reuseExistingServer: !process.env.CI,
     timeout: 15_000,

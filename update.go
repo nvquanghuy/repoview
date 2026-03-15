@@ -1,13 +1,15 @@
 package main
 
 import (
+	"archive/tar"
+	"archive/zip"
+	"compress/gzip"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -131,7 +133,11 @@ func checkLatestVersion() (*ReleaseInfo, error) {
 	}
 
 	// Find the right asset for this OS/arch
-	assetName := fmt.Sprintf("repoview-%s-%s.tar.gz", runtime.GOOS, runtime.GOARCH)
+	ext := ".tar.gz"
+	if runtime.GOOS == "windows" {
+		ext = ".zip"
+	}
+	assetName := fmt.Sprintf("repoview-%s-%s%s", runtime.GOOS, runtime.GOARCH, ext)
 	for _, asset := range release.Assets {
 		if asset.Name == assetName {
 			info.DownloadURL = asset.BrowserDownloadURL
@@ -185,6 +191,14 @@ func compareVersions(a, b string) int {
 	return 0
 }
 
+// binaryName returns the expected binary name for the current OS.
+func binaryName() string {
+	if runtime.GOOS == "windows" {
+		return "repoview.exe"
+	}
+	return "repoview"
+}
+
 // selfUpdate downloads and installs a new version.
 func selfUpdate(downloadURL string) error {
 	// Get path to current executable
@@ -209,39 +223,53 @@ func selfUpdate(downloadURL string) error {
 		return fmt.Errorf("download returned status %d", resp.StatusCode)
 	}
 
-	// Create temp file for the tarball
-	tmpTar, err := os.CreateTemp("", "repoview-*.tar.gz")
+	// Create temp file for the archive
+	suffix := ".tar.gz"
+	if runtime.GOOS == "windows" {
+		suffix = ".zip"
+	}
+	tmpArchive, err := os.CreateTemp("", "repoview-*"+suffix)
 	if err != nil {
 		return fmt.Errorf("cannot create temp file: %w", err)
 	}
-	tmpTarPath := tmpTar.Name()
-	defer os.Remove(tmpTarPath)
+	tmpArchivePath := tmpArchive.Name()
+	defer os.Remove(tmpArchivePath)
 
-	if _, err := io.Copy(tmpTar, resp.Body); err != nil {
-		tmpTar.Close()
+	if _, err := io.Copy(tmpArchive, resp.Body); err != nil {
+		tmpArchive.Close()
 		return fmt.Errorf("download failed: %w", err)
 	}
-	tmpTar.Close()
+	tmpArchive.Close()
 
-	// Extract the binary from tarball
+	// Extract the binary from archive
 	tmpDir, err := os.MkdirTemp("", "repoview-extract-*")
 	if err != nil {
 		return fmt.Errorf("cannot create temp dir: %w", err)
 	}
 	defer os.RemoveAll(tmpDir)
 
-	if err := extractTarGz(tmpTarPath, tmpDir); err != nil {
-		return fmt.Errorf("extraction failed: %w", err)
+	if runtime.GOOS == "windows" {
+		if err := extractZip(tmpArchivePath, tmpDir); err != nil {
+			return fmt.Errorf("extraction failed: %w", err)
+		}
+	} else {
+		if err := extractTarGz(tmpArchivePath, tmpDir); err != nil {
+			return fmt.Errorf("extraction failed: %w", err)
+		}
 	}
 
 	// Find the binary in extracted files
-	newBinaryPath := filepath.Join(tmpDir, "repoview")
+	newBinaryPath := filepath.Join(tmpDir, binaryName())
 	if _, err := os.Stat(newBinaryPath); err != nil {
 		return fmt.Errorf("binary not found in archive: %w", err)
 	}
 
-	// Create backup of current executable
-	backupPath := execPath + ".backup"
+	// On Windows, the running executable is locked, so we rename it to .old
+	// instead of .backup (the .old file is cleaned up on next run).
+	backupPath := execPath + ".old"
+	// Clean up any leftover .old file from a previous update
+	os.Remove(backupPath)
+
 	if err := os.Rename(execPath, backupPath); err != nil {
 		return fmt.Errorf("cannot create backup: %w", err)
 	}
@@ -253,53 +281,100 @@ func selfUpdate(downloadURL string) error {
 		return fmt.Errorf("cannot install new binary: %w", err)
 	}
 
-	// Set executable permissions
-	if err := os.Chmod(execPath, 0755); err != nil {
-		// Try to restore backup
-		os.Remove(execPath)
-		os.Rename(backupPath, execPath)
-		return fmt.Errorf("cannot set permissions: %w", err)
+	// Set executable permissions (no-op on Windows, but harmless)
+	if runtime.GOOS != "windows" {
+		if err := os.Chmod(execPath, 0755); err != nil {
+			// Try to restore backup
+			os.Remove(execPath)
+			os.Rename(backupPath, execPath)
+			return fmt.Errorf("cannot set permissions: %w", err)
+		}
 	}
 
-	// Remove backup
+	// Remove backup (may fail on Windows if still running; cleaned up next time)
 	os.Remove(backupPath)
 
 	return nil
 }
 
-// extractTarGz extracts a .tar.gz file to a directory.
-func extractTarGz(tarPath, destDir string) error {
-	// Use system tar for simplicity
-	cmd := fmt.Sprintf("tar -xzf %s -C %s", tarPath, destDir)
-	return runShellCommand(cmd)
+// extractTarGz extracts a .tar.gz file to a directory using pure Go.
+func extractTarGz(archivePath, destDir string) error {
+	f, err := os.Open(archivePath)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	gz, err := gzip.NewReader(f)
+	if err != nil {
+		return err
+	}
+	defer gz.Close()
+
+	tr := tar.NewReader(gz)
+	for {
+		hdr, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return err
+		}
+
+		// Only extract regular files
+		if hdr.Typeflag != tar.TypeReg {
+			continue
+		}
+
+		// Use only the base name to avoid path traversal
+		outPath := filepath.Join(destDir, filepath.Base(hdr.Name))
+		out, err := os.OpenFile(outPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, os.FileMode(hdr.Mode))
+		if err != nil {
+			return err
+		}
+		if _, err := io.Copy(out, tr); err != nil {
+			out.Close()
+			return err
+		}
+		out.Close()
+	}
+	return nil
 }
 
-// runShellCommand executes a shell command.
-func runShellCommand(cmd string) error {
-	return execCommand("sh", "-c", cmd)
-}
+// extractZip extracts a .zip file to a directory.
+func extractZip(archivePath, destDir string) error {
+	r, err := zip.OpenReader(archivePath)
+	if err != nil {
+		return err
+	}
+	defer r.Close()
 
-// execCommand runs a command and returns an error if it fails.
-func execCommand(name string, args ...string) error {
-	c := newExecCommand(name, args...)
-	return c.Run()
-}
+	for _, f := range r.File {
+		if f.FileInfo().IsDir() {
+			continue
+		}
 
-// newExecCommand creates an exec.Cmd - extracted for testing.
-var newExecCommand = defaultNewExecCommand
+		// Use only the base name to avoid path traversal
+		outPath := filepath.Join(destDir, filepath.Base(f.Name))
+		rc, err := f.Open()
+		if err != nil {
+			return err
+		}
 
-func defaultNewExecCommand(name string, args ...string) interface{ Run() error } {
-	return &realCmd{name: name, args: args}
-}
-
-type realCmd struct {
-	name string
-	args []string
-}
-
-func (c *realCmd) Run() error {
-	cmd := exec.Command(c.name, c.args...)
-	return cmd.Run()
+		out, err := os.OpenFile(outPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, f.Mode())
+		if err != nil {
+			rc.Close()
+			return err
+		}
+		if _, err := io.Copy(out, rc); err != nil {
+			out.Close()
+			rc.Close()
+			return err
+		}
+		out.Close()
+		rc.Close()
+	}
+	return nil
 }
 
 // copyFile copies a file from src to dst.
@@ -323,8 +398,18 @@ func copyFile(src, dst string) error {
 	return out.Close()
 }
 
+// cleanupOldBinary removes leftover .old files from a previous update (Windows).
+func cleanupOldBinary() {
+	execPath, err := os.Executable()
+	if err != nil {
+		return
+	}
+	os.Remove(execPath + ".old")
+}
+
 // maybeCheckForUpdates runs an update check in the background if enough time has passed.
 func maybeCheckForUpdates() {
+	cleanupOldBinary()
 	go func() {
 		state := loadUpdateState()
 		if time.Since(state.LastUpdateCheck) < checkInterval {

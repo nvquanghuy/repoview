@@ -81,7 +81,7 @@ func TestHandleTree_Subdir(t *testing.T) {
 	for _, e := range entries {
 		if e.Name == "nested.md" {
 			found = true
-			if e.Path != filepath.Join("subdir", "nested.md") {
+			if e.Path != "subdir/nested.md" {
 				t.Errorf("unexpected path: %s", e.Path)
 			}
 		}
@@ -216,6 +216,24 @@ func TestHandleFile_MarkdownFrontmatter(t *testing.T) {
 	}
 	if !strings.Contains(resp.Content, "Welcome") {
 		t.Error("expected body content 'Welcome'")
+	}
+}
+
+func TestParseFrontmatter_CRLF(t *testing.T) {
+	data := []byte("---\r\ntitle: Test\r\nauthor: Alice\r\n---\r\n# Hello\r\n")
+	pairs, body := parseFrontmatter(data)
+
+	if len(pairs) != 2 {
+		t.Fatalf("expected 2 frontmatter pairs, got %d", len(pairs))
+	}
+	if pairs[0][0] != "title" || pairs[0][1] != "Test" {
+		t.Errorf("unexpected first pair: %v", pairs[0])
+	}
+	if pairs[1][0] != "author" || pairs[1][1] != "Alice" {
+		t.Errorf("unexpected second pair: %v", pairs[1])
+	}
+	if !strings.Contains(string(body), "# Hello") {
+		t.Error("expected body to contain '# Hello'")
 	}
 }
 
@@ -631,8 +649,8 @@ func TestNotifyFile_ParentDirectoryWatch(t *testing.T) {
 	h.register(client)
 	defer h.unregister(client)
 
-	// Notify about a file inside the watched directory
-	h.notifyFile(filepath.Join("subdir", "nested.md"))
+	// Notify about a file inside the watched directory (paths are forward-slash normalized)
+	h.notifyFile("subdir/nested.md")
 
 	// Should receive the notification
 	select {
@@ -691,8 +709,8 @@ func TestNotifyFile_NestedDirectoryWatch(t *testing.T) {
 	h.register(client)
 	defer h.unregister(client)
 
-	// Notify about a deeply nested file
-	h.notifyFile(filepath.Join("src", "components", "Button.tsx"))
+	// Notify about a deeply nested file (paths are forward-slash normalized)
+	h.notifyFile("src/components/Button.tsx")
 
 	// Should receive the notification
 	select {
@@ -721,8 +739,8 @@ func TestNotifyFile_NoMatchingWatch(t *testing.T) {
 	h.register(client)
 	defer h.unregister(client)
 
-	// Notify about a file in a different directory
-	h.notifyFile(filepath.Join("src", "main.go"))
+	// Notify about a file in a different directory (paths are forward-slash normalized)
+	h.notifyFile("src/main.go")
 
 	// Should NOT receive the notification
 	select {
