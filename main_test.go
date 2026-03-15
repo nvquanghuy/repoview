@@ -175,6 +175,35 @@ func TestHandleFile_Markdown(t *testing.T) {
 	}
 }
 
+func TestHandleFile_MarkdownHardWraps(t *testing.T) {
+	// Create a temp file with newlines that should become <br> tags
+	tmpDir := t.TempDir()
+	content := "Line one\nLine two\nLine three"
+	if err := os.WriteFile(filepath.Join(tmpDir, "test.md"), []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	setRoot(t, tmpDir)
+
+	req := httptest.NewRequest("GET", "/api/file?path=test.md", nil)
+	w := httptest.NewRecorder()
+	handleFile(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+
+	var resp FileResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+
+	// Hard wraps should convert newlines to <br> tags
+	if !strings.Contains(resp.Content, "<br") {
+		t.Error("expected newlines to be rendered as <br> tags")
+	}
+}
+
 func TestHandleFile_MarkdownFrontmatter(t *testing.T) {
 	setRoot(t, "testdata")
 

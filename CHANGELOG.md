@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- [added] Markdown hard wraps: single newlines are now rendered as `<br>` tags, making line breaks visible in the preview.
 
 ## [v0.5.1] - 2026-03-15
 
