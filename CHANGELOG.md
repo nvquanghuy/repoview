@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+- [added] Windows support: release pipeline now builds Windows binaries (amd64/arm64) as .zip archives
+- [added] PowerShell install script (`install.ps1`) for Windows one-liner installation
+- [fixed] Path separators normalized to forward slashes in all API responses, fixing frontend on Windows
+- [fixed] WebSocket file-change notifications now work correctly on Windows (path matching uses forward slashes)
+- [fixed] Markdown frontmatter parsing now handles CRLF line endings (common on Windows)
+- [fixed] Self-update uses pure Go archive extraction instead of shelling out to `sh`/`tar`, enabling updates on Windows
+- [changed] VS Code editor setup URL now links to generic CLI docs instead of macOS-specific page
 
 ## [v0.5.1] - 2026-03-15
 
