@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+
+## [v0.5.1] - 2026-03-15
+
 - [changed] Default port changed from 8080 to 7777 (less commonly used by other services)
 
 ## [v0.5.0] - 2026-03-06
