@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 - [added] Collapsible markdown sections: click the toggle on any heading (h1-h6) to collapse/expand all content until the next heading of equal or higher level. State persists in localStorage per file. Keyboard shortcuts: Alt+C to collapse all, Alt+E to expand all. Clicking outline links auto-expands collapsed sections.
+- [fixed] Symlink folder support: symlinked directories now appear as folders in the tree view (not files). Also fixed path resolution when the root directory itself is a symlink.
 
 ## [v0.5.1] - 2026-03-15
 
