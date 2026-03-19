@@ -393,13 +393,11 @@
                 position: relative;
             }
             .markdown-body .heading-anchor {
-                position: absolute;
-                left: -24px;
                 color: #656d76;
                 opacity: 0;
                 transition: opacity 0.1s;
                 text-decoration: none;
-                line-height: inherit;
+                margin-left: 8px;
             }
             .markdown-body h1:hover .heading-anchor,
             .markdown-body h2:hover .heading-anchor,
@@ -517,6 +515,56 @@
             }
             .markdown-body .task-list-item input {
                 margin-right: 0.5em;
+            }
+
+            /* ── Collapsible heading sections ────────────────────────── */
+            .markdown-body .heading-section { position: relative; }
+            .markdown-body .heading-section-content {
+                display: grid;
+                grid-template-rows: 1fr;
+                transition: grid-template-rows 0.2s ease-out;
+            }
+            .markdown-body .heading-section.collapsed > .heading-section-content {
+                grid-template-rows: 0fr;
+            }
+            .markdown-body .heading-section-content > .heading-section-inner {
+                min-height: 0;
+                overflow: hidden;
+                margin-left: -24px;
+                padding-left: 24px;
+            }
+            .markdown-body .heading-toggle {
+                position: absolute;
+                left: -24px;
+                top: 50%;
+                transform: translateY(-50%);
+                width: 20px;
+                height: 20px;
+                cursor: pointer;
+                opacity: 0;
+                transition: opacity 0.15s, transform 0.15s;
+                background: none;
+                border: none;
+                padding: 0;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+            .markdown-body h1:hover .heading-toggle,
+            .markdown-body h2:hover .heading-toggle,
+            .markdown-body h3:hover .heading-toggle,
+            .markdown-body h4:hover .heading-toggle,
+            .markdown-body h5:hover .heading-toggle,
+            .markdown-body h6:hover .heading-toggle,
+            .markdown-body .heading-toggle:focus { opacity: 1; }
+            .markdown-body .heading-section.collapsed > h1 .heading-toggle,
+            .markdown-body .heading-section.collapsed > h2 .heading-toggle,
+            .markdown-body .heading-section.collapsed > h3 .heading-toggle,
+            .markdown-body .heading-section.collapsed > h4 .heading-toggle,
+            .markdown-body .heading-section.collapsed > h5 .heading-toggle,
+            .markdown-body .heading-section.collapsed > h6 .heading-toggle {
+                transform: translateY(-50%) rotate(-90deg);
+                opacity: 0.6;
             }
 
             /* ── Outline sidebar ──────────────────────────────────────── */
@@ -1169,6 +1217,7 @@
                     '<svg width="16" height="16" viewBox="0 0 16 16" fill="#54aeff"><path d="M.513 1.513A1.75 1.75 0 0 1 1.75 1h3.5c.55 0 1.07.26 1.4.7l.9 1.2a.25.25 0 0 0 .2.1h6.5A1.75 1.75 0 0 1 16 4.75v8.5A1.75 1.75 0 0 1 14.25 15H1.75A1.75 1.75 0 0 1 0 13.25V2.75c0-.464.184-.91.513-1.237ZM1.75 2.5a.25.25 0 0 0-.25.25v10.5c0 .138.112.25.25.25h12.5a.25.25 0 0 0 .25-.25v-8.5a.25.25 0 0 0-.25-.25H7.5c-.55 0-1.07-.26-1.4-.7l-.9-1.2a.25.25 0 0 0-.2-.1Z"/></svg>',
                 file: '<svg width="16" height="16" viewBox="0 0 16 16" fill="#656d76"><path d="M2 1.75C2 .784 2.784 0 3.75 0h6.586c.464 0 .909.184 1.237.513l2.914 2.914c.329.328.513.773.513 1.237v9.586A1.75 1.75 0 0 1 13.25 16h-9.5A1.75 1.75 0 0 1 2 14.25Zm1.75-.25a.25.25 0 0 0-.25.25v12.5c0 .138.112.25.25.25h9.5a.25.25 0 0 0 .25-.25V6h-2.75A1.75 1.75 0 0 1 9 4.25V1.5Zm6.75.062V4.25c0 .138.112.25.25.25h2.688l-.011-.013-2.914-2.914-.013-.011Z"/></svg>',
                 caret: '<svg width="16" height="16" viewBox="0 0 16 16" fill="#656d76"><path d="M6.22 3.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042L9.94 8 6.22 4.28a.75.75 0 0 1 0-1.06Z"/></svg>',
+                collapseToggle: '<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M4.427 7.427l3.396 3.396a.25.25 0 00.354 0l3.396-3.396A.25.25 0 0011.396 7H4.604a.25.25 0 00-.177.427z"/></svg>',
             };
 
             /* ── State ────────────────────────────────────────────────── */
@@ -1738,8 +1787,156 @@
                             history.pushState(null, "", "#" + id);
                             h.scrollIntoView({ behavior: "smooth" });
                         };
-                        h.insertBefore(anchor, h.firstChild);
+                        h.appendChild(anchor);
                     });
+            }
+
+            /* ── Collapsible sections ────────────────────────────────── */
+            function getCollapseStorageKey(filePath) {
+                return 'collapsedSections:' + filePath;
+            }
+
+            function loadCollapseState(filePath) {
+                try {
+                    var data = localStorage.getItem(getCollapseStorageKey(filePath));
+                    return data ? JSON.parse(data) : [];
+                } catch (e) {
+                    return [];
+                }
+            }
+
+            function saveCollapseState(filePath, collapsedIds) {
+                try {
+                    if (collapsedIds.length === 0) {
+                        localStorage.removeItem(getCollapseStorageKey(filePath));
+                    } else {
+                        localStorage.setItem(getCollapseStorageKey(filePath), JSON.stringify(collapsedIds));
+                    }
+                } catch (e) {
+                    // Ignore storage errors
+                }
+            }
+
+            function getCollapsedIds(container) {
+                var ids = [];
+                container.querySelectorAll('.heading-section.collapsed').forEach(function(section) {
+                    var heading = section.querySelector('h1, h2, h3, h4, h5, h6');
+                    if (heading && heading.id) {
+                        ids.push(heading.id);
+                    }
+                });
+                return ids;
+            }
+
+            function toggleSection(section, filePath) {
+                section.classList.toggle('collapsed');
+                var container = section.closest('.markdown-body');
+                if (container) {
+                    saveCollapseState(filePath, getCollapsedIds(container));
+                }
+            }
+
+            function expandSectionForElement(element) {
+                var parent = element.closest('.heading-section');
+                while (parent) {
+                    parent.classList.remove('collapsed');
+                    parent = parent.parentElement ? parent.parentElement.closest('.heading-section') : null;
+                }
+            }
+
+            function collapseAllSections(container, filePath) {
+                container.querySelectorAll('.heading-section').forEach(function(section) {
+                    section.classList.add('collapsed');
+                });
+                saveCollapseState(filePath, getCollapsedIds(container));
+            }
+
+            function expandAllSections(container, filePath) {
+                container.querySelectorAll('.heading-section.collapsed').forEach(function(section) {
+                    section.classList.remove('collapsed');
+                });
+                saveCollapseState(filePath, []);
+            }
+
+            function wrapCollapsibleSections(container, filePath) {
+                var headings = Array.from(container.querySelectorAll('h1, h2, h3, h4, h5, h6'));
+                if (headings.length === 0) return;
+
+                var collapsedIds = loadCollapseState(filePath);
+
+                // Process headings in reverse order to handle nesting correctly
+                for (var i = headings.length - 1; i >= 0; i--) {
+                    var heading = headings[i];
+                    var level = parseInt(heading.tagName.charAt(1));
+
+                    // Collect content until next heading of same or higher level
+                    var contentNodes = [];
+                    var sibling = heading.nextSibling;
+                    while (sibling) {
+                        if (sibling.nodeType === 1) {
+                            // Check if it's a heading of same or higher level
+                            var siblingTag = sibling.tagName;
+                            if (/^H[1-6]$/.test(siblingTag)) {
+                                var siblingLevel = parseInt(siblingTag.charAt(1));
+                                if (siblingLevel <= level) break;
+                            }
+                            // Check if it's a heading-section with same or higher level
+                            if (sibling.classList && sibling.classList.contains('heading-section')) {
+                                var sectionHeading = sibling.querySelector('h1, h2, h3, h4, h5, h6');
+                                if (sectionHeading) {
+                                    var sectionLevel = parseInt(sectionHeading.tagName.charAt(1));
+                                    if (sectionLevel <= level) break;
+                                }
+                            }
+                        }
+                        contentNodes.push(sibling);
+                        sibling = sibling.nextSibling;
+                    }
+
+                    // Create section wrapper
+                    var section = document.createElement('div');
+                    section.className = 'heading-section';
+
+                    // Restore collapsed state
+                    if (collapsedIds.indexOf(heading.id) !== -1) {
+                        section.classList.add('collapsed');
+                    }
+
+                    // Insert section before heading
+                    heading.parentNode.insertBefore(section, heading);
+
+                    // Move heading into section
+                    section.appendChild(heading);
+
+                    // Add toggle button to heading
+                    var toggle = document.createElement('button');
+                    toggle.className = 'heading-toggle';
+                    toggle.innerHTML = SVG.collapseToggle;
+                    toggle.setAttribute('aria-label', 'Toggle section');
+                    toggle.onclick = function(sec) {
+                        return function(e) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            toggleSection(sec, filePath);
+                        };
+                    }(section);
+                    heading.insertBefore(toggle, heading.firstChild);
+
+                    // Create content wrapper if there's content
+                    if (contentNodes.length > 0) {
+                        var contentWrapper = document.createElement('div');
+                        contentWrapper.className = 'heading-section-content';
+                        var inner = document.createElement('div');
+                        inner.className = 'heading-section-inner';
+                        contentWrapper.appendChild(inner);
+                        section.appendChild(contentWrapper);
+
+                        // Move content nodes
+                        contentNodes.forEach(function(node) {
+                            inner.appendChild(node);
+                        });
+                    }
+                }
             }
 
             /* ── Outline sidebar ──────────────────────────────────────── */
@@ -1785,6 +1982,12 @@
                 var id = e.target.getAttribute("href").slice(1);
                 var target = document.getElementById(id);
                 if (target) {
+                    expandSectionForElement(target);
+                    // Save state after expanding
+                    var mdBody = document.querySelector('.markdown-body');
+                    if (mdBody && currentFilePath) {
+                        saveCollapseState(currentFilePath, getCollapsedIds(mdBody));
+                    }
                     history.pushState(null, "", "#" + id);
                     target.scrollIntoView({ behavior: "smooth" });
                 }
@@ -2021,6 +2224,7 @@
                             var mdBody = area.querySelector(".markdown-body");
                             if (mdBody) {
                                 addHeadingAnchors(mdBody);
+                                wrapCollapsibleSections(mdBody, currentFilePath);
                                 hasOutline = buildOutline(mdBody);
                                 if (
                                     hasOutline &&
@@ -2034,6 +2238,8 @@
                                         location.hash.slice(1),
                                     );
                                     if (target) {
+                                        expandSectionForElement(target);
+                                        saveCollapseState(currentFilePath, getCollapsedIds(mdBody));
                                         setTimeout(function () {
                                             target.scrollIntoView();
                                         }, 50);
@@ -2667,6 +2873,22 @@
                 if (e.key === "t") {
                     e.preventDefault();
                     openSearch();
+                }
+                // Alt+C: Collapse all sections
+                if (e.altKey && e.key === "c") {
+                    e.preventDefault();
+                    var mdBody = document.querySelector('.markdown-body');
+                    if (mdBody && currentFilePath) {
+                        collapseAllSections(mdBody, currentFilePath);
+                    }
+                }
+                // Alt+E: Expand all sections
+                if (e.altKey && e.key === "e") {
+                    e.preventDefault();
+                    var mdBody = document.querySelector('.markdown-body');
+                    if (mdBody && currentFilePath) {
+                        expandAllSections(mdBody, currentFilePath);
+                    }
                 }
             });
 
