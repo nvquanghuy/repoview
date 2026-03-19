@@ -393,13 +393,11 @@
                 position: relative;
             }
             .markdown-body .heading-anchor {
-                position: absolute;
-                left: -24px;
                 color: #656d76;
                 opacity: 0;
                 transition: opacity 0.1s;
                 text-decoration: none;
-                line-height: inherit;
+                margin-left: 8px;
             }
             .markdown-body h1:hover .heading-anchor,
             .markdown-body h2:hover .heading-anchor,
@@ -532,15 +530,18 @@
             .markdown-body .heading-section-content > .heading-section-inner {
                 min-height: 0;
                 overflow: hidden;
+                margin-left: -24px;
+                padding-left: 24px;
             }
             .markdown-body .heading-toggle {
                 position: absolute;
-                left: -28px;
-                top: 0;
+                left: -24px;
+                top: 50%;
+                transform: translateY(-50%);
                 width: 20px;
                 height: 20px;
                 cursor: pointer;
-                opacity: 0.4;
+                opacity: 0;
                 transition: opacity 0.15s, transform 0.15s;
                 background: none;
                 border: none;
@@ -549,14 +550,21 @@
                 align-items: center;
                 justify-content: center;
             }
-            .markdown-body .heading-toggle:hover { opacity: 1; }
+            .markdown-body h1:hover .heading-toggle,
+            .markdown-body h2:hover .heading-toggle,
+            .markdown-body h3:hover .heading-toggle,
+            .markdown-body h4:hover .heading-toggle,
+            .markdown-body h5:hover .heading-toggle,
+            .markdown-body h6:hover .heading-toggle,
+            .markdown-body .heading-toggle:focus { opacity: 1; }
             .markdown-body .heading-section.collapsed > h1 .heading-toggle,
             .markdown-body .heading-section.collapsed > h2 .heading-toggle,
             .markdown-body .heading-section.collapsed > h3 .heading-toggle,
             .markdown-body .heading-section.collapsed > h4 .heading-toggle,
             .markdown-body .heading-section.collapsed > h5 .heading-toggle,
             .markdown-body .heading-section.collapsed > h6 .heading-toggle {
-                transform: rotate(-90deg);
+                transform: translateY(-50%) rotate(-90deg);
+                opacity: 0.6;
             }
 
             /* ── Outline sidebar ──────────────────────────────────────── */
@@ -1779,7 +1787,7 @@
                             history.pushState(null, "", "#" + id);
                             h.scrollIntoView({ behavior: "smooth" });
                         };
-                        h.insertBefore(anchor, h.firstChild);
+                        h.appendChild(anchor);
                     });
             }
 
