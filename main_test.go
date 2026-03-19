@@ -25,7 +25,12 @@ func setRoot(t *testing.T, dir string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	rootDir = abs
+	// Resolve symlinks like main() does
+	resolved, err := filepath.EvalSymlinks(abs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rootDir = resolved
 }
 
 // ── Tree tests ──────────────────────────────────────────────
@@ -1286,6 +1291,32 @@ func TestHandleTree_SymlinkDirectory(t *testing.T) {
 	}
 	if !linkEntry.IsDir {
 		t.Error("expected symlinked directory to have IsDir=true")
+	}
+
+	// Now test listing the contents of the symlinked directory
+	req2 := httptest.NewRequest("GET", "/api/tree?path=linkdir", nil)
+	w2 := httptest.NewRecorder()
+	handleTree(w2, req2)
+
+	if w2.Code != http.StatusOK {
+		t.Fatalf("expected 200 for symlink dir contents, got %d: %s", w2.Code, w2.Body.String())
+	}
+
+	var contents []TreeEntry
+	if err := json.NewDecoder(w2.Body).Decode(&contents); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+
+	// Should contain file.txt
+	var fileEntry *TreeEntry
+	for i, e := range contents {
+		if e.Name == "file.txt" {
+			fileEntry = &contents[i]
+			break
+		}
+	}
+	if fileEntry == nil {
+		t.Fatal("expected to find file.txt inside symlinked directory")
 	}
 }
 
