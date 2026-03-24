@@ -9,6 +9,7 @@
 - [fixed] WebSocket file-change notifications now work correctly on Windows (path matching uses forward slashes)
 - [fixed] Markdown frontmatter parsing now handles CRLF line endings (common on Windows)
 - [fixed] Self-update uses pure Go archive extraction instead of shelling out to `sh`/`tar`, enabling updates on Windows
+- [fixed] Local images in markdown files now render correctly (image src rewritten to use /api/raw endpoint)
 - [changed] VS Code editor setup URL now links to generic CLI docs instead of macOS-specific page
 
 ## [v0.5.1] - 2026-03-15
