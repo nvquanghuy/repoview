@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- [fixed] Local images in markdown files now render correctly (image src rewritten to use /api/raw endpoint)
 - [added] Windows support: release pipeline now builds Windows binaries (amd64/arm64) as .zip archives
 - [added] PowerShell install script (`install.ps1`) for Windows one-liner installation
 - [fixed] Path separators normalized to forward slashes in all API responses, fixing frontend on Windows
