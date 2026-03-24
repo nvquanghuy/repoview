@@ -4,6 +4,7 @@
 
 - [added] Windows support: release pipeline now builds Windows binaries (amd64/arm64) as .zip archives
 - [added] PowerShell install script (`install.ps1`) for Windows one-liner installation
+- [added] Collapsible markdown sections: click the toggle on any heading (h1-h6) to collapse/expand all content until the next heading of equal or higher level. State persists in localStorage per file. Keyboard shortcuts: Alt+C to collapse all, Alt+E to expand all. Clicking outline links auto-expands collapsed sections.
 - [fixed] Path separators normalized to forward slashes in all API responses, fixing frontend on Windows
 - [fixed] WebSocket file-change notifications now work correctly on Windows (path matching uses forward slashes)
 - [fixed] Markdown frontmatter parsing now handles CRLF line endings (common on Windows)
