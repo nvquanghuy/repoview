@@ -27,6 +27,12 @@ jobs:
             tar czf "repoview-${pair%/*}-${pair#*/}.tar.gz" repoview
             rm repoview
           done
+          for pair in windows/amd64 windows/arm64; do
+            GOOS="${pair%/*}" GOARCH="${pair#*/}" \
+              go build -ldflags "-X main.version=${VERSION}" -o repoview.exe .
+            zip "repoview-${pair%/*}-${pair#*/}.zip" repoview.exe
+            rm repoview.exe
+          done
 
       - name: Extract changelog for this version
         id: changelog
@@ -45,4 +51,6 @@ jobs:
           body: ${{ steps.changelog.outputs.notes }}
           files: |
             repoview-*.tar.gz
+            repoview-*.zip
             install.sh
+            install.ps1

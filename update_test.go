@@ -1,6 +1,9 @@
 package main
 
 import (
+	"archive/tar"
+	"archive/zip"
+	"compress/gzip"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -69,6 +72,8 @@ func TestCheckLatestVersion(t *testing.T) {
 				{Name: "repoview-darwin-amd64.tar.gz", BrowserDownloadURL: "https://example.com/darwin-amd64.tar.gz"},
 				{Name: "repoview-linux-amd64.tar.gz", BrowserDownloadURL: "https://example.com/linux-amd64.tar.gz"},
 				{Name: "repoview-linux-arm64.tar.gz", BrowserDownloadURL: "https://example.com/linux-arm64.tar.gz"},
+				{Name: "repoview-windows-amd64.zip", BrowserDownloadURL: "https://example.com/windows-amd64.zip"},
+				{Name: "repoview-windows-arm64.zip", BrowserDownloadURL: "https://example.com/windows-arm64.zip"},
 			},
 		}
 		json.NewEncoder(w).Encode(release)
@@ -130,6 +135,90 @@ func TestLoadUpdateStateNoFile(t *testing.T) {
 	state := loadUpdateState()
 	if !state.LastUpdateCheck.IsZero() {
 		t.Error("expected zero time for non-existent state file")
+	}
+}
+
+func TestExtractTarGz(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Create a .tar.gz archive with a test file
+	archivePath := filepath.Join(tmpDir, "test.tar.gz")
+	f, err := os.Create(archivePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gw := gzip.NewWriter(f)
+	tw := tar.NewWriter(gw)
+
+	content := []byte("hello from tar")
+	hdr := &tar.Header{
+		Name: "repoview",
+		Mode: 0755,
+		Size: int64(len(content)),
+	}
+	if err := tw.WriteHeader(hdr); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tw.Write(content); err != nil {
+		t.Fatal(err)
+	}
+	tw.Close()
+	gw.Close()
+	f.Close()
+
+	// Extract
+	extractDir := filepath.Join(tmpDir, "extracted")
+	os.MkdirAll(extractDir, 0755)
+	if err := extractTarGz(archivePath, extractDir); err != nil {
+		t.Fatalf("extractTarGz failed: %v", err)
+	}
+
+	// Verify
+	got, err := os.ReadFile(filepath.Join(extractDir, "repoview"))
+	if err != nil {
+		t.Fatalf("extracted file not found: %v", err)
+	}
+	if string(got) != "hello from tar" {
+		t.Errorf("got %q, want %q", got, "hello from tar")
+	}
+}
+
+func TestExtractZip(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Create a .zip archive with a test file
+	archivePath := filepath.Join(tmpDir, "test.zip")
+	f, err := os.Create(archivePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	zw := zip.NewWriter(f)
+
+	content := []byte("hello from zip")
+	fw, err := zw.Create("repoview.exe")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := fw.Write(content); err != nil {
+		t.Fatal(err)
+	}
+	zw.Close()
+	f.Close()
+
+	// Extract
+	extractDir := filepath.Join(tmpDir, "extracted")
+	os.MkdirAll(extractDir, 0755)
+	if err := extractZip(archivePath, extractDir); err != nil {
+		t.Fatalf("extractZip failed: %v", err)
+	}
+
+	// Verify
+	got, err := os.ReadFile(filepath.Join(extractDir, "repoview.exe"))
+	if err != nil {
+		t.Fatalf("extracted file not found: %v", err)
+	}
+	if string(got) != "hello from zip" {
+		t.Errorf("got %q, want %q", got, "hello from zip")
 	}
 }
 

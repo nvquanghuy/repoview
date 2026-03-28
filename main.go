@@ -51,7 +51,7 @@ var editorCommands = map[string]struct {
 }
 
 var editorSetupURLs = map[string]string{
-	"vscode":  "https://code.visualstudio.com/docs/setup/mac#_launch-vs-code-from-the-command-line",
+	"vscode":  "https://code.visualstudio.com/docs/editor/command-line",
 	"cursor":  "https://cursor.com/docs/cli/installation",
 	"sublime": "https://www.sublimetext.com/docs/command_line.html",
 	"zed":     "https://zed.dev/features#cli",
@@ -215,6 +215,7 @@ func handleTree(w http.ResponseWriter, r *http.Request) {
 	for _, e := range entries {
 		name := e.Name()
 		relPath, _ := filepath.Rel(rootDir, filepath.Join(dirPath, name))
+		relPath = filepath.ToSlash(relPath)
 		ext := ""
 		if !e.IsDir() {
 			ext = strings.TrimPrefix(filepath.Ext(name), ".")
@@ -334,7 +335,7 @@ func handleFile(w http.ResponseWriter, r *http.Request) {
 // It returns the pairs and the remaining body. If no valid frontmatter is found,
 // it returns nil and the original data unchanged.
 func parseFrontmatter(data []byte) ([][2]string, []byte) {
-	s := string(data)
+	s := strings.ReplaceAll(string(data), "\r\n", "\n")
 	if !strings.HasPrefix(s, "---\n") {
 		return nil, data
 	}
@@ -546,7 +547,7 @@ func handleFiles(w http.ResponseWriter, r *http.Request) {
 			}
 			if !d.IsDir() {
 				rel, _ := filepath.Rel(rootDir, path)
-				files = append(files, rel)
+				files = append(files, filepath.ToSlash(rel))
 			}
 			return nil
 		})
@@ -814,7 +815,7 @@ func watchLoop(watcher *fsnotify.Watcher, h *hub) {
 				if err != nil {
 					continue
 				}
-				h.notifyFile(relPath)
+				h.notifyFile(filepath.ToSlash(relPath))
 			}
 		case _, ok := <-watcher.Errors:
 			if !ok {
