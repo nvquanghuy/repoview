@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+
+## [v0.6.0] - 2026-03-28
+
 - [added] Markdown hard wraps: single newlines are now rendered as `<br>` tags, making line breaks visible in the preview.
 - [fixed] Local images in markdown files now render correctly (image src rewritten to use /api/raw endpoint)
 - [added] Windows support: release pipeline now builds Windows binaries (amd64/arm64) as .zip archives
