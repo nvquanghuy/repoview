@@ -458,6 +458,46 @@ test.describe("README below directory listing", () => {
   });
 });
 
+test.describe("Markdown image rewriting", () => {
+  test("local image src is rewritten to /api/raw", async ({ page }) => {
+    await page.goto("/images.md");
+    const content = page.locator("#content-area .markdown-body");
+    await expect(content).toBeVisible();
+
+    // Relative image (pixel.png) should be rewritten
+    const relImg = content.locator('img[alt="pixel"]');
+    await expect(relImg).toBeVisible();
+    const relSrc = await relImg.getAttribute("src");
+    expect(relSrc).toContain("/api/raw?path=pixel.png");
+
+    // Dot-relative image (./pixel.png) should also be rewritten
+    const dotImg = content.locator('img[alt="pixel dot"]');
+    await expect(dotImg).toBeVisible();
+    const dotSrc = await dotImg.getAttribute("src");
+    expect(dotSrc).toContain("/api/raw?path=pixel.png");
+
+    // External image should NOT be rewritten
+    const extImg = content.locator('img[alt="external"]');
+    await expect(extImg).toBeVisible();
+    const extSrc = await extImg.getAttribute("src");
+    expect(extSrc).toBe("https://example.com/logo.png");
+  });
+
+  test("rewritten image actually loads via /api/raw", async ({ page }) => {
+    await page.goto("/images.md");
+    const content = page.locator("#content-area .markdown-body");
+    await expect(content).toBeVisible();
+
+    const img = content.locator('img[alt="pixel"]');
+    await expect(img).toBeVisible();
+    // Verify the image loaded successfully (naturalWidth > 0)
+    const loaded = await img.evaluate(
+      (el: HTMLImageElement) => el.complete && el.naturalWidth > 0
+    );
+    expect(loaded).toBe(true);
+  });
+});
+
 test.describe("URL routing", () => {
   test("direct navigation to a file URL loads the file", async ({ page }) => {
     await page.goto("/hello.md");

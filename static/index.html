@@ -1686,7 +1686,10 @@
                                     .appendChild(container);
                                 var mdBody =
                                     container.querySelector(".markdown-body");
-                                if (mdBody) addHeadingAnchors(mdBody);
+                                if (mdBody) {
+                                    addHeadingAnchors(mdBody);
+                                    rewriteMarkdownImages(mdBody, readme.path);
+                                }
                                 bindAnchorLinks(container);
                             }
                         });
@@ -1748,6 +1751,37 @@
             }
 
             /* ── File loading ─────────────────────────────────────────── */
+            function rewriteMarkdownImages(container, filePath) {
+                var dir = filePath.split("/").slice(0, -1).join("/");
+                container.querySelectorAll("img").forEach(function (img) {
+                    var src = img.getAttribute("src");
+                    if (!src) return;
+                    // Skip absolute URLs (http://, https://, data:, /api/)
+                    if (/^https?:\/\/|^data:|^\/api\//.test(src)) return;
+                    var resolved;
+                    if (src.startsWith("/")) {
+                        // Root-relative: strip leading slash
+                        resolved = src.slice(1);
+                    } else {
+                        // Relative to the markdown file's directory
+                        resolved = dir ? dir + "/" + src : src;
+                        // Normalize . and .. segments
+                        var parts = resolved.split("/");
+                        var stack = [];
+                        for (var i = 0; i < parts.length; i++) {
+                            if (parts[i] === "." || parts[i] === "") continue;
+                            if (parts[i] === ".." && stack.length > 0) {
+                                stack.pop();
+                            } else if (parts[i] !== "..") {
+                                stack.push(parts[i]);
+                            }
+                        }
+                        resolved = stack.join("/");
+                    }
+                    img.setAttribute("src", "/api/raw?path=" + encodeURIComponent(resolved));
+                });
+            }
+
             function bindAnchorLinks(container) {
                 container
                     .querySelectorAll('a[href^="#"]')
@@ -2224,6 +2258,7 @@
                             var mdBody = area.querySelector(".markdown-body");
                             if (mdBody) {
                                 addHeadingAnchors(mdBody);
+                                rewriteMarkdownImages(mdBody, path);
                                 wrapCollapsibleSections(mdBody, currentFilePath);
                                 hasOutline = buildOutline(mdBody);
                                 if (
