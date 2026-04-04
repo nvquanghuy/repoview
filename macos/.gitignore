@@ -1,7 +1,10 @@
 # Build outputs
 build/
 *.app
-repoview
+/repoview
+/repoview-go
+/repoview-bin
+.build/
 
 # Xcode
 xcuserdata/
