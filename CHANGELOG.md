@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- [added] Collapsible markdown sections: click the toggle on any heading (h1-h6) to collapse/expand all content until the next heading of equal or higher level. State persists in localStorage per file. Keyboard shortcuts: Alt+C to collapse all, Alt+E to expand all. Clicking outline links auto-expands collapsed sections.
 
 ## [v0.6.0] - 2026-03-28
 
