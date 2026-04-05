@@ -16,6 +16,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 
@@ -29,6 +30,7 @@ import (
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/extension"
 	"github.com/yuin/goldmark/parser"
+	"github.com/yuin/goldmark/renderer"
 	gmhtml "github.com/yuin/goldmark/renderer/html"
 	"gopkg.in/yaml.v3"
 )
@@ -39,6 +41,8 @@ var staticFiles embed.FS
 var version = "dev"
 
 var rootDir string
+
+var isObsidianVault bool
 
 // Editor configuration for the edit button feature.
 var editorCommands = map[string]struct {
@@ -111,6 +115,12 @@ func main() {
 	rootDir, err = filepath.Abs(rootDir)
 	if err != nil {
 		log.Fatal(err)
+	}
+
+	// Check if this is an Obsidian vault
+	if _, err := os.Stat(filepath.Join(rootDir, ".obsidian")); err == nil {
+		isObsidianVault = true
+		log.Println("Obsidian vault detected, enabling wiki links")
 	}
 
 	hub := newHub()
@@ -394,6 +404,35 @@ func parseFrontmatter(data []byte) ([][2]string, []byte) {
 	return pairs, body
 }
 
+// wikiLinkRe matches Obsidian wiki links: [[target]], [[target|display]], [[target#heading]], [[target#heading|display]]
+var wikiLinkRe = regexp.MustCompile(`\[\[([^\]|#]+)(?:#([^\]|]+))?(?:\|([^\]]+))?\]\]`)
+
+// preprocessWikiLinks converts Obsidian wiki link syntax to HTML placeholders for frontend resolution.
+func preprocessWikiLinks(data []byte) []byte {
+	return wikiLinkRe.ReplaceAllFunc(data, func(match []byte) []byte {
+		groups := wikiLinkRe.FindSubmatch(match)
+		target := string(groups[1])
+		heading := ""
+		display := target
+
+		if len(groups) > 2 && len(groups[2]) > 0 {
+			heading = string(groups[2])
+		}
+		if len(groups) > 3 && len(groups[3]) > 0 {
+			display = string(groups[3])
+		}
+
+		// Build the placeholder anchor tag with href="#" so it's clickable
+		result := fmt.Sprintf(`<a class="wiki-link" href="#" data-wiki-target="%s"`,
+			html.EscapeString(target))
+		if heading != "" {
+			result += fmt.Sprintf(` data-wiki-heading="%s"`, html.EscapeString(heading))
+		}
+		result += fmt.Sprintf(`>%s</a>`, html.EscapeString(display))
+		return []byte(result)
+	})
+}
+
 // renderMarkdown converts markdown bytes to HTML using goldmark with GFM.
 func renderMarkdown(w io.Writer, data []byte) {
 	pairs, body := parseFrontmatter(data)
@@ -407,6 +446,11 @@ func renderMarkdown(w io.Writer, data []byte) {
 		fmt.Fprint(w, "</tbody></table>")
 	}
 
+	rendererOpts := []renderer.Option{gmhtml.WithHardWraps()}
+	if isObsidianVault {
+		body = preprocessWikiLinks(body)
+		rendererOpts = append(rendererOpts, gmhtml.WithUnsafe())
+	}
 	md := goldmark.New(
 		goldmark.WithExtensions(
 			extension.GFM,
@@ -415,9 +459,10 @@ func renderMarkdown(w io.Writer, data []byte) {
 			parser.WithAutoHeadingID(),
 		),
 		goldmark.WithRendererOptions(
-			gmhtml.WithHardWraps(),
+			rendererOpts...,
 		),
 	)
+
 	var buf bytes.Buffer
 	if err := md.Convert(body, &buf); err != nil {
 		fmt.Fprintf(w, "<pre>%s</pre>", html.EscapeString(string(body)))

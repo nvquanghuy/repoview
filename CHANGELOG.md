@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- [added] Obsidian wiki link support: when serving an Obsidian vault (directory containing `.obsidian/`), `[[wiki links]]` in markdown are converted to anchor tags with `class="wiki-link"` and `data-wiki-target` / `data-wiki-heading` attributes for frontend resolution.
 
 ## [v0.9.0] - 2026-04-05
 
