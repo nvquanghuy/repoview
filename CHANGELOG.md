@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- [added] Resizable outline panel (right sidebar) - drag the left edge to resize
+
 ## [v0.10.0] - 2026-04-05
 
 - [added] Obsidian wiki link support: when serving an Obsidian vault (directory containing `.obsidian/`), `[[wiki links]]` in markdown are converted to clickable links with frontend resolution.

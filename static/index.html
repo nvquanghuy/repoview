@@ -608,6 +608,7 @@
 
             /* ── Outline sidebar ──────────────────────────────────────── */
             #outline-sidebar {
+                position: relative;
                 width: 0;
                 min-width: 0;
                 overflow: hidden;
@@ -623,8 +624,21 @@
             }
             #outline-sidebar.open {
                 width: 280px;
-                min-width: 280px;
+                min-width: 180px;
                 border-left-color: #d0d7de;
+            }
+            #outline-resize-handle {
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 6px;
+                height: 100%;
+                cursor: col-resize;
+                z-index: 10;
+            }
+            #outline-resize-handle:hover,
+            #outline-resize-handle.active {
+                background: #0969da40;
             }
             .outline-header {
                 display: flex;
@@ -1219,6 +1233,7 @@
                         </div>
                     </div>
                     <div id="outline-sidebar">
+                        <div id="outline-resize-handle"></div>
                         <div class="outline-header">
                             <span class="outline-header-title">Outline</span>
                             <button
@@ -3177,6 +3192,35 @@
                 }
                 function onUp() {
                     handle.classList.remove("active");
+                    document.removeEventListener("mousemove", onMove);
+                    document.removeEventListener("mouseup", onUp);
+                }
+            })();
+
+            /* ── Outline resize handle ───────────────────────────────────── */
+            (function initOutlineResize() {
+                var handle = document.getElementById("outline-resize-handle");
+                var sidebar = document.getElementById("outline-sidebar");
+                var startX, startW;
+                handle.addEventListener("mousedown", function (e) {
+                    e.preventDefault();
+                    startX = e.clientX;
+                    startW = sidebar.offsetWidth;
+                    handle.classList.add("active");
+                    sidebar.style.transition = "none";
+                    document.addEventListener("mousemove", onMove);
+                    document.addEventListener("mouseup", onUp);
+                });
+                function onMove(e) {
+                    // Dragging left increases width (opposite of left sidebar)
+                    var w = startW - (e.clientX - startX);
+                    sidebar.style.width =
+                        Math.max(180, Math.min(w, window.innerWidth * 0.5)) +
+                        "px";
+                }
+                function onUp() {
+                    handle.classList.remove("active");
+                    sidebar.style.transition = "";
                     document.removeEventListener("mousemove", onMove);
                     document.removeEventListener("mouseup", onUp);
                 }
