@@ -244,6 +244,7 @@ type FileResponse struct {
 	IsCSV      bool   `json:"isCSV"`
 	IsSVG      bool   `json:"isSVG,omitempty"`
 	RawSVG     string `json:"rawSVG,omitempty"`
+	IsPDF      bool   `json:"isPDF,omitempty"`
 	IsBinary   bool   `json:"isBinary,omitempty"`
 	MimeType   string `json:"mimeType,omitempty"`
 	Size       int64  `json:"size,omitempty"`
@@ -275,6 +276,21 @@ func handleFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Detect PDF files and return metadata for frontend rendering.
+	ext := strings.ToLower(filepath.Ext(filePath))
+	if ext == ".pdf" {
+		resp := FileResponse{
+			Name:     filepath.Base(filePath),
+			Path:     reqPath,
+			IsPDF:    true,
+			MimeType: "application/pdf",
+			Size:     info.Size(),
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(resp)
+		return
+	}
+
 	// Detect binary files and return metadata instead of content.
 	if isBinaryContent(data) {
 		resp := FileResponse{
@@ -289,7 +305,6 @@ func handleFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ext := strings.ToLower(filepath.Ext(filePath))
 	isMarkdown := ext == ".md" || ext == ".markdown"
 	isCSV := ext == ".csv"
 	isSVG := ext == ".svg"

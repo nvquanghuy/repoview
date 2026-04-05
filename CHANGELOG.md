@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- [added] Inline PDF viewing using the browser's native PDF viewer
 
 ## [v0.6.0] - 2026-03-28
 
