@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -1315,5 +1316,72 @@ func TestFindAvailablePort_SkipsMultipleOccupiedPorts(t *testing.T) {
 	port := findAvailablePort("127.0.0.1", 19200, 10)
 	if port != 19203 {
 		t.Errorf("expected port 19203, got %d", port)
+	}
+}
+
+func TestPreprocessWikiLinks(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		wantFrag string
+	}{
+		{
+			name:     "simple link",
+			input:    "[[My Note]]",
+			wantFrag: `<a class="wiki-link" data-wiki-target="My Note">My Note</a>`,
+		},
+		{
+			name:     "link with display text",
+			input:    "[[My Note|Display Text]]",
+			wantFrag: `<a class="wiki-link" data-wiki-target="My Note">Display Text</a>`,
+		},
+		{
+			name:     "link with heading",
+			input:    "[[My Note#Section]]",
+			wantFrag: `<a class="wiki-link" data-wiki-target="My Note" data-wiki-heading="Section">My Note</a>`,
+		},
+		{
+			name:     "link with heading and display text",
+			input:    "[[My Note#Section|Display]]",
+			wantFrag: `<a class="wiki-link" data-wiki-target="My Note" data-wiki-heading="Section">Display</a>`,
+		},
+		{
+			name:     "no wiki link unchanged",
+			input:    "plain text without links",
+			wantFrag: "plain text without links",
+		},
+		{
+			name:     "html special chars escaped",
+			input:    `[[A & B|<Display>]]`,
+			wantFrag: `data-wiki-target="A &amp; B"`,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := string(preprocessWikiLinks([]byte(tc.input)))
+			if !strings.Contains(got, tc.wantFrag) {
+				t.Errorf("preprocessWikiLinks(%q) = %q, want fragment %q", tc.input, got, tc.wantFrag)
+			}
+		})
+	}
+}
+
+func TestRenderMarkdown_WikiLinks(t *testing.T) {
+	// Enable Obsidian mode for this test.
+	old := isObsidianVault
+	isObsidianVault = true
+	defer func() { isObsidianVault = old }()
+
+	input := []byte("See [[My Note]] for details.")
+	var buf bytes.Buffer
+	renderMarkdown(&buf, input)
+	out := buf.String()
+
+	if !strings.Contains(out, `class="wiki-link"`) {
+		t.Errorf("expected wiki-link class in output, got: %s", out)
+	}
+	if !strings.Contains(out, `data-wiki-target="My Note"`) {
+		t.Errorf("expected data-wiki-target attribute in output, got: %s", out)
 	}
 }

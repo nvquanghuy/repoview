@@ -500,6 +500,21 @@
                 border: 1px solid #d0d7de;
                 overflow-x: auto;
             }
+            .wiki-link {
+                text-decoration: none;
+                border-bottom: 1px dashed #0969da;
+            }
+            .wiki-link:hover {
+                border-bottom-style: solid;
+            }
+            .wiki-link-broken {
+                color: #cf222e;
+                border-bottom-color: #cf222e;
+            }
+            .wiki-link-broken::after {
+                content: ' [?]';
+                font-size: 0.8em;
+            }
             .markdown-body table {
                 border-collapse: collapse;
                 border-spacing: 0;
@@ -1277,6 +1292,7 @@
             let expandedDirs = new Set();
             let treeCache = {};
             let allFiles = null;
+            let wikiLinkIndex = null;
             let searchIdx = 0;
             let ws = null;
             let watchedPaths = new Set();
@@ -1307,6 +1323,7 @@
                         hideConnectionError();
                         treeCache = {};
                         allFiles = null;
+                        wikiLinkIndex = null;
                         await refreshTree();
                         connectWS();
                     }
@@ -1839,6 +1856,116 @@
                 });
             }
 
+            // Build index mapping basenames to full paths for wiki link resolution
+            function buildWikiLinkIndex() {
+                if (wikiLinkIndex && allFiles) return wikiLinkIndex;
+                if (!allFiles) return null;
+
+                wikiLinkIndex = {};
+                allFiles.forEach(function(path) {
+                    var basename = path.split('/').pop();
+                    var nameNoExt = basename.replace(/\.md$/i, '');
+
+                    // Index by name without extension
+                    if (!wikiLinkIndex[nameNoExt.toLowerCase()]) {
+                        wikiLinkIndex[nameNoExt.toLowerCase()] = [];
+                    }
+                    wikiLinkIndex[nameNoExt.toLowerCase()].push(path);
+
+                    // Also index by full basename
+                    if (!wikiLinkIndex[basename.toLowerCase()]) {
+                        wikiLinkIndex[basename.toLowerCase()] = [];
+                    }
+                    wikiLinkIndex[basename.toLowerCase()].push(path);
+                });
+                return wikiLinkIndex;
+            }
+
+            // Resolve wiki link target to actual file path
+            function resolveWikiTarget(target, currentDir) {
+                var index = buildWikiLinkIndex();
+                if (!index) return null;
+
+                // Normalize target
+                var normalizedTarget = target.trim();
+
+                // Try exact path match first
+                if (allFiles.indexOf(normalizedTarget) !== -1) {
+                    return normalizedTarget;
+                }
+                // Try with .md extension
+                if (allFiles.indexOf(normalizedTarget + '.md') !== -1) {
+                    return normalizedTarget + '.md';
+                }
+
+                // Try basename lookup
+                var basename = normalizedTarget.split('/').pop().toLowerCase();
+                var candidates = index[basename] || index[basename.replace(/\.md$/i, '')] || [];
+
+                if (candidates.length === 0) return null;
+                if (candidates.length === 1) return candidates[0];
+
+                // Multiple matches: prefer same directory
+                var sameDirMatch = candidates.find(function(c) {
+                    var dir = c.split('/').slice(0, -1).join('/');
+                    return dir === currentDir;
+                });
+                if (sameDirMatch) return sameDirMatch;
+
+                // Otherwise return shortest path
+                candidates.sort(function(a, b) { return a.length - b.length; });
+                return candidates[0];
+            }
+
+            // Resolve all wiki links in a container
+            function resolveWikiLinks(container, currentFilePath) {
+                var currentDir = currentFilePath.split('/').slice(0, -1).join('/');
+                var links = container.querySelectorAll('a.wiki-link');
+
+                if (links.length === 0) return;
+
+                // Ensure file list is loaded for resolution
+                if (!allFiles) {
+                    fetch('/api/files')
+                        .then(function(r) { return r.json(); })
+                        .then(function(result) {
+                            if (result.status === 'ok') {
+                                allFiles = result.data;
+                                wikiLinkIndex = null;
+                                resolveWikiLinksInner(links, currentDir);
+                            }
+                        });
+                } else {
+                    resolveWikiLinksInner(links, currentDir);
+                }
+            }
+
+            function resolveWikiLinksInner(links, currentDir) {
+                links.forEach(function(link) {
+                    var target = link.dataset.wikiTarget;
+                    var heading = link.dataset.wikiHeading || '';
+                    var resolved = resolveWikiTarget(target, currentDir);
+
+                    if (resolved) {
+                        link.href = '/' + resolved + (heading ? '#' + heading : '');
+                        link.classList.add('wiki-link-valid');
+                        link.onclick = function(e) {
+                            e.preventDefault();
+                            loadFile(resolved);
+                            if (heading) {
+                                setTimeout(function() {
+                                    var h = document.getElementById(heading);
+                                    if (h) h.scrollIntoView({ behavior: 'smooth' });
+                                }, 100);
+                            }
+                        };
+                    } else {
+                        link.classList.add('wiki-link-broken');
+                        link.title = 'File not found: ' + target;
+                    }
+                });
+            }
+
             function bindAnchorLinks(container) {
                 container
                     .querySelectorAll('a[href^="#"]')
@@ -2354,6 +2481,7 @@
                             if (mdBody) {
                                 addHeadingAnchors(mdBody);
                                 rewriteMarkdownImages(mdBody, path);
+                                resolveWikiLinks(mdBody, path);
                                 wrapCollapsibleSections(mdBody, currentFilePath);
                                 renderMermaidDiagrams(mdBody);
                                 hasOutline = buildOutline(mdBody);
