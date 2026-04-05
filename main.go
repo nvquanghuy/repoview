@@ -64,6 +64,8 @@ type TreeEntry struct {
 	Path      string `json:"path"`
 	IsDir     bool   `json:"isDir"`
 	Extension string `json:"extension,omitempty"`
+	Size      int64  `json:"size"`
+	ModTime   int64  `json:"modTime"`
 }
 
 func main() {
@@ -221,11 +223,19 @@ func handleTree(w http.ResponseWriter, r *http.Request) {
 		if !e.IsDir() {
 			ext = strings.TrimPrefix(filepath.Ext(name), ".")
 		}
+		var size int64
+		var modTime int64
+		if info, err := e.Info(); err == nil {
+			size = info.Size()
+			modTime = info.ModTime().UnixMilli()
+		}
 		result = append(result, TreeEntry{
 			Name:      name,
 			Path:      relPath,
 			IsDir:     e.IsDir(),
 			Extension: ext,
+			Size:      size,
+			ModTime:   modTime,
 		})
 	}
 
