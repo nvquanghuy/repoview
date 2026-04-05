@@ -503,6 +503,7 @@
             .wiki-link {
                 text-decoration: none;
                 border-bottom: 1px dashed #0969da;
+                cursor: pointer;
             }
             .wiki-link:hover {
                 border-bottom-style: solid;
@@ -1968,7 +1969,7 @@
 
             function bindAnchorLinks(container) {
                 container
-                    .querySelectorAll('a[href^="#"]')
+                    .querySelectorAll('a[href^="#"]:not(.wiki-link)')
                     .forEach(function (link) {
                         link.onclick = function (e) {
                             var id = link.getAttribute("href").slice(1);

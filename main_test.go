@@ -1328,22 +1328,22 @@ func TestPreprocessWikiLinks(t *testing.T) {
 		{
 			name:     "simple link",
 			input:    "[[My Note]]",
-			wantFrag: `<a class="wiki-link" data-wiki-target="My Note">My Note</a>`,
+			wantFrag: `<a class="wiki-link" href="#" data-wiki-target="My Note">My Note</a>`,
 		},
 		{
 			name:     "link with display text",
 			input:    "[[My Note|Display Text]]",
-			wantFrag: `<a class="wiki-link" data-wiki-target="My Note">Display Text</a>`,
+			wantFrag: `<a class="wiki-link" href="#" data-wiki-target="My Note">Display Text</a>`,
 		},
 		{
 			name:     "link with heading",
 			input:    "[[My Note#Section]]",
-			wantFrag: `<a class="wiki-link" data-wiki-target="My Note" data-wiki-heading="Section">My Note</a>`,
+			wantFrag: `<a class="wiki-link" href="#" data-wiki-target="My Note" data-wiki-heading="Section">My Note</a>`,
 		},
 		{
 			name:     "link with heading and display text",
 			input:    "[[My Note#Section|Display]]",
-			wantFrag: `<a class="wiki-link" data-wiki-target="My Note" data-wiki-heading="Section">Display</a>`,
+			wantFrag: `<a class="wiki-link" href="#" data-wiki-target="My Note" data-wiki-heading="Section">Display</a>`,
 		},
 		{
 			name:     "no wiki link unchanged",

@@ -422,8 +422,8 @@ func preprocessWikiLinks(data []byte) []byte {
 			display = string(groups[3])
 		}
 
-		// Build the placeholder anchor tag
-		result := fmt.Sprintf(`<a class="wiki-link" data-wiki-target="%s"`,
+		// Build the placeholder anchor tag with href="#" so it's clickable
+		result := fmt.Sprintf(`<a class="wiki-link" href="#" data-wiki-target="%s"`,
 			html.EscapeString(target))
 		if heading != "" {
 			result += fmt.Sprintf(` data-wiki-heading="%s"`, html.EscapeString(heading))
