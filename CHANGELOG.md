@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+
+## [v0.9.0] - 2026-04-05
+
 - [added] Mermaid diagram rendering in markdown code blocks (flowcharts, sequence diagrams, class diagrams, etc.)
 
 ## [v0.8.0] - 2026-04-05
