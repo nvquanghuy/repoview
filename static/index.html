@@ -1927,15 +1927,13 @@
 
                 // Ensure file list is loaded for resolution
                 if (!allFiles) {
-                    fetch('/api/files')
-                        .then(function(r) { return r.json(); })
-                        .then(function(result) {
-                            if (result.status === 'ok') {
-                                allFiles = result.data;
-                                wikiLinkIndex = null;
-                                resolveWikiLinksInner(links, currentDir);
-                            }
-                        });
+                    apiFetch('/api/files').then(function(result) {
+                        if (result.ok) {
+                            allFiles = result.data;
+                            wikiLinkIndex = null;
+                            resolveWikiLinksInner(links, currentDir);
+                        }
+                    });
                 } else {
                     resolveWikiLinksInner(links, currentDir);
                 }
