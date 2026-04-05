@@ -997,6 +997,39 @@ func TestHandleFile_BinaryExecutable(t *testing.T) {
 	}
 }
 
+func TestHandleFile_PDF(t *testing.T) {
+	setRoot(t, "testdata")
+
+	req := httptest.NewRequest("GET", "/api/file?path=test.pdf", nil)
+	w := httptest.NewRecorder()
+	handleFile(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+
+	var resp FileResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+
+	if !resp.IsPDF {
+		t.Error("expected isPDF to be true")
+	}
+	if resp.IsBinary {
+		t.Error("expected isBinary to be false for PDF")
+	}
+	if resp.MimeType != "application/pdf" {
+		t.Errorf("expected mimeType application/pdf, got %s", resp.MimeType)
+	}
+	if resp.Content != "" {
+		t.Error("expected empty content for PDF file")
+	}
+	if resp.Size == 0 {
+		t.Error("expected non-zero size for PDF file")
+	}
+}
+
 func TestHandleFile_SVG(t *testing.T) {
 	setRoot(t, "testdata")
 

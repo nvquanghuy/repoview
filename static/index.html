@@ -1110,6 +1110,17 @@
             ::-webkit-scrollbar-thumb:hover {
                 background: #afb8c1;
             }
+
+            /* ── PDF Viewer ──────────────────────────────────────────── */
+            .pdf-viewer {
+                width: 100%;
+                height: 100%;
+            }
+            .pdf-viewer embed {
+                width: 100%;
+                height: 100%;
+                border: none;
+            }
         </style>
     </head>
     <body>
@@ -2074,6 +2085,13 @@
                 history.replaceState(null, "", url);
             }
 
+            // ── PDF Viewer ─────────────────────────────────────────────
+            function renderPDF(path, data) {
+                var area = document.getElementById("content-area");
+                var rawURL = "/api/raw?path=" + encodeURIComponent(path);
+                area.innerHTML = '<div class="pdf-viewer"><embed src="' + escAttr(rawURL) + '" type="application/pdf"></div>';
+            }
+
             async function loadFile(path, skipPush) {
                 // Unwatch old file
                 if (currentFilePath) wsUnwatch(currentFilePath);
@@ -2126,6 +2144,23 @@
                 var data = result.data;
 
                 var area = document.getElementById("content-area");
+
+                // Handle PDF files
+                if (data.isPDF) {
+                    if (getViewParam()) setViewParam(null);
+                    renderPDF(path, data);
+
+                    var sizeStr = formatFileSize(data.size);
+                    var metaHTML = "<span>" + esc(sizeStr) + '</span><span class="sep">·</span><span>PDF</span>';
+                    showFileHeaderBar(null, metaHTML);
+
+                    wsWatch(path);
+                    refreshTree();
+                    var filename = path.split("/").pop();
+                    document.title = filename + " - RepoView";
+                    return;
+                }
+
                 if (data.isBinary) {
                     // Strip ?view param for binary files
                     if (getViewParam()) setViewParam(null);
