@@ -491,6 +491,15 @@
                 border-radius: 0;
                 font-size: 100%;
             }
+            .markdown-body .mermaid {
+                text-align: center;
+                margin: 16px 0;
+                padding: 16px;
+                background: #f6f8fa;
+                border-radius: 6px;
+                border: 1px solid #d0d7de;
+                overflow-x: auto;
+            }
             .markdown-body table {
                 border-collapse: collapse;
                 border-spacing: 0;
@@ -1136,6 +1145,10 @@
                 border: none;
             }
         </style>
+        <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+        <script>
+            mermaid.initialize({ startOnLoad: false });
+        </script>
     </head>
     <body>
         <div id="connection-banner">
@@ -1936,6 +1949,20 @@
                 saveCollapseState(filePath, []);
             }
 
+            function renderMermaidDiagrams(container) {
+                var codeBlocks = container.querySelectorAll('code.language-mermaid');
+                codeBlocks.forEach(function(code) {
+                    var pre = code.parentElement;
+                    var diagram = document.createElement('div');
+                    diagram.className = 'mermaid';
+                    diagram.textContent = code.textContent;
+                    pre.parentNode.replaceChild(diagram, pre);
+                });
+                if (codeBlocks.length > 0) {
+                    mermaid.run();
+                }
+            }
+
             function wrapCollapsibleSections(container, filePath) {
                 var headings = Array.from(container.querySelectorAll('h1, h2, h3, h4, h5, h6'));
                 if (headings.length === 0) return;
@@ -2328,6 +2355,7 @@
                                 addHeadingAnchors(mdBody);
                                 rewriteMarkdownImages(mdBody, path);
                                 wrapCollapsibleSections(mdBody, currentFilePath);
+                                renderMermaidDiagrams(mdBody);
                                 hasOutline = buildOutline(mdBody);
                                 if (
                                     hasOutline &&
