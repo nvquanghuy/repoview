@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- [added] Mobile-friendly responsive design: collapsible sidebar with hamburger menu, touch-optimized layout, full-width panels on small screens
 - [added] Resizable outline panel (right sidebar) - drag the left edge to resize
 - [fixed] Outline close button now clickable (resize handle no longer overlaps header)
 

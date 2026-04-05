@@ -1174,6 +1174,120 @@
                 height: 100%;
                 border: none;
             }
+
+            /* ── Mobile Menu Toggle ───────────────────────────────────── */
+            #menu-toggle {
+                display: none;
+                background: none;
+                border: none;
+                padding: 8px;
+                cursor: pointer;
+                color: #656d76;
+                border-radius: 6px;
+                flex-shrink: 0;
+            }
+            #menu-toggle:hover {
+                background: #eaeef2;
+                color: #1f2328;
+            }
+            #sidebar-overlay {
+                display: none;
+                position: fixed;
+                inset: 0;
+                background: rgba(0, 0, 0, 0.3);
+                z-index: 15;
+            }
+            #sidebar-overlay.open {
+                display: block;
+            }
+
+            /* ── Mobile Responsive ────────────────────────────────────── */
+            @media (max-width: 768px) {
+                #menu-toggle {
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                }
+                #sidebar {
+                    position: fixed;
+                    left: 0;
+                    top: 0;
+                    bottom: 0;
+                    z-index: 20;
+                    width: 280px !important;
+                    transform: translateX(-100%);
+                    transition: transform 0.2s ease;
+                    box-shadow: none;
+                }
+                #sidebar.open {
+                    transform: translateX(0);
+                    box-shadow: 4px 0 12px rgba(0, 0, 0, 0.15);
+                }
+                #resize-handle {
+                    display: none;
+                }
+                #breadcrumb-bar {
+                    padding: 8px 12px;
+                }
+                #content-area {
+                    padding: 16px;
+                }
+                .dir-listing-row .size,
+                .dir-listing-row .modified {
+                    display: none;
+                }
+                #go-to-file-btn kbd {
+                    display: none;
+                }
+                #outline-sidebar.open {
+                    position: fixed;
+                    right: 0;
+                    top: 0;
+                    bottom: 0;
+                    width: 280px !important;
+                    z-index: 25;
+                    box-shadow: -4px 0 12px rgba(0, 0, 0, 0.15);
+                }
+                #outline-resize-handle {
+                    display: none;
+                }
+                #file-header-bar {
+                    padding: 8px 12px;
+                    flex-wrap: wrap;
+                    gap: 8px;
+                }
+                #file-header-bar .file-header-meta {
+                    display: none;
+                }
+                .welcome {
+                    margin-top: 60px;
+                    padding: 0 16px;
+                }
+                .search-result {
+                    padding: 10px 16px;
+                }
+                /* Larger touch targets for tree items */
+                .tree-item {
+                    padding: 8px 8px;
+                }
+            }
+
+            @media (max-width: 480px) {
+                #sidebar.open {
+                    width: 100% !important;
+                    max-width: none;
+                }
+                #outline-sidebar.open {
+                    width: 100% !important;
+                }
+                #search-box {
+                    margin: 16px;
+                    border-radius: 8px;
+                }
+                #search-overlay {
+                    padding-top: 40px;
+                }
+            }
         </style>
         <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
         <script>
@@ -1210,8 +1324,14 @@
                 <div id="tree-container"></div>
                 <div id="resize-handle"></div>
             </div>
+            <div id="sidebar-overlay" onclick="closeSidebar()"></div>
             <div id="main">
                 <div id="breadcrumb-bar">
+                    <button id="menu-toggle" onclick="toggleSidebar()" title="Toggle sidebar">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                            <path d="M1 2.75A.75.75 0 0 1 1.75 2h12.5a.75.75 0 0 1 0 1.5H1.75A.75.75 0 0 1 1 2.75Zm0 5A.75.75 0 0 1 1.75 7h12.5a.75.75 0 0 1 0 1.5H1.75A.75.75 0 0 1 1 7.75ZM1.75 12h12.5a.75.75 0 0 1 0 1.5H1.75a.75.75 0 0 1 0-1.5Z"/>
+                        </svg>
+                    </button>
                     <span class="crumb root" onclick="navigateTo('')"
                         >root</span
                     >
@@ -1721,6 +1841,7 @@
 
             /* ── Navigate to directory ────────────────────────────────── */
             async function navigateTo(path, skipPush) {
+                closeSidebar();
                 currentPath = path;
                 currentFilePath = "";
                 // Hide file header bar when navigating to a directory
@@ -2236,6 +2357,11 @@
                     }
                     history.pushState(null, "", "#" + id);
                     target.scrollIntoView({ behavior: "smooth" });
+                    // Close outline on mobile after clicking a link
+                    if (window.innerWidth <= 768) {
+                        hideOutline();
+                        localStorage.setItem("outlineOpen", "0");
+                    }
                 }
             }
 
@@ -2294,6 +2420,7 @@
             }
 
             async function loadFile(path, skipPush) {
+                closeSidebar();
                 // Unwatch old file
                 if (currentFilePath) wsUnwatch(currentFilePath);
 
@@ -2750,6 +2877,23 @@
                         navigateTo(el.dataset.nav);
                     };
                 });
+            }
+
+            /* ── Mobile Sidebar ───────────────────────────────────────── */
+            function toggleSidebar() {
+                var sidebar = document.getElementById("sidebar");
+                var overlay = document.getElementById("sidebar-overlay");
+                var isOpen = sidebar.classList.toggle("open");
+                overlay.classList.toggle("open", isOpen);
+                document.body.style.overflow = isOpen ? "hidden" : "";
+            }
+
+            function closeSidebar() {
+                var sidebar = document.getElementById("sidebar");
+                var overlay = document.getElementById("sidebar-overlay");
+                sidebar.classList.remove("open");
+                overlay.classList.remove("open");
+                document.body.style.overflow = "";
             }
 
             /* ── Fuzzy Search ─────────────────────────────────────────── */
