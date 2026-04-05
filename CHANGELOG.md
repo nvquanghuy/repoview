@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- [added] Folder listing now displays file size and last modified date
 
 ## [v0.7.0] - 2026-04-05
 

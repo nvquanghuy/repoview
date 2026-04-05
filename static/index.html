@@ -209,6 +209,20 @@
             .dir-listing-row .name {
                 flex: 1;
             }
+            .dir-listing-row .size,
+            .dir-listing-row .modified {
+                color: #656d76;
+                font-size: 12px;
+                flex-shrink: 0;
+            }
+            .dir-listing-row .size {
+                width: 70px;
+                text-align: right;
+            }
+            .dir-listing-row .modified {
+                width: 140px;
+                text-align: right;
+            }
 
             /* ── Tree ─────────────────────────────────────────────────── */
             .tree-item {
@@ -1616,7 +1630,9 @@
                         '<span class="icon folder">' +
                         SVG.folderClosed +
                         "</span>" +
-                        '<span class="name">..</span></div>';
+                        '<span class="name">..</span>' +
+                        '<span class="size"></span>' +
+                        '<span class="modified"></span></div>';
                 }
                 for (var i = 0; i < items.length; i++) {
                     var item = items[i];
@@ -1625,6 +1641,8 @@
                           SVG.folderClosed +
                           "</span>"
                         : '<span class="icon file">' + SVG.file + "</span>";
+                    var sizeStr = item.isDir ? "" : formatFileSize(item.size);
+                    var modStr = formatDate(item.modTime);
                     html +=
                         '<div class="dir-listing-row" data-path="' +
                         escAttr(item.path) +
@@ -1634,7 +1652,9 @@
                         icon +
                         '<span class="name">' +
                         esc(item.name) +
-                        "</span></div>";
+                        '</span>' +
+                        '<span class="size">' + sizeStr + '</span>' +
+                        '<span class="modified">' + modStr + '</span></div>';
                 }
                 html += "</div>";
                 return html;
@@ -2931,6 +2951,12 @@
                     .replace(/'/g, "&#39;")
                     .replace(/</g, "&lt;")
                     .replace(/>/g, "&gt;");
+            }
+            function formatDate(ms) {
+                if (!ms) return "";
+                var d = new Date(ms);
+                var mon = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+                return mon[d.getMonth()] + " " + d.getDate() + ", " + d.getFullYear();
             }
 
             /* ── Keyboard shortcut ────────────────────────────────────── */
