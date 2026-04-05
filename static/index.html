@@ -2075,23 +2075,29 @@
                 }
             }
 
+            // Convert heading text to slug format (same as addHeadingAnchors)
+            function slugifyHeading(text) {
+                return text.toLowerCase().replace(/[^\w]+/g, '-').replace(/^-|-$/g, '');
+            }
+
             function resolveWikiLinksInner(links, currentDir) {
                 links.forEach(function(link) {
                     var target = link.dataset.wikiTarget;
                     var heading = link.dataset.wikiHeading || '';
+                    var headingSlug = heading ? slugifyHeading(heading) : '';
                     var resolved = resolveWikiTarget(target, currentDir);
 
                     if (resolved) {
-                        link.href = '/' + resolved + (heading ? '#' + heading : '');
+                        link.href = '/' + resolved + (headingSlug ? '#' + headingSlug : '');
                         link.classList.add('wiki-link-valid');
-                        link.onclick = function(e) {
+                        link.onclick = async function(e) {
                             e.preventDefault();
-                            loadFile(resolved);
-                            if (heading) {
-                                setTimeout(function() {
-                                    var h = document.getElementById(heading);
-                                    if (h) h.scrollIntoView({ behavior: 'smooth' });
-                                }, 100);
+                            await loadFile(resolved);
+                            if (headingSlug) {
+                                // Update URL to include the hash
+                                history.replaceState(null, '', location.pathname + '#' + headingSlug);
+                                var h = document.getElementById(headingSlug);
+                                if (h) h.scrollIntoView({ behavior: 'smooth' });
                             }
                         };
                     } else {
@@ -2125,9 +2131,7 @@
                         if (h.querySelector(".heading-anchor")) return; // Already has anchor
                         var id = h.id;
                         if (!id) {
-                            id = h.textContent
-                                .toLowerCase()
-                                .replace(/[^\w]+/g, "-");
+                            id = slugifyHeading(h.textContent);
                             h.id = id;
                         }
                         var anchor = document.createElement("a");

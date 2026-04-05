@@ -564,3 +564,42 @@ test.describe("Connection error handling", () => {
     });
   });
 });
+
+test.describe("Wiki links", () => {
+  test("wiki link with mixed-case heading navigates and scrolls to target", async ({ page }) => {
+    await page.goto("/wiki-test.md");
+    const content = page.locator("#content-area .markdown-body");
+    await expect(content.locator("h1", { hasText: "Wiki Link Test" })).toBeVisible();
+
+    // Find the wiki link with mixed case heading
+    const wikiLink = content.locator('a.wiki-link', { hasText: "Jump to Code Block" });
+    await expect(wikiLink).toBeVisible();
+
+    // Verify the href is correctly slugified (lowercase, hyphenated)
+    await expect(wikiLink).toHaveAttribute("href", "/hello.md#code-block");
+
+    // Click the link
+    await wikiLink.click();
+
+    // Should navigate to hello.md and the Code Block heading should be visible
+    await expect(page.locator("#content-area .markdown-body h2#code-block")).toBeVisible();
+
+    // URL should include the hash
+    expect(page.url()).toContain("/hello.md#code-block");
+  });
+
+  test("wiki link href is properly slugified", async ({ page }) => {
+    await page.goto("/wiki-test.md");
+    const content = page.locator("#content-area .markdown-body");
+    await expect(content.locator("h1", { hasText: "Wiki Link Test" })).toBeVisible();
+
+    // Check that heading anchors in hrefs are slugified (wait for resolution)
+    const linkWithHeading = content.locator('a.wiki-link[data-wiki-heading="Code Block"]');
+    // Wait for the link to be resolved (href changes from "#" to actual path)
+    await expect(linkWithHeading).toHaveAttribute("href", /^\/hello\.md#/);
+
+    const href = await linkWithHeading.getAttribute("href");
+    // href should have lowercase, hyphenated anchor
+    expect(href).toBe("/hello.md#code-block");
+  });
+});

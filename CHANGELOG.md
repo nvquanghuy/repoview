@@ -5,6 +5,7 @@
 - [added] Mobile-friendly responsive design: collapsible sidebar with hamburger menu, touch-optimized layout, full-width panels on small screens
 - [added] Resizable outline panel (right sidebar) - drag the left edge to resize
 - [fixed] Outline close button now clickable (resize handle no longer overlaps header)
+- [fixed] Wiki links with heading anchors now correctly navigate to headings (mixed-case anchors are slugified to match heading IDs)
 
 ## [v0.10.0] - 2026-04-05
 

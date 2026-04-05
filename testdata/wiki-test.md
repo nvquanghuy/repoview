@@ -17,6 +17,7 @@ This file tests Obsidian-style wiki links.
 
 - With heading: [[hello#code-block]]
 - Heading and display: [[hello#table|Jump to Table]]
+- Mixed case heading: [[hello#Code Block|Jump to Code Block]]
 
 ## Broken Links
 
