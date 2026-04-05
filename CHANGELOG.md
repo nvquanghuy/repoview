@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 - [added] Resizable outline panel (right sidebar) - drag the left edge to resize
+- [fixed] Outline close button now clickable (resize handle no longer overlaps header)
 
 ## [v0.10.0] - 2026-04-05
 
