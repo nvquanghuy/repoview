@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"embed"
 	"encoding/csv"
@@ -17,6 +18,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -138,6 +140,7 @@ func main() {
 	http.HandleFunc("/api/file", handleFile)
 	http.HandleFunc("/api/files", handleFiles)
 	http.HandleFunc("/api/raw", handleRaw)
+	http.HandleFunc("/api/jsonl", handleJSONL)
 	http.HandleFunc("/api/editors", handleEditors)
 	http.HandleFunc("/api/open", handleOpen)
 	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
@@ -266,8 +269,19 @@ type FileResponse struct {
 	RawSVG     string `json:"rawSVG,omitempty"`
 	IsPDF      bool   `json:"isPDF,omitempty"`
 	IsBinary   bool   `json:"isBinary,omitempty"`
+	IsJSONL    bool   `json:"isJSONL,omitempty"`
 	MimeType   string `json:"mimeType,omitempty"`
 	Size       int64  `json:"size,omitempty"`
+}
+
+// JSONLResponse represents paginated JSONL data.
+type JSONLResponse struct {
+	Records     []string `json:"records"`
+	TotalLines  int64    `json:"totalLines"`
+	Page        int      `json:"page"`
+	PageSize    int      `json:"pageSize"`
+	HasMore     bool     `json:"hasMore"`
+	ParseErrors []string `json:"parseErrors,omitempty"`
 }
 
 // handleFile returns rendered file content as JSON.
@@ -290,14 +304,10 @@ func handleFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	data, err := os.ReadFile(filePath)
-	if err != nil {
-		http.Error(w, "cannot read file", http.StatusInternalServerError)
-		return
-	}
+	// Get file extension early to avoid reading large files unnecessarily.
+	ext := strings.ToLower(filepath.Ext(filePath))
 
 	// Detect PDF files and return metadata for frontend rendering.
-	ext := strings.ToLower(filepath.Ext(filePath))
 	if ext == ".pdf" {
 		resp := FileResponse{
 			Name:     filepath.Base(filePath),
@@ -308,6 +318,26 @@ func handleFile(w http.ResponseWriter, r *http.Request) {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(resp)
+		return
+	}
+
+	// Detect JSONL files and return metadata for frontend pagination.
+	if ext == ".jsonl" {
+		resp := FileResponse{
+			Name:     filepath.Base(filePath),
+			Path:     reqPath,
+			IsJSONL:  true,
+			MimeType: "application/x-ndjson",
+			Size:     info.Size(),
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(resp)
+		return
+	}
+
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		http.Error(w, "cannot read file", http.StatusInternalServerError)
 		return
 	}
 
@@ -897,4 +927,154 @@ func watchLoop(watcher *fsnotify.Watcher, h *hub) {
 			}
 		}
 	}
+}
+
+// handleJSONL serves paginated JSONL data.
+func handleJSONL(w http.ResponseWriter, r *http.Request) {
+	reqPath := r.URL.Query().Get("path")
+	if reqPath == "" {
+		http.Error(w, "path required", http.StatusBadRequest)
+		return
+	}
+
+	// Parse pagination parameters.
+	page := 1
+	if pageStr := r.URL.Query().Get("page"); pageStr != "" {
+		if p, err := strconv.Atoi(pageStr); err == nil && p > 0 {
+			page = p
+		}
+	}
+
+	pageSize := 100 // Default page size
+	if sizeStr := r.URL.Query().Get("pageSize"); sizeStr != "" {
+		if s, err := strconv.Atoi(sizeStr); err == nil && s > 0 && s <= 500 {
+			pageSize = s
+		}
+	}
+
+	filePath, err := safePath(reqPath)
+	if err != nil {
+		http.Error(w, "invalid path", http.StatusBadRequest)
+		return
+	}
+
+	info, err := os.Stat(filePath)
+	if err != nil || info.IsDir() {
+		http.Error(w, "file not found", http.StatusNotFound)
+		return
+	}
+
+	// Count total lines first.
+	totalLines, err := countJSONLLines(filePath)
+	if err != nil {
+		http.Error(w, "cannot read file", http.StatusInternalServerError)
+		return
+	}
+
+	// Read paginated records.
+	records, parseErrors, err := readJSONLPage(filePath, page, pageSize)
+	if err != nil {
+		http.Error(w, "cannot read file", http.StatusInternalServerError)
+		return
+	}
+
+	resp := JSONLResponse{
+		Records:     records,
+		TotalLines:  totalLines,
+		Page:        page,
+		PageSize:    pageSize,
+		HasMore:     int64(page*pageSize) < totalLines,
+		ParseErrors: parseErrors,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(resp)
+}
+
+// countJSONLLines efficiently counts lines in a file.
+func countJSONLLines(filePath string) (int64, error) {
+	file, err := os.Open(filePath)
+	if err != nil {
+		return 0, err
+	}
+	defer file.Close()
+
+	var count int64
+	scanner := bufio.NewScanner(file)
+	// Use larger buffer for better performance with large lines.
+	buf := make([]byte, 1024*1024) // 1MB buffer
+	scanner.Buffer(buf, 10*1024*1024) // Max 10MB per line
+
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line != "" && line != "{}" { // Skip empty lines and empty objects
+			count++
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}
+
+// readJSONLPage reads a specific page of JSONL records.
+func readJSONLPage(filePath string, page, pageSize int) ([]string, []string, error) {
+	file, err := os.Open(filePath)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	buf := make([]byte, 1024*1024)
+	scanner.Buffer(buf, 10*1024*1024)
+
+	var records []string
+	var parseErrors []string
+
+	startIdx := (page - 1) * pageSize
+	endIdx := page * pageSize
+	currentIdx := 0
+	lineNum := 0
+
+	for scanner.Scan() {
+		lineNum++
+		line := strings.TrimSpace(scanner.Text())
+
+		if line == "" || line == "{}" {
+			continue
+		}
+
+		if currentIdx >= startIdx && currentIdx < endIdx {
+			// Validate JSON.
+			var v interface{}
+			if err := json.Unmarshal([]byte(line), &v); err != nil {
+				parseErrors = append(parseErrors, fmt.Sprintf("Line %d: %s", lineNum, err.Error()))
+				// Include the malformed line with error marker.
+				records = append(records, line)
+			} else {
+				// Pretty-print the JSON for better display.
+				prettyJSON, err := json.MarshalIndent(v, "", "  ")
+				if err != nil {
+					records = append(records, line)
+				} else {
+					records = append(records, string(prettyJSON))
+				}
+			}
+		}
+
+		currentIdx++
+
+		if currentIdx >= endIdx {
+			break
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return nil, nil, err
+	}
+
+	return records, parseErrors, nil
 }

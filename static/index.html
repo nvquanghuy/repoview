@@ -844,6 +844,221 @@
                 background: #f6f8fa;
             }
 
+            /* ── JSONL viewer ────────────────────────────────────────── */
+            .jsonl-container {
+                display: flex;
+                flex-direction: column;
+                gap: 12px;
+            }
+
+            .jsonl-record-card {
+                border: 1px solid #d0d7de;
+                border-radius: 6px;
+                overflow: hidden;
+                background: #fff;
+            }
+
+            .jsonl-record-header {
+                background: #f6f8fa;
+                padding: 6px 13px;
+                font-weight: 600;
+                font-size: 12px;
+                color: #656d76;
+                border-bottom: 1px solid #d0d7de;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+            }
+
+            .jsonl-record-number {
+                font-family: ui-monospace, monospace;
+            }
+
+            .jsonl-record-content {
+                font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo,
+                    Consolas, monospace;
+                font-size: 13px;
+                line-height: 1.5;
+            }
+
+            .jsonl-record-content pre {
+                margin: 0;
+                padding: 12px;
+                overflow-x: auto;
+            }
+
+            .jsonl-record-error {
+                background: #fff8c5;
+                border-left: 3px solid #d4a72c;
+                padding: 8px 13px;
+                font-size: 12px;
+                color: #633c01;
+                font-family: ui-monospace, monospace;
+            }
+
+            /* Pagination controls */
+            .jsonl-pagination {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 12px;
+                padding: 16px;
+                border-top: 1px solid #d0d7de;
+                background: #f6f8fa;
+            }
+
+            .jsonl-pagination button {
+                padding: 6px 12px;
+                font-size: 13px;
+                font-weight: 500;
+                color: #1f2328;
+                background: #fff;
+                border: 1px solid #d0d7de;
+                border-radius: 6px;
+                cursor: pointer;
+            }
+
+            .jsonl-pagination button:hover:not(:disabled) {
+                background: #f6f8fa;
+                border-color: #1f2328;
+            }
+
+            .jsonl-pagination button:disabled {
+                color: #8c959f;
+                cursor: not-allowed;
+                opacity: 0.6;
+            }
+
+            .jsonl-pagination-info {
+                font-size: 13px;
+                color: #656d76;
+                margin: 0 8px;
+            }
+
+            .jsonl-pagination-jump {
+                display: flex;
+                align-items: center;
+                gap: 6px;
+            }
+
+            .jsonl-pagination-jump input {
+                width: 60px;
+                padding: 5px 8px;
+                font-size: 13px;
+                border: 1px solid #d0d7de;
+                border-radius: 6px;
+                text-align: center;
+            }
+
+            .jsonl-loading {
+                text-align: center;
+                padding: 48px;
+                color: #656d76;
+                font-size: 14px;
+            }
+
+            /* Compact view */
+            .jsonl-compact-table {
+                border: 1px solid #d0d7de;
+                border-radius: 6px;
+                overflow: auto;
+            }
+
+            .jsonl-compact-table table {
+                border-collapse: collapse;
+                width: 100%;
+            }
+
+            .jsonl-compact-table th,
+            .jsonl-compact-table td {
+                padding: 6px 13px;
+                border: 1px solid #d0d7de;
+                font-size: 13px;
+                font-family: ui-monospace, monospace;
+            }
+
+            .jsonl-compact-table th {
+                background: #f6f8fa;
+                font-weight: 600;
+                position: sticky;
+                top: 0;
+            }
+
+            .jsonl-compact-table .jsonl-actions-cell {
+                white-space: nowrap;
+            }
+
+            .jsonl-compact-table .jsonl-action-btn {
+                background: none;
+                border: none;
+                cursor: pointer;
+                color: #0969da;
+                font-size: 12px;
+                padding: 2px 6px;
+                border-radius: 4px;
+                margin-right: 4px;
+            }
+
+            .jsonl-compact-table .jsonl-action-btn:hover {
+                background: #f6f8fa;
+                text-decoration: underline;
+            }
+
+            .jsonl-compact-expanded {
+                display: none;
+            }
+
+            .jsonl-compact-expanded.visible {
+                display: table-row;
+            }
+
+            .jsonl-compact-expanded td {
+                background: #f6f8fa;
+                padding: 12px;
+            }
+
+            .jsonl-compact-expanded pre {
+                margin: 0;
+                padding: 12px;
+                background: #fff;
+                border: 1px solid #d0d7de;
+                border-radius: 6px;
+                overflow-x: auto;
+            }
+
+            /* Raw view */
+            .jsonl-raw {
+                border: 1px solid #d0d7de;
+                border-radius: 6px;
+                background: #f6f8fa;
+            }
+
+            .jsonl-raw pre {
+                margin: 0;
+                padding: 16px;
+                font-family: ui-monospace, monospace;
+                font-size: 13px;
+                line-height: 1.5;
+                overflow-x: auto;
+            }
+
+            /* Page size selector */
+            .jsonl-page-size {
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                font-size: 12px;
+                color: #656d76;
+            }
+
+            .jsonl-page-size select {
+                padding: 4px 8px;
+                font-size: 12px;
+                border: 1px solid #d0d7de;
+                border-radius: 6px;
+                background: #fff;
+            }
+
             /* ── File header bar (GitHub-style) ──────────────────────── */
             #file-header-bar {
                 display: none;
@@ -2493,6 +2708,13 @@
                     return;
                 }
 
+                // Handle JSONL files
+                if (data.isJSONL) {
+                    await renderJSONLViewer(path, data);
+                    document.title = filename + " - RepoView";
+                    return;
+                }
+
                 if (data.isBinary) {
                     // Strip ?view param for binary files
                     if (getViewParam()) setViewParam(null);
@@ -3259,6 +3481,436 @@
                 var qs = params.toString();
                 var url = location.pathname + (qs ? "?" + qs : "");
                 history.replaceState(null, "", url);
+            }
+
+            /* ── JSONL viewer ───────────────────────────────────────── */
+            var jsonlState = {
+                path: null,
+                page: 1,
+                pageSize: 100,
+                totalLines: 0,
+                viewMode: "list",
+                data: null,
+            };
+
+            async function renderJSONLViewer(path, data) {
+                var area = document.getElementById("content-area");
+
+                // Initialize state
+                jsonlState.path = path;
+                jsonlState.page = 1;
+                jsonlState.pageSize = 100;
+
+                // Load first page
+                await loadJSONLPage();
+
+                // Create view toggle
+                var toggle = document.createElement("span");
+                toggle.className = "view-toggle";
+
+                var btnList = document.createElement("button");
+                btnList.textContent = "List";
+                btnList.className = "active";
+
+                var btnCompact = document.createElement("button");
+                btnCompact.textContent = "Compact";
+
+                var btnRaw = document.createElement("button");
+                btnRaw.textContent = "Raw";
+
+                toggle.appendChild(btnList);
+                toggle.appendChild(btnCompact);
+                toggle.appendChild(btnRaw);
+
+                // Page size selector
+                var pageSizeControl = document.createElement("span");
+                pageSizeControl.className = "jsonl-page-size";
+                pageSizeControl.innerHTML =
+                    'Per page: <select id="jsonl-page-size-select">' +
+                    '<option value="50">50</option>' +
+                    '<option value="100" selected>100</option>' +
+                    '<option value="200">200</option>' +
+                    '<option value="500">500</option>' +
+                    "</select>";
+
+                showFileHeaderBar(toggle, null);
+
+                // Add page size selector to header
+                var headerBar = document.getElementById("file-header-bar");
+                var metaEl = headerBar.querySelector(".file-header-meta");
+                metaEl.appendChild(pageSizeControl);
+
+                // Event handlers
+                btnList.onclick = function () {
+                    jsonlState.viewMode = "list";
+                    btnList.className = "active";
+                    btnCompact.className = "";
+                    btnRaw.className = "";
+                    renderJSONLContent();
+                };
+
+                btnCompact.onclick = function () {
+                    jsonlState.viewMode = "compact";
+                    btnCompact.className = "active";
+                    btnList.className = "";
+                    btnRaw.className = "";
+                    renderJSONLContent();
+                };
+
+                btnRaw.onclick = function () {
+                    jsonlState.viewMode = "raw";
+                    btnRaw.className = "active";
+                    btnList.className = "";
+                    btnCompact.className = "";
+                    renderJSONLContent();
+                };
+
+                document.getElementById(
+                    "jsonl-page-size-select",
+                ).onchange = async function (e) {
+                    jsonlState.pageSize = parseInt(e.target.value);
+                    jsonlState.page = 1;
+                    await loadJSONLPage();
+                };
+            }
+
+            async function loadJSONLPage() {
+                var area = document.getElementById("content-area");
+                area.innerHTML =
+                    '<div class="jsonl-loading">Loading...</div>';
+
+                var url =
+                    "/api/jsonl?path=" +
+                    encodeURIComponent(jsonlState.path) +
+                    "&page=" +
+                    jsonlState.page +
+                    "&pageSize=" +
+                    jsonlState.pageSize;
+
+                var result = await apiFetch(url);
+                if (!result.ok) {
+                    area.innerHTML =
+                        '<div class="welcome"><h2>Error loading JSONL</h2><p>' +
+                        esc(result.error || "Unknown error") +
+                        "</p></div>";
+                    return;
+                }
+
+                jsonlState.data = result.data;
+                jsonlState.totalLines = result.data.totalLines;
+                renderJSONLContent();
+            }
+
+            function renderJSONLContent() {
+                var area = document.getElementById("content-area");
+                var data = jsonlState.data;
+
+                if (!data || !data.records || data.records.length === 0) {
+                    area.innerHTML =
+                        '<div class="welcome"><h2>Empty JSONL file</h2><p>No records found.</p></div>';
+                    return;
+                }
+
+                var html = "";
+
+                // Add pagination at top
+                html += renderJSONLPagination(data, "top");
+
+                if (jsonlState.viewMode === "list") {
+                    html += renderJSONLListView(data);
+                } else if (jsonlState.viewMode === "compact") {
+                    html += renderJSONLCompactView(data);
+                } else if (jsonlState.viewMode === "raw") {
+                    html += renderJSONLRawView(data);
+                }
+
+                // Add pagination at bottom
+                html += renderJSONLPagination(data, "bottom");
+
+                area.innerHTML = html;
+                bindJSONLPaginationEvents();
+                bindJSONLCompactViewEvents();
+            }
+
+            function renderJSONLListView(data) {
+                var html = '<div class="jsonl-container">';
+                var startRecord =
+                    (jsonlState.page - 1) * jsonlState.pageSize + 1;
+
+                data.records.forEach(function (record, idx) {
+                    var recordNum = startRecord + idx;
+                    html += '<div class="jsonl-record-card" id="jsonl-record-' + recordNum + '">';
+                    html += '<div class="jsonl-record-header">';
+                    html +=
+                        '<span class="jsonl-record-number">Record ' +
+                        recordNum +
+                        "</span>";
+                    html += "</div>";
+
+                    // Check if this record has a parse error
+                    var hasError =
+                        data.parseErrors &&
+                        data.parseErrors.some(function (err) {
+                            return err.startsWith("Line " + recordNum);
+                        });
+
+                    if (hasError) {
+                        html += '<div class="jsonl-record-error">';
+                        var errorMsg = data.parseErrors.find(function (err) {
+                            return err.startsWith("Line " + recordNum);
+                        });
+                        html += "Parse Error: " + esc(errorMsg);
+                        html += "</div>";
+                    }
+
+                    html += '<div class="jsonl-record-content">';
+                    html += "<pre><code>" + esc(record) + "</code></pre>";
+                    html += "</div>";
+                    html += "</div>";
+                });
+
+                html += "</div>";
+                return html;
+            }
+
+            function renderJSONLCompactView(data) {
+                var html = '<div class="jsonl-compact-table">';
+                html += "<table>";
+                html += "<thead><tr>";
+                html += "<th>Line</th>";
+                html += "<th>JSON Preview</th>";
+                html += "<th>Actions</th>";
+                html += "</tr></thead>";
+                html += "<tbody>";
+
+                var startRecord =
+                    (jsonlState.page - 1) * jsonlState.pageSize + 1;
+
+                data.records.forEach(function (record, idx) {
+                    var recordNum = startRecord + idx;
+                    // Show first 100 chars of minified JSON
+                    var preview = record.replace(/\s+/g, " ").substring(0, 100);
+                    if (record.length > 100) preview += "...";
+
+                    html += '<tr data-record="' + recordNum + '">';
+                    html += "<td>" + recordNum + "</td>";
+                    html += "<td>" + esc(preview) + "</td>";
+                    html += '<td class="jsonl-actions-cell">';
+                    html += '<button class="jsonl-action-btn jsonl-expand-btn" data-record="' + recordNum + '">Expand</button>';
+                    html += '<button class="jsonl-action-btn jsonl-view-list-btn" data-record="' + recordNum + '">View in List</button>';
+                    html += "</td>";
+                    html += "</tr>";
+
+                    // Expanded row (hidden by default)
+                    html += '<tr class="jsonl-compact-expanded" data-expanded-for="' + recordNum + '">';
+                    html += '<td colspan="3">';
+                    html += '<pre><code>' + esc(record) + '</code></pre>';
+                    html += '</td>';
+                    html += '</tr>';
+                });
+
+                html += "</tbody></table>";
+                html += "</div>";
+                return html;
+            }
+
+            function renderJSONLRawView(data) {
+                var html = '<div class="jsonl-raw">';
+                html += "<pre><code>";
+
+                data.records.forEach(function (record) {
+                    // Minify for raw view
+                    var minified = record.replace(/\s+/g, " ").trim();
+                    html += esc(minified) + "\n";
+                });
+
+                html += "</code></pre>";
+                html += "</div>";
+                return html;
+            }
+
+            function renderJSONLPagination(data, position) {
+                var totalPages = Math.ceil(
+                    jsonlState.totalLines / jsonlState.pageSize,
+                );
+                var startRecord =
+                    (jsonlState.page - 1) * jsonlState.pageSize + 1;
+                var endRecord = Math.min(
+                    jsonlState.page * jsonlState.pageSize,
+                    jsonlState.totalLines,
+                );
+
+                var suffix = position === "top" ? "-top" : "-bottom";
+                var html = '<div class="jsonl-pagination">';
+
+                // Previous button
+                html +=
+                    '<button class="jsonl-prev-btn" data-position="' + position + '" ' +
+                    (jsonlState.page <= 1 ? "disabled" : "") +
+                    ">← Previous</button>";
+
+                // Page info
+                html += '<span class="jsonl-pagination-info">';
+                html +=
+                    "Showing " +
+                    startRecord +
+                    "-" +
+                    endRecord +
+                    " of " +
+                    jsonlState.totalLines +
+                    " records";
+                html +=
+                    " (Page " +
+                    jsonlState.page +
+                    " of " +
+                    totalPages +
+                    ")";
+                html += "</span>";
+
+                // Jump to page
+                html += '<span class="jsonl-pagination-jump">';
+                html += "<span>Go to:</span>";
+                html +=
+                    '<input type="number" class="jsonl-page-input" min="1" max="' +
+                    totalPages +
+                    '" value="' +
+                    jsonlState.page +
+                    '">';
+                html += '<button class="jsonl-jump-btn" data-position="' + position + '">Go</button>';
+                html += "</span>";
+
+                // Next button
+                html +=
+                    '<button class="jsonl-next-btn" data-position="' + position + '" ' +
+                    (!data.hasMore ? "disabled" : "") +
+                    ">Next →</button>";
+
+                html += "</div>";
+
+                return html;
+            }
+
+            function bindJSONLPaginationEvents() {
+                var prevBtns = document.querySelectorAll(".jsonl-prev-btn");
+                var nextBtns = document.querySelectorAll(".jsonl-next-btn");
+                var jumpBtns = document.querySelectorAll(".jsonl-jump-btn");
+                var pageInputs = document.querySelectorAll(".jsonl-page-input");
+
+                prevBtns.forEach(function (btn) {
+                    btn.onclick = async function () {
+                        if (jsonlState.page > 1) {
+                            jsonlState.page--;
+                            await loadJSONLPage();
+                        }
+                    };
+                });
+
+                nextBtns.forEach(function (btn) {
+                    btn.onclick = async function () {
+                        if (jsonlState.data.hasMore) {
+                            jsonlState.page++;
+                            await loadJSONLPage();
+                        }
+                    };
+                });
+
+                jumpBtns.forEach(function (btn, idx) {
+                    var pageInput = pageInputs[idx];
+                    if (pageInput) {
+                        var jumpToPage = async function () {
+                            var targetPage = parseInt(pageInput.value);
+                            var totalPages = Math.ceil(
+                                jsonlState.totalLines / jsonlState.pageSize,
+                            );
+
+                            if (targetPage >= 1 && targetPage <= totalPages) {
+                                jsonlState.page = targetPage;
+                                await loadJSONLPage();
+                            } else {
+                                alert(
+                                    "Please enter a page number between 1 and " +
+                                        totalPages,
+                                );
+                            }
+                        };
+
+                        btn.onclick = jumpToPage;
+                        pageInput.onkeypress = function (e) {
+                            if (e.key === "Enter") {
+                                jumpToPage();
+                            }
+                        };
+                    }
+                });
+            }
+
+            function bindJSONLCompactViewEvents() {
+                // Expand/collapse buttons
+                var expandBtns = document.querySelectorAll(".jsonl-expand-btn");
+                expandBtns.forEach(function (btn) {
+                    btn.onclick = function () {
+                        var recordNum = btn.getAttribute("data-record");
+                        var expandedRow = document.querySelector(
+                            '.jsonl-compact-expanded[data-expanded-for="' + recordNum + '"]'
+                        );
+
+                        if (expandedRow) {
+                            var isVisible = expandedRow.classList.contains("visible");
+                            if (isVisible) {
+                                expandedRow.classList.remove("visible");
+                                btn.textContent = "Expand";
+                            } else {
+                                expandedRow.classList.add("visible");
+                                btn.textContent = "Collapse";
+                            }
+                        }
+                    };
+                });
+
+                // View in List buttons
+                var viewListBtns = document.querySelectorAll(".jsonl-view-list-btn");
+                viewListBtns.forEach(function (btn) {
+                    btn.onclick = async function () {
+                        var recordNum = parseInt(btn.getAttribute("data-record"));
+
+                        // Calculate which page the record is on
+                        var targetPage = Math.ceil(recordNum / jsonlState.pageSize);
+
+                        // Switch to list view
+                        jsonlState.viewMode = "list";
+
+                        // Load the page if different
+                        if (targetPage !== jsonlState.page) {
+                            jsonlState.page = targetPage;
+                            await loadJSONLPage();
+                        } else {
+                            renderJSONLContent();
+                        }
+
+                        // Update view toggle buttons
+                        var toggleBtns = document.querySelectorAll(".view-toggle button");
+                        toggleBtns.forEach(function (toggleBtn) {
+                            if (toggleBtn.textContent === "List") {
+                                toggleBtn.className = "active";
+                            } else {
+                                toggleBtn.className = "";
+                            }
+                        });
+
+                        // Scroll to the record
+                        setTimeout(function () {
+                            var recordEl = document.getElementById("jsonl-record-" + recordNum);
+                            if (recordEl) {
+                                recordEl.scrollIntoView({ behavior: "smooth", block: "start" });
+                                // Highlight briefly
+                                recordEl.style.backgroundColor = "#fff8c5";
+                                setTimeout(function () {
+                                    recordEl.style.backgroundColor = "";
+                                }, 2000);
+                            }
+                        }, 100);
+                    };
+                });
             }
 
             /* ── Helpers ──────────────────────────────────────────────── */

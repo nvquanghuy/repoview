@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- [added] JSONL (JSON Lines) file viewer with server-side pagination for large files, three view modes (List, Compact, Raw), configurable page size, and malformed JSON error handling
+- [added] JSONL pagination controls at both top and bottom of content for easier navigation
+- [added] JSONL Compact view: expand/collapse buttons to show full JSON for each row, and "View in List" buttons that jump to specific records in List view with highlighting
+
 ## [v0.11.0] - 2026-04-05
 
 - [added] Mobile-friendly responsive design: collapsible sidebar with hamburger menu, touch-optimized layout, full-width panels on small screens

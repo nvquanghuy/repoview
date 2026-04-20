@@ -1,0 +1,6 @@
+{"id": 1, "name": "Valid Record"}
+{"id": 2, "name": "Another Valid"
+{"id": 3, "missing": "closing brace"
+{"id": 4, "name": "Valid Again"}
+invalid json here
+{"id": 5, "name": "Final Valid Record"}

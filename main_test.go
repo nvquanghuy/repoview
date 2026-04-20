@@ -1385,3 +1385,294 @@ func TestRenderMarkdown_WikiLinks(t *testing.T) {
 		t.Errorf("expected data-wiki-target attribute in output, got: %s", out)
 	}
 }
+
+// ── JSONL tests ──────────────────────────────────────────────
+
+func TestHandleJSONL_Pagination(t *testing.T) {
+	setRoot(t, "testdata")
+
+	// Test first page
+	req := httptest.NewRequest("GET", "/api/jsonl?path=small.jsonl&page=1&pageSize=5", nil)
+	w := httptest.NewRecorder()
+	handleJSONL(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+
+	var resp JSONLResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+
+	if resp.TotalLines != 10 {
+		t.Errorf("expected 10 total lines, got %d", resp.TotalLines)
+	}
+
+	if resp.Page != 1 {
+		t.Errorf("expected page 1, got %d", resp.Page)
+	}
+
+	if resp.PageSize != 5 {
+		t.Errorf("expected page size 5, got %d", resp.PageSize)
+	}
+
+	if len(resp.Records) != 5 {
+		t.Errorf("expected 5 records, got %d", len(resp.Records))
+	}
+
+	if !resp.HasMore {
+		t.Error("expected HasMore to be true")
+	}
+
+	// Test second page
+	req2 := httptest.NewRequest("GET", "/api/jsonl?path=small.jsonl&page=2&pageSize=5", nil)
+	w2 := httptest.NewRecorder()
+	handleJSONL(w2, req2)
+
+	if w2.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w2.Code)
+	}
+
+	var resp2 JSONLResponse
+	if err := json.NewDecoder(w2.Body).Decode(&resp2); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+
+	if len(resp2.Records) != 5 {
+		t.Errorf("expected 5 records on page 2, got %d", len(resp2.Records))
+	}
+
+	if resp2.HasMore {
+		t.Error("expected HasMore to be false on last page")
+	}
+}
+
+func TestCountJSONLLines(t *testing.T) {
+	setRoot(t, "testdata")
+
+	tests := []struct {
+		file     string
+		expected int64
+	}{
+		{"small.jsonl", 10},
+		{"single-line.jsonl", 1},
+		{"empty.jsonl", 0},
+		{"nested.jsonl", 3},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.file, func(t *testing.T) {
+			path := filepath.Join(rootDir, tt.file)
+			count, err := countJSONLLines(path)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if count != tt.expected {
+				t.Errorf("expected %d lines, got %d", tt.expected, count)
+			}
+		})
+	}
+}
+
+func TestReadJSONLPage(t *testing.T) {
+	setRoot(t, "testdata")
+
+	path := filepath.Join(rootDir, "small.jsonl")
+
+	// Test first page
+	records, parseErrors, err := readJSONLPage(path, 1, 5)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(records) != 5 {
+		t.Errorf("expected 5 records, got %d", len(records))
+	}
+
+	if len(parseErrors) != 0 {
+		t.Errorf("expected no parse errors, got %d", len(parseErrors))
+	}
+
+	// Verify first record contains expected data
+	if !strings.Contains(records[0], "Alice") {
+		t.Errorf("expected first record to contain 'Alice', got: %s", records[0])
+	}
+
+	// Test second page
+	records2, _, err := readJSONLPage(path, 2, 5)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(records2) != 5 {
+		t.Errorf("expected 5 records on page 2, got %d", len(records2))
+	}
+
+	// Verify we got different records
+	if records[0] == records2[0] {
+		t.Error("expected different records on different pages")
+	}
+}
+
+func TestHandleJSONL_MalformedJSON(t *testing.T) {
+	setRoot(t, "testdata")
+
+	req := httptest.NewRequest("GET", "/api/jsonl?path=malformed.jsonl&page=1&pageSize=10", nil)
+	w := httptest.NewRecorder()
+	handleJSONL(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+
+	var resp JSONLResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+
+	// Should count all non-empty lines (valid + malformed)
+	if resp.TotalLines != 6 {
+		t.Errorf("expected 6 total lines (valid + malformed counted), got %d", resp.TotalLines)
+	}
+
+	// Should have some parse errors
+	if len(resp.ParseErrors) == 0 {
+		t.Error("expected parse errors for malformed JSON")
+	}
+}
+
+func TestHandleJSONL_EmptyFile(t *testing.T) {
+	setRoot(t, "testdata")
+
+	req := httptest.NewRequest("GET", "/api/jsonl?path=empty.jsonl&page=1&pageSize=100", nil)
+	w := httptest.NewRecorder()
+	handleJSONL(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+
+	var resp JSONLResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+
+	if resp.TotalLines != 0 {
+		t.Errorf("expected 0 total lines, got %d", resp.TotalLines)
+	}
+
+	if len(resp.Records) != 0 {
+		t.Errorf("expected 0 records, got %d", len(resp.Records))
+	}
+
+	if resp.HasMore {
+		t.Error("expected HasMore to be false for empty file")
+	}
+}
+
+func TestHandleJSONL_SingleLine(t *testing.T) {
+	setRoot(t, "testdata")
+
+	req := httptest.NewRequest("GET", "/api/jsonl?path=single-line.jsonl&page=1&pageSize=100", nil)
+	w := httptest.NewRecorder()
+	handleJSONL(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+
+	var resp JSONLResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+
+	if resp.TotalLines != 1 {
+		t.Errorf("expected 1 total line, got %d", resp.TotalLines)
+	}
+
+	if len(resp.Records) != 1 {
+		t.Errorf("expected 1 record, got %d", len(resp.Records))
+	}
+
+	if resp.HasMore {
+		t.Error("expected HasMore to be false for single line file")
+	}
+}
+
+func TestHandleJSONL_LargeFile(t *testing.T) {
+	setRoot(t, "testdata")
+
+	// Test that large file pagination works
+	req := httptest.NewRequest("GET", "/api/jsonl?path=large.jsonl&page=1&pageSize=100", nil)
+	w := httptest.NewRecorder()
+	handleJSONL(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+
+	var resp JSONLResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+
+	if resp.TotalLines != 10000 {
+		t.Errorf("expected 10000 total lines, got %d", resp.TotalLines)
+	}
+
+	if len(resp.Records) != 100 {
+		t.Errorf("expected 100 records, got %d", len(resp.Records))
+	}
+
+	if !resp.HasMore {
+		t.Error("expected HasMore to be true")
+	}
+
+	// Test a later page
+	req2 := httptest.NewRequest("GET", "/api/jsonl?path=large.jsonl&page=50&pageSize=100", nil)
+	w2 := httptest.NewRecorder()
+	handleJSONL(w2, req2)
+
+	if w2.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w2.Code)
+	}
+
+	var resp2 JSONLResponse
+	if err := json.NewDecoder(w2.Body).Decode(&resp2); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+
+	if len(resp2.Records) != 100 {
+		t.Errorf("expected 100 records on page 50, got %d", len(resp2.Records))
+	}
+}
+
+func TestHandleFile_JSONL(t *testing.T) {
+	setRoot(t, "testdata")
+
+	req := httptest.NewRequest("GET", "/api/file?path=small.jsonl", nil)
+	w := httptest.NewRecorder()
+	handleFile(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+
+	var resp FileResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+
+	if !resp.IsJSONL {
+		t.Error("expected IsJSONL to be true")
+	}
+
+	if resp.MimeType != "application/x-ndjson" {
+		t.Errorf("expected MIME type application/x-ndjson, got %s", resp.MimeType)
+	}
+
+	if resp.Size == 0 {
+		t.Error("expected size to be non-zero")
+	}
+}
