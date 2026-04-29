@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v0.13.0] - 2026-04-29
+
 - [added] Page title includes root folder name for easy tab identification
 
 ## [v0.12.0] - 2026-04-20
