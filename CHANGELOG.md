@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- [added] Page title includes root folder name for easy tab identification
+
 ## [v0.12.0] - 2026-04-20
 
 - [added] JSONL (JSON Lines) file viewer with server-side pagination for large files, three view modes (List, Compact, Raw), configurable page size, and malformed JSON error handling

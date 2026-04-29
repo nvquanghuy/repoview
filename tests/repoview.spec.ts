@@ -285,7 +285,7 @@ test.describe("Anchor links", () => {
 test.describe("Page title", () => {
   test("title updates to show filename when viewing a file", async ({ page }) => {
     await page.goto("/");
-    await expect(page).toHaveTitle("RepoView");
+    await expect(page).toHaveTitle("testdata - RepoView");
     await page.locator(".tree-item .label", { hasText: "hello.md" }).click();
     await expect(page).toHaveTitle("hello.md - RepoView");
   });
@@ -301,7 +301,7 @@ test.describe("Page title", () => {
     await page.locator(".tree-item .label", { hasText: "hello.md" }).click();
     await expect(page).toHaveTitle("hello.md - RepoView");
     await page.locator(".crumb.root").click();
-    await expect(page).toHaveTitle("RepoView");
+    await expect(page).toHaveTitle("testdata - RepoView");
   });
 });
 

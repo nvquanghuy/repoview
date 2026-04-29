@@ -3,7 +3,7 @@
     <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>RepoView</title>
+        <title>__ROOT_DIR_NAME__ - RepoView</title>
         <style>
             /* ── Reset & Base ─────────────────────────────────────────── */
             *,
@@ -1548,7 +1548,7 @@
                         </svg>
                     </button>
                     <span class="crumb root" onclick="navigateTo('')"
-                        >root</span
+                        >__ROOT_DIR_NAME__</span
                     >
                     <span id="breadcrumb-path"></span>
                 </div>
@@ -1613,6 +1613,7 @@
         </div>
 
         <script>
+            var rootDirName = __ROOT_DIR_NAME_JS__;
             /* ── SVG helpers ──────────────────────────────────────────── */
             const SVG = {
                 folderClosed:
@@ -2078,7 +2079,7 @@
                     var dirname = path.split("/").pop();
                     document.title = dirname + " - RepoView";
                 } else {
-                    document.title = "RepoView";
+                    document.title = rootDirName + " - RepoView";
                 }
 
                 document.getElementById("content-area").innerHTML =

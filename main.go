@@ -156,6 +156,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	indexHTML = prepareIndexHTML(indexHTML, filepath.Base(rootDir))
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.Write(indexHTML)
@@ -191,6 +192,13 @@ func findAvailablePort(host string, startPort, maxAttempts int) int {
 		}
 	}
 	return startPort + maxAttempts - 1
+}
+
+func prepareIndexHTML(raw []byte, rootName string) []byte {
+	jsName, _ := json.Marshal(rootName)
+	out := bytes.ReplaceAll(raw, []byte("__ROOT_DIR_NAME_JS__"), jsName)
+	out = bytes.ReplaceAll(out, []byte("__ROOT_DIR_NAME__"), []byte(html.EscapeString(rootName)))
+	return out
 }
 
 // safePath resolves a request path within rootDir and rejects traversal.

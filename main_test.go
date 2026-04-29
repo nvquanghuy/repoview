@@ -791,7 +791,8 @@ func newTestServer(t *testing.T) *httptest.Server {
 	mux.HandleFunc("/api/file", handleFile)
 	mux.HandleFunc("/api/raw", handleRaw)
 	sub, _ := fs.Sub(staticFiles, "static")
-	indexHTML, _ := fs.ReadFile(sub, "index.html")
+	rawHTML, _ := fs.ReadFile(sub, "index.html")
+	indexHTML := prepareIndexHTML(rawHTML, filepath.Base(rootDir))
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.Write(indexHTML)
@@ -832,10 +833,9 @@ func TestSPARoute_ServesIndexHTML(t *testing.T) {
 		"/",
 	}
 
-	// Read index.html to compare against.
 	sub, _ := fs.Sub(staticFiles, "static")
-	indexData, _ := fs.ReadFile(sub, "index.html")
-	indexBody := string(indexData)
+	rawHTML, _ := fs.ReadFile(sub, "index.html")
+	expectedBody := string(prepareIndexHTML(rawHTML, filepath.Base(rootDir)))
 
 	for _, p := range paths {
 		resp, err := http.Get(srv.URL + p)
@@ -851,9 +851,29 @@ func TestSPARoute_ServesIndexHTML(t *testing.T) {
 		if ct := resp.Header.Get("Content-Type"); !strings.Contains(ct, "text/html") {
 			t.Errorf("GET %s: expected text/html, got %s", p, ct)
 		}
-		if string(body) != indexBody {
-			t.Errorf("GET %s: response body does not match index.html", p)
+		if string(body) != expectedBody {
+			t.Errorf("GET %s: response body does not match prepared index.html", p)
 		}
+	}
+}
+
+func TestIndexHTML_ContainsRootDirName(t *testing.T) {
+	setRoot(t, "testdata")
+	srv := newTestServer(t)
+	defer srv.Close()
+
+	resp, err := http.Get(srv.URL + "/")
+	if err != nil {
+		t.Fatalf("failed to GET /: %v", err)
+	}
+	body, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+
+	if !strings.Contains(string(body), "<title>testdata - RepoView</title>") {
+		t.Error("expected page title to contain root dir name")
+	}
+	if !strings.Contains(string(body), `var rootDirName = "testdata"`) {
+		t.Error("expected JS rootDirName variable with root dir name")
 	}
 }
 
@@ -1119,8 +1139,8 @@ func TestSPARoute_EncodedPaths(t *testing.T) {
 	defer srv.Close()
 
 	sub, _ := fs.Sub(staticFiles, "static")
-	indexData, _ := fs.ReadFile(sub, "index.html")
-	indexBody := string(indexData)
+	rawHTML, _ := fs.ReadFile(sub, "index.html")
+	expectedBody := string(prepareIndexHTML(rawHTML, filepath.Base(rootDir)))
 
 	// URL-encoded paths that the browser would produce
 	paths := []string{
@@ -1140,8 +1160,8 @@ func TestSPARoute_EncodedPaths(t *testing.T) {
 		if resp.StatusCode != http.StatusOK {
 			t.Errorf("GET %s: expected 200, got %d", p, resp.StatusCode)
 		}
-		if string(body) != indexBody {
-			t.Errorf("GET %s: response body does not match index.html", p)
+		if string(body) != expectedBody {
+			t.Errorf("GET %s: response body does not match prepared index.html", p)
 		}
 	}
 }
