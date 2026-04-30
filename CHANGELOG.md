@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+
+## [v0.15.0] - 2026-04-30
+
 - [added] Dark mode toggle with eye-easing warm dark theme (Catppuccin-inspired), persisted via localStorage with OS preference detection as fallback
 - [added] Sun/moon toggle button in breadcrumb bar for switching themes
 - [changed] Refactored all CSS colors to use CSS custom properties for theme support
