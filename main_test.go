@@ -1375,6 +1375,16 @@ func TestPreprocessWikiLinks(t *testing.T) {
 			input:    `[[A & B|<Display>]]`,
 			wantFrag: `data-wiki-target="A &amp; B"`,
 		},
+		{
+			name:     "escaped pipe in table cell",
+			input:    `[[path/to/file\|2023-12-30]]`,
+			wantFrag: `<a class="wiki-link" href="#" data-wiki-target="path/to/file">2023-12-30</a>`,
+		},
+		{
+			name:     "escaped pipe with heading",
+			input:    `[[path/to/file#Section\|Display]]`,
+			wantFrag: `<a class="wiki-link" href="#" data-wiki-target="path/to/file" data-wiki-heading="Section">Display</a>`,
+		},
 	}
 
 	for _, tc := range tests {

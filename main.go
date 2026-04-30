@@ -443,21 +443,28 @@ func parseFrontmatter(data []byte) ([][2]string, []byte) {
 }
 
 // wikiLinkRe matches Obsidian wiki links: [[target]], [[target|display]], [[target#heading]], [[target#heading|display]]
-var wikiLinkRe = regexp.MustCompile(`\[\[([^\]|#]+)(?:#([^\]|]+))?(?:\|([^\]]+))?\]\]`)
+// The inner content may contain \| (an escaped pipe used inside markdown tables); splitting on the
+// alias separator and unescaping is done in preprocessWikiLinks rather than the regex itself.
+var wikiLinkRe = regexp.MustCompile(`\[\[([^\]]+)\]\]`)
 
 // preprocessWikiLinks converts Obsidian wiki link syntax to HTML placeholders for frontend resolution.
 func preprocessWikiLinks(data []byte) []byte {
 	return wikiLinkRe.ReplaceAllFunc(data, func(match []byte) []byte {
-		groups := wikiLinkRe.FindSubmatch(match)
-		target := string(groups[1])
-		heading := ""
-		display := target
+		// Inside a markdown table, the alias separator is written as \| to avoid colliding with
+		// the column separator. Treat \| identically to | by unescaping before splitting.
+		inner := strings.ReplaceAll(string(match[2:len(match)-2]), `\|`, `|`)
 
-		if len(groups) > 2 && len(groups[2]) > 0 {
-			heading = string(groups[2])
+		targetPart, display, hasAlias := strings.Cut(inner, "|")
+
+		heading := ""
+		target := targetPart
+		if idx := strings.IndexByte(targetPart, '#'); idx >= 0 {
+			target = targetPart[:idx]
+			heading = targetPart[idx+1:]
 		}
-		if len(groups) > 3 && len(groups[3]) > 0 {
-			display = string(groups[3])
+
+		if !hasAlias {
+			display = target
 		}
 
 		// Build the placeholder anchor tag with href="#" so it's clickable

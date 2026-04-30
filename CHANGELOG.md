@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- [fixed] Obsidian wiki links inside markdown tables: `[[path\|alias]]` (backslash-escaped pipe, the form Obsidian uses to disambiguate from the table column separator) now parses correctly instead of producing a target with a trailing backslash.
+
 ## [v0.13.0] - 2026-04-29
 
 - [added] Page title includes root folder name for easy tab identification
