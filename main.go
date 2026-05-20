@@ -447,6 +447,11 @@ func parseFrontmatter(data []byte) ([][2]string, []byte) {
 // alias separator and unescaping is done in preprocessWikiLinks rather than the regex itself.
 var wikiLinkRe = regexp.MustCompile(`\[\[([^\]]+)\]\]`)
 
+var wikiImageExts = map[string]bool{
+	".png": true, ".jpg": true, ".jpeg": true, ".gif": true,
+	".webp": true, ".svg": true, ".bmp": true, ".tiff": true, ".tif": true, ".avif": true,
+}
+
 // preprocessWikiLinks converts Obsidian wiki link syntax to HTML placeholders for frontend resolution.
 func preprocessWikiLinks(data []byte) []byte {
 	return wikiLinkRe.ReplaceAllFunc(data, func(match []byte) []byte {
@@ -454,7 +459,7 @@ func preprocessWikiLinks(data []byte) []byte {
 		// the column separator. Treat \| identically to | by unescaping before splitting.
 		inner := strings.ReplaceAll(string(match[2:len(match)-2]), `\|`, `|`)
 
-		targetPart, display, hasAlias := strings.Cut(inner, "|")
+		targetPart, alias, hasAlias := strings.Cut(inner, "|")
 
 		heading := ""
 		target := targetPart
@@ -463,8 +468,35 @@ func preprocessWikiLinks(data []byte) []byte {
 			heading = targetPart[idx+1:]
 		}
 
-		if !hasAlias {
-			display = target
+		// Obsidian renders image wiki-links as <img> elements.
+		if wikiImageExts[strings.ToLower(filepath.Ext(target))] {
+			altText := strings.TrimSuffix(filepath.Base(target), filepath.Ext(target))
+			result := fmt.Sprintf(`<img class="wiki-image" data-wiki-target="%s"`, html.EscapeString(target))
+			if hasAlias && alias != "" {
+				// Alias may be a width ("200"), WxH ("200x300"), or alt text.
+				if w, err := strconv.Atoi(alias); err == nil {
+					result += fmt.Sprintf(` width="%d"`, w)
+				} else if parts := strings.SplitN(alias, "x", 2); len(parts) == 2 {
+					if w, err1 := strconv.Atoi(parts[0]); err1 == nil {
+						if h, err2 := strconv.Atoi(parts[1]); err2 == nil {
+							result += fmt.Sprintf(` width="%d" height="%d"`, w, h)
+						} else {
+							altText = alias
+						}
+					} else {
+						altText = alias
+					}
+				} else {
+					altText = alias
+				}
+			}
+			result += fmt.Sprintf(` alt="%s">`, html.EscapeString(altText))
+			return []byte(result)
+		}
+
+		display := target
+		if hasAlias {
+			display = alias
 		}
 
 		// Build the placeholder anchor tag with href="#" so it's clickable

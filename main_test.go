@@ -1385,6 +1385,31 @@ func TestPreprocessWikiLinks(t *testing.T) {
 			input:    `[[path/to/file#Section\|Display]]`,
 			wantFrag: `<a class="wiki-link" href="#" data-wiki-target="path/to/file" data-wiki-heading="Section">Display</a>`,
 		},
+		{
+			name:     "image png",
+			input:    `[[photos/cat.png]]`,
+			wantFrag: `<img class="wiki-image" data-wiki-target="photos/cat.png" alt="cat">`,
+		},
+		{
+			name:     "image jpg",
+			input:    `[[hero.jpg]]`,
+			wantFrag: `<img class="wiki-image" data-wiki-target="hero.jpg" alt="hero">`,
+		},
+		{
+			name:     "image with width alias",
+			input:    `[[cat.png|300]]`,
+			wantFrag: `<img class="wiki-image" data-wiki-target="cat.png" width="300" alt="cat">`,
+		},
+		{
+			name:     "image with WxH alias",
+			input:    `[[cat.png|300x200]]`,
+			wantFrag: `<img class="wiki-image" data-wiki-target="cat.png" width="300" height="200" alt="cat">`,
+		},
+		{
+			name:     "image with alt text alias",
+			input:    `[[cat.png|My Cat Photo]]`,
+			wantFrag: `<img class="wiki-image" data-wiki-target="cat.png" alt="My Cat Photo">`,
+		},
 	}
 
 	for _, tc := range tests {

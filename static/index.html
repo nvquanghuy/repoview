@@ -582,6 +582,13 @@
                 content: ' [?]';
                 font-size: 0.8em;
             }
+            .wiki-image {
+                max-width: 100%;
+            }
+            .wiki-image-broken {
+                opacity: 0.4;
+                border: 1px dashed var(--rv-error-text);
+            }
             .markdown-body table {
                 border-collapse: collapse;
                 border-spacing: 0;
@@ -2433,8 +2440,9 @@
             function resolveWikiLinks(container, currentFilePath) {
                 var currentDir = currentFilePath.split('/').slice(0, -1).join('/');
                 var links = container.querySelectorAll('a.wiki-link');
+                var images = container.querySelectorAll('img.wiki-image');
 
-                if (links.length === 0) return;
+                if (links.length === 0 && images.length === 0) return;
 
                 // Ensure file list is loaded for resolution
                 if (!allFiles) {
@@ -2443,11 +2451,28 @@
                             allFiles = result.data;
                             wikiLinkIndex = null;
                             resolveWikiLinksInner(links, currentDir);
+                            resolveWikiImagesInner(images, currentDir);
                         }
                     });
                 } else {
                     resolveWikiLinksInner(links, currentDir);
+                    resolveWikiImagesInner(images, currentDir);
                 }
+            }
+
+            function resolveWikiImagesInner(images, currentDir) {
+                images.forEach(function(img) {
+                    var target = img.dataset.wikiTarget;
+                    var resolved = resolveWikiTarget(target, currentDir);
+                    if (resolved) {
+                        img.src = '/api/raw?path=' + encodeURIComponent(resolved);
+                        img.classList.add('wiki-image-valid');
+                    } else {
+                        img.classList.add('wiki-image-broken');
+                        img.alt = img.alt + ' [not found]';
+                        img.title = 'File not found: ' + target;
+                    }
+                });
             }
 
             // Convert heading text to slug format (same as addHeadingAnchors)
