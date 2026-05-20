@@ -275,6 +275,7 @@ type FileResponse struct {
 	IsCSV      bool   `json:"isCSV"`
 	IsSVG      bool   `json:"isSVG,omitempty"`
 	RawSVG     string `json:"rawSVG,omitempty"`
+	IsHTML     bool   `json:"isHTML,omitempty"`
 	IsPDF      bool   `json:"isPDF,omitempty"`
 	IsBinary   bool   `json:"isBinary,omitempty"`
 	IsJSONL    bool   `json:"isJSONL,omitempty"`
@@ -366,6 +367,7 @@ func handleFile(w http.ResponseWriter, r *http.Request) {
 	isMarkdown := ext == ".md" || ext == ".markdown"
 	isCSV := ext == ".csv"
 	isSVG := ext == ".svg"
+	isHTML := ext == ".html" || ext == ".htm"
 
 	var buf bytes.Buffer
 	switch {
@@ -373,6 +375,8 @@ func handleFile(w http.ResponseWriter, r *http.Request) {
 		renderMarkdown(&buf, data)
 	case isCSV:
 		renderCSV(&buf, data)
+	case isHTML:
+		// HTML files render via /api/raw in an iframe; no server-side rendering needed.
 	default:
 		data = prettyPrint(data, ext)
 		renderCode(&buf, data, filepath.Base(filePath))
@@ -385,13 +389,14 @@ func handleFile(w http.ResponseWriter, r *http.Request) {
 		IsMarkdown: isMarkdown,
 		IsCSV:      isCSV,
 		IsSVG:      isSVG,
+		IsHTML:     isHTML,
 	}
 
 	if isCSV {
 		resp.RawCSV = string(data)
 	}
 
-	if isMarkdown || isSVG {
+	if isMarkdown || isSVG || isHTML {
 		var rawBuf bytes.Buffer
 		renderCode(&rawBuf, data, filepath.Base(filePath))
 		resp.RawContent = rawBuf.String()

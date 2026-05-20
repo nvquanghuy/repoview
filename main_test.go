@@ -1113,6 +1113,41 @@ func TestHandleRaw_SVG(t *testing.T) {
 	}
 }
 
+func TestHandleFile_HTML(t *testing.T) {
+	setRoot(t, "testdata")
+
+	req := httptest.NewRequest("GET", "/api/file?path=sample.html", nil)
+	w := httptest.NewRecorder()
+	handleFile(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+
+	var resp FileResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+
+	if !resp.IsHTML {
+		t.Error("expected isHTML to be true")
+	}
+	if resp.IsBinary {
+		t.Error("expected isBinary to be false for HTML")
+	}
+	// Content should be empty (iframe renders via /api/raw)
+	if resp.Content != "" {
+		t.Error("expected empty content for HTML file (rendered via /api/raw iframe)")
+	}
+	// RawContent should be syntax-highlighted source for the Code toggle
+	if resp.RawContent == "" {
+		t.Error("expected non-empty rawContent for HTML file")
+	}
+	if !strings.Contains(resp.RawContent, "<span") {
+		t.Error("expected syntax-highlighted <span> tokens in HTML rawContent")
+	}
+}
+
 func TestHandleRaw(t *testing.T) {
 	setRoot(t, "testdata")
 

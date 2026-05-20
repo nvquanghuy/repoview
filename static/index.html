@@ -1286,6 +1286,14 @@
                 max-height: 70vh;
             }
 
+            .html-preview {
+                width: 100%;
+                height: calc(100vh - 120px);
+                border: 1px solid var(--rv-border);
+                border-radius: 6px;
+                background: #fff;
+            }
+
             /* ── Edit dropdown ────────────────────────────────────────── */
             .edit-dropdown {
                 position: relative;
@@ -3006,7 +3014,40 @@
                     document.title = filename + " - RepoView";
                     return;
                 }
-                if (data.isMarkdown || data.isSVG) {
+                if (data.isHTML) {
+                    var rawSrc = "/api/raw?path=" + encodeURIComponent(path);
+                    var previewEl = '<iframe class="html-preview" sandbox="allow-scripts" src="' + rawSrc + '"></iframe>';
+                    var codeHTML = '<div class="source-code">' + data.rawContent + "</div>";
+                    var wantCode = getViewParam() === "code";
+
+                    area.innerHTML = wantCode ? codeHTML : previewEl;
+
+                    var toggle = document.createElement("span");
+                    toggle.className = "view-toggle";
+                    var btnPreview = document.createElement("button");
+                    btnPreview.textContent = "Preview";
+                    btnPreview.className = wantCode ? "" : "active";
+                    var btnCode = document.createElement("button");
+                    btnCode.textContent = "Code";
+                    btnCode.className = wantCode ? "active" : "";
+                    toggle.appendChild(btnPreview);
+                    toggle.appendChild(btnCode);
+
+                    showFileHeaderBar(toggle, null);
+
+                    btnPreview.onclick = function () {
+                        area.innerHTML = previewEl;
+                        btnPreview.className = "active";
+                        btnCode.className = "";
+                        setViewParam(null);
+                    };
+                    btnCode.onclick = function () {
+                        area.innerHTML = codeHTML;
+                        btnCode.className = "active";
+                        btnPreview.className = "";
+                        setViewParam("code");
+                    };
+                } else if (data.isMarkdown || data.isSVG) {
                     var previewHTML, codeHTML;
                     if (data.isMarkdown) {
                         previewHTML =
