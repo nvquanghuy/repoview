@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+
+## [v0.16.0] - 2026-05-20
+
 - [added] HTML file rendering: `.html`/`.htm` files now show a rendered Preview (sandboxed iframe) with a Preview/Code toggle, mirroring Markdown/SVG behavior.
 - [added] Obsidian wiki-link image embeds: `[[image.png]]`, `[[image.png|300]]` (width), `[[image.png|300x200]]` (width×height), and `[[image.png|alt text]]` now render as inline images resolved via the same fuzzy filename index as wiki links.
 
