@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+
+## [v0.17.0] - 2026-05-25
+
 - [fixed] Relative links in folder README.md files now resolve correctly; directory URLs are normalized with a trailing slash so `[./file.md]` resolves to the correct path within the folder instead of the parent
 
 ## [v0.16.0] - 2026-05-20
