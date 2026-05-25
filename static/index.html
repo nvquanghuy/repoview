@@ -2237,7 +2237,10 @@
                 // Hide file header bar when navigating to a directory
                 hideFileHeaderBar();
                 if (getViewParam()) setViewParam(null);
-                if (!skipPush) pushURL(path);
+                var url = path ? "/" + encodePath(path) + "/" : "/";
+                if (location.pathname !== url) {
+                    history.pushState(null, "", url);
+                }
                 updateBreadcrumb(path);
                 var items = await fetchTree(path);
 
@@ -4273,7 +4276,7 @@
             function navigateFromURL(skipPush) {
                 var raw = location.pathname.replace(/^\//, "");
                 if (!raw) return false;
-                var path = decodeURIComponent(raw);
+                var path = decodeURIComponent(raw).replace(/\/$/, "");
                 if (isFilePath(path)) {
                     loadFile(path, skipPush);
                 } else {
