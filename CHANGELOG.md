@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+
+## [v0.18.0] - 2026-11-11
+
 - [fixed] `repoview update` no longer fails with "context deadline exceeded" on slow connections: the download no longer has a 60s cap on total time, and instead aborts only if no data arrives for 30s
 - [added] `repoview update` shows a live download progress line (`3.1 / 7.4 MB (42%)  65 KB/s`) when run in a terminal; piped or logged output is unchanged
 
