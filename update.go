@@ -4,7 +4,9 @@ import (
 	"archive/tar"
 	"archive/zip"
 	"compress/gzip"
+	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -92,7 +94,11 @@ func runUpdate(args []string) {
 	}
 
 	fmt.Printf("\nDownloading %s...\n", release.Version)
-	if err := selfUpdate(release.DownloadURL); err != nil {
+	var progressOut io.Writer
+	if isTerminal(os.Stdout) {
+		progressOut = os.Stdout
+	}
+	if err := selfUpdate(release.DownloadURL, progressOut); err != nil {
 		fmt.Fprintf(os.Stderr, "Error updating: %v\n", err)
 		os.Exit(1)
 	}
@@ -199,8 +205,168 @@ func binaryName() string {
 	return "repoview"
 }
 
+// downloadIdleTimeout is how long a download may go without receiving any
+// bytes before it is abandoned. There is deliberately no cap on the total
+// transfer time, so slow-but-progressing connections still complete.
+const downloadIdleTimeout = 30 * time.Second
+
+var errDownloadStalled = errors.New("download stalled")
+
+// newDownloadClient returns a client that bounds connecting (dial and TLS,
+// via DefaultTransport) and waiting for response headers, but not the body.
+func newDownloadClient() *http.Client {
+	t := http.DefaultTransport.(*http.Transport).Clone()
+	t.ResponseHeaderTimeout = 30 * time.Second
+	return &http.Client{Transport: t}
+}
+
+// download streams url into dst, failing only if no data arrives for idle.
+// If p is non-nil, it is fed the bytes as they arrive to report progress.
+func download(client *http.Client, url string, dst io.Writer, idle time.Duration, p *progress) error {
+	ctx, cancel := context.WithCancelCause(context.Background())
+	defer cancel(nil)
+	timer := time.AfterFunc(idle, func() {
+		cancel(fmt.Errorf("%w: no data received for %s", errDownloadStalled, idle))
+	})
+	defer timer.Stop()
+
+	// Prefer the stall cause over the generic "context canceled" error.
+	wrap := func(err error) error {
+		if cause := context.Cause(ctx); errors.Is(cause, errDownloadStalled) {
+			return cause
+		}
+		return err
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return err
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return wrap(err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("status %d", resp.StatusCode)
+	}
+
+	body := &idleResetReader{r: resp.Body, timer: timer, idle: idle}
+	if p != nil {
+		p.total = resp.ContentLength
+		dst = io.MultiWriter(dst, p)
+	}
+	_, err = io.Copy(dst, body)
+	if p != nil {
+		p.finish()
+	}
+	if err != nil {
+		return wrap(err)
+	}
+	return nil
+}
+
+// progressInterval limits how often the progress line is redrawn.
+const progressInterval = 200 * time.Millisecond
+
+// progress is an io.Writer that counts bytes and redraws a single
+// progress line on out (meant to be a terminal) as they arrive.
+type progress struct {
+	out   io.Writer
+	total int64 // -1 when the server didn't send Content-Length
+	done  int64
+	now   func() time.Time
+	start time.Time
+	last  time.Time
+}
+
+func newProgress(out io.Writer) *progress {
+	return &progress{out: out, total: -1, now: time.Now}
+}
+
+func (p *progress) Write(b []byte) (int, error) {
+	t := p.now()
+	if p.start.IsZero() {
+		p.start = t
+	}
+	p.done += int64(len(b))
+	if t.Sub(p.last) >= progressInterval {
+		p.last = t
+		p.draw(t)
+	}
+	return len(b), nil
+}
+
+// finish draws the final state and ends the line.
+func (p *progress) finish() {
+	if p.start.IsZero() {
+		return // nothing was received; leave no stray line
+	}
+	p.draw(p.now())
+	fmt.Fprintln(p.out)
+}
+
+func (p *progress) draw(t time.Time) {
+	// \r returns to the line start; \x1b[K clears leftovers from a longer line.
+	fmt.Fprintf(p.out, "\r  %s\x1b[K", formatProgress(p.done, p.total, t.Sub(p.start)))
+}
+
+// formatProgress renders e.g. "3.1 / 7.4 MB (42%)  65 KB/s".
+// total < 0 means unknown size, in which case only bytes so far are shown.
+func formatProgress(done, total int64, elapsed time.Duration) string {
+	var s string
+	if total > 0 {
+		s = fmt.Sprintf("%s / %s (%d%%)", formatMB(done), formatBytes(total), done*100/total)
+	} else {
+		s = formatBytes(done)
+	}
+	if elapsed > 0 {
+		s += "  " + formatBytes(int64(float64(done)/elapsed.Seconds())) + "/s"
+	}
+	return s
+}
+
+// formatMB renders n in megabytes without a unit, to pair with formatBytes(total).
+func formatMB(n int64) string {
+	return fmt.Sprintf("%.1f", float64(n)/(1<<20))
+}
+
+func formatBytes(n int64) string {
+	switch {
+	case n >= 1<<20:
+		return fmt.Sprintf("%.1f MB", float64(n)/(1<<20))
+	case n >= 1<<10:
+		return fmt.Sprintf("%d KB", n>>10)
+	default:
+		return fmt.Sprintf("%d B", n)
+	}
+}
+
+// isTerminal reports whether f is an interactive terminal (not a pipe or file).
+func isTerminal(f *os.File) bool {
+	fi, err := f.Stat()
+	return err == nil && fi.Mode()&os.ModeCharDevice != 0
+}
+
+// idleResetReader pushes back the stall timer every time bytes arrive.
+type idleResetReader struct {
+	r     io.Reader
+	timer *time.Timer
+	idle  time.Duration
+}
+
+func (ir *idleResetReader) Read(p []byte) (int, error) {
+	n, err := ir.r.Read(p)
+	if n > 0 {
+		ir.timer.Reset(ir.idle)
+	}
+	return n, err
+}
+
 // selfUpdate downloads and installs a new version.
-func selfUpdate(downloadURL string) error {
+// If progressOut is non-nil, a live progress line is drawn on it.
+func selfUpdate(downloadURL string, progressOut io.Writer) error {
 	// Get path to current executable
 	execPath, err := os.Executable()
 	if err != nil {
@@ -209,18 +375,6 @@ func selfUpdate(downloadURL string) error {
 	execPath, err = filepath.EvalSymlinks(execPath)
 	if err != nil {
 		return fmt.Errorf("cannot resolve symlinks: %w", err)
-	}
-
-	// Download to temp file
-	client := &http.Client{Timeout: 60 * time.Second}
-	resp, err := client.Get(downloadURL)
-	if err != nil {
-		return fmt.Errorf("download failed: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("download returned status %d", resp.StatusCode)
 	}
 
 	// Create temp file for the archive
@@ -235,7 +389,11 @@ func selfUpdate(downloadURL string) error {
 	tmpArchivePath := tmpArchive.Name()
 	defer os.Remove(tmpArchivePath)
 
-	if _, err := io.Copy(tmpArchive, resp.Body); err != nil {
+	var p *progress
+	if progressOut != nil {
+		p = newProgress(progressOut)
+	}
+	if err := download(newDownloadClient(), downloadURL, tmpArchive, downloadIdleTimeout, p); err != nil {
 		tmpArchive.Close()
 		return fmt.Errorf("download failed: %w", err)
 	}
