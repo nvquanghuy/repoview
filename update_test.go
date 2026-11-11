@@ -3,12 +3,17 @@ package main
 import (
 	"archive/tar"
 	"archive/zip"
+	"bytes"
 	"compress/gzip"
 	"encoding/json"
+	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"testing"
 	"time"
 )
@@ -252,3 +257,132 @@ func TestCopyFile(t *testing.T) {
 	}
 }
 
+func TestDownloadSlowButProgressing(t *testing.T) {
+	// Total transfer (~10 chunks x 30ms = 300ms) far exceeds the idle
+	// window (100ms), but data keeps arriving, so it must succeed.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		for i := 0; i < 10; i++ {
+			w.Write([]byte("chunk"))
+			w.(http.Flusher).Flush()
+			time.Sleep(30 * time.Millisecond)
+		}
+	}))
+	defer srv.Close()
+
+	var buf bytes.Buffer
+	if err := download(srv.Client(), srv.URL, &buf, 100*time.Millisecond, nil); err != nil {
+		t.Fatalf("download failed: %v", err)
+	}
+	if got, want := buf.String(), strings.Repeat("chunk", 10); got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+func TestDownloadStalled(t *testing.T) {
+	release := make(chan struct{})
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("partial"))
+		w.(http.Flusher).Flush()
+		select { // stall until the client gives up
+		case <-r.Context().Done():
+		case <-release:
+		}
+	}))
+	defer srv.Close()
+	defer close(release)
+
+	var buf bytes.Buffer
+	err := download(srv.Client(), srv.URL, &buf, 100*time.Millisecond, nil)
+	if !errors.Is(err, errDownloadStalled) {
+		t.Fatalf("expected stall error, got %v", err)
+	}
+}
+
+func TestDownloadBadStatus(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "nope", http.StatusNotFound)
+	}))
+	defer srv.Close()
+
+	err := download(srv.Client(), srv.URL, io.Discard, time.Second, nil)
+	if err == nil || !strings.Contains(err.Error(), "404") {
+		t.Fatalf("expected 404 error, got %v", err)
+	}
+}
+
+func TestFormatProgress(t *testing.T) {
+	tests := []struct {
+		name        string
+		done, total int64
+		elapsed     time.Duration
+		want        string
+	}{
+		{"known size", 3 << 20, 8 << 20, 2 * time.Second, "3.0 / 8.0 MB (37%)  1.5 MB/s"},
+		{"slow link", 1 << 20, 7757952, 16 * time.Second, "1.0 / 7.4 MB (13%)  64 KB/s"},
+		{"unknown size", 512 << 10, -1, time.Second, "512 KB  512 KB/s"},
+		{"no time yet", 100, 1000, 0, "0.0 / 1000 B (10%)"},
+		{"complete", 8 << 20, 8 << 20, 4 * time.Second, "8.0 / 8.0 MB (100%)  2.0 MB/s"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := formatProgress(tt.done, tt.total, tt.elapsed); got != tt.want {
+				t.Errorf("got %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestProgressThrottlesAndFinishes(t *testing.T) {
+	var out bytes.Buffer
+	p := newProgress(&out)
+	p.total = 300
+	clock := time.Unix(0, 0)
+	p.now = func() time.Time { return clock }
+
+	p.Write(make([]byte, 100)) // first write draws
+	clock = clock.Add(50 * time.Millisecond)
+	p.Write(make([]byte, 100)) // within the interval: no redraw
+	if n := strings.Count(out.String(), "\r"); n != 1 {
+		t.Fatalf("expected 1 draw after throttled write, got %d: %q", n, out.String())
+	}
+	clock = clock.Add(progressInterval)
+	p.Write(make([]byte, 100)) // past the interval: redraw
+	p.finish()
+
+	s := out.String()
+	if n := strings.Count(s, "\r"); n != 3 {
+		t.Errorf("expected 3 draws, got %d: %q", n, s)
+	}
+	if !strings.HasSuffix(s, "(100%)  1 KB/s\x1b[K\n") {
+		t.Errorf("final line should show 100%% and end the line, got %q", s)
+	}
+}
+
+func TestProgressFinishWithoutData(t *testing.T) {
+	var out bytes.Buffer
+	newProgress(&out).finish()
+	if out.Len() != 0 {
+		t.Errorf("expected no output, got %q", out.String())
+	}
+}
+
+func TestDownloadReportsProgress(t *testing.T) {
+	payload := strings.Repeat("x", 4096)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Length", strconv.Itoa(len(payload)))
+		w.Write([]byte(payload))
+	}))
+	defer srv.Close()
+
+	var out bytes.Buffer
+	p := newProgress(&out)
+	if err := download(srv.Client(), srv.URL, io.Discard, time.Second, p); err != nil {
+		t.Fatalf("download failed: %v", err)
+	}
+	if p.total != 4096 || p.done != 4096 {
+		t.Errorf("got done=%d total=%d, want 4096/4096", p.done, p.total)
+	}
+	if !strings.Contains(out.String(), "(100%)") || !strings.HasSuffix(out.String(), "\n") {
+		t.Errorf("unexpected progress output %q", out.String())
+	}
+}
