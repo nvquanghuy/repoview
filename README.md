@@ -92,6 +92,17 @@ repoview update --check   # check for updates without installing
 
 The update command downloads the latest release from GitHub, shows release notes, and replaces the current binary.
 
+### Using on your phone (Add to Home Screen)
+
+RepoView can be installed as a home-screen web app (PWA), so a server on another machine becomes a notes viewer on your phone. Nothing is synced or stored on the device. RepoView has no authentication, so keep it on a private network. [Tailscale](https://tailscale.com) works well:
+
+```bash
+# on the server (e.g. a VPS syncing your notes from Dropbox)
+repoview --host "$(tailscale ip -4)" --no-browser ~/Dropbox/notes
+```
+
+On the iPhone (with Tailscale connected), open `http://<tailscale-ip>:7777` in Safari, then tap **Share → Add to Home Screen**. It launches full-screen with its own icon, named after the folder.
+
 ## API
 
 | Endpoint | Description |
@@ -99,6 +110,7 @@ The update command downloads the latest release from GitHub, shows release notes
 | `GET /api/tree?path=` | Returns immediate children of a directory as JSON |
 | `GET /api/file?path=` | Returns rendered file content as JSON (`content`, `name`, `path`, `isMarkdown`, `isCSV`) |
 | `GET /api/files` | Returns a flat list of all file paths (uses `git ls-files` when available) |
+| `GET /api/manifest.webmanifest` | Web app manifest (enables "Add to Home Screen") |
 | `WS /ws` | WebSocket for file change notifications |
 
 ## Development
