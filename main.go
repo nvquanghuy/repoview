@@ -139,6 +139,7 @@ func main() {
 	http.HandleFunc("/api/tree", handleTree)
 	http.HandleFunc("/api/file", handleFile)
 	http.HandleFunc("/api/files", handleFiles)
+	http.HandleFunc("/api/search", handleSearch)
 	http.HandleFunc("/api/raw", handleRaw)
 	http.HandleFunc("/api/jsonl", handleJSONL)
 	http.HandleFunc("/api/editors", handleEditors)
@@ -678,6 +679,14 @@ func handleRaw(w http.ResponseWriter, r *http.Request) {
 
 // handleFiles returns a flat list of all file paths for fuzzy search.
 func handleFiles(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(listFiles())
+}
+
+// listFiles returns all file paths under rootDir (slash-separated, relative).
+// It uses `git ls-files` when rootDir is a git repo, otherwise walks the tree
+// skipping dotfiles and dot-directories (e.g. .git, .obsidian).
+func listFiles() []string {
 	var files []string
 
 	// Try git ls-files first.
@@ -689,29 +698,28 @@ func handleFiles(w http.ResponseWriter, r *http.Request) {
 				files = append(files, line)
 			}
 		}
-	} else {
-		// Walk the directory tree.
-		filepath.WalkDir(rootDir, func(path string, d fs.DirEntry, err error) error {
-			if err != nil {
-				return nil
-			}
-			name := d.Name()
-			if strings.HasPrefix(name, ".") && path != rootDir {
-				if d.IsDir() {
-					return filepath.SkipDir
-				}
-				return nil
-			}
-			if !d.IsDir() {
-				rel, _ := filepath.Rel(rootDir, path)
-				files = append(files, filepath.ToSlash(rel))
-			}
-			return nil
-		})
+		return files
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(files)
+	// Walk the directory tree.
+	filepath.WalkDir(rootDir, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		name := d.Name()
+		if strings.HasPrefix(name, ".") && path != rootDir {
+			if d.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !d.IsDir() {
+			rel, _ := filepath.Rel(rootDir, path)
+			files = append(files, filepath.ToSlash(rel))
+		}
+		return nil
+	})
+	return files
 }
 
 // EditorInfo is returned by the /api/editors endpoint.
