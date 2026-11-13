@@ -793,6 +793,7 @@ func newTestServer(t *testing.T) *httptest.Server {
 	sub, _ := fs.Sub(staticFiles, "static")
 	rawHTML, _ := fs.ReadFile(sub, "index.html")
 	indexHTML := prepareIndexHTML(rawHTML, filepath.Base(rootDir))
+	registerPWARoutes(mux, filepath.Base(rootDir))
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.Write(indexHTML)

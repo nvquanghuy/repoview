@@ -2,7 +2,15 @@
 <html lang="en">
     <head>
         <meta charset="UTF-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+        <!-- PWA: installable via "Add to Home Screen", launches standalone -->
+        <link rel="manifest" href="/api/manifest.webmanifest" />
+        <link rel="apple-touch-icon" href="/api/icons/icon-180.png" />
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-title" content="__ROOT_DIR_NAME__" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+        <meta name="theme-color" content="#ffffff" />
         <title>__ROOT_DIR_NAME__ - RepoView</title>
         <style>
             /* ── Theme Variables ──────────────────────────────────────── */
@@ -96,6 +104,10 @@
             #app {
                 display: flex;
                 height: 100vh;
+                height: 100dvh;
+                /* Keep content clear of the notch / rounded corners (viewport-fit=cover) */
+                padding-left: env(safe-area-inset-left);
+                padding-right: env(safe-area-inset-right);
             }
             #sidebar {
                 width: 250px;
@@ -1514,6 +1526,9 @@
                     bottom: 0;
                     z-index: 20;
                     width: 280px !important;
+                    padding-top: env(safe-area-inset-top);
+                    padding-bottom: env(safe-area-inset-bottom);
+                    padding-left: env(safe-area-inset-left);
                     transform: translateX(-100%);
                     transition: transform 0.2s ease;
                     box-shadow: none;
@@ -1527,9 +1542,11 @@
                 }
                 #breadcrumb-bar {
                     padding: 8px 12px;
+                    padding-top: calc(8px + env(safe-area-inset-top));
                 }
                 #content-area {
                     padding: 16px;
+                    padding-bottom: calc(16px + env(safe-area-inset-bottom));
                 }
                 .dir-listing-row .size,
                 .dir-listing-row .modified {
@@ -1545,6 +1562,9 @@
                     bottom: 0;
                     width: 280px !important;
                     z-index: 25;
+                    padding-top: env(safe-area-inset-top);
+                    padding-bottom: env(safe-area-inset-bottom);
+                    padding-right: env(safe-area-inset-right);
                     box-shadow: -4px 0 12px var(--rv-shadow-strong);
                 }
                 #outline-resize-handle {
@@ -1584,7 +1604,7 @@
                     border-radius: 8px;
                 }
                 #search-overlay {
-                    padding-top: 40px;
+                    padding-top: calc(40px + env(safe-area-inset-top));
                 }
             }
 
@@ -1616,7 +1636,13 @@
                     theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
                 }
                 document.documentElement.setAttribute('data-theme', theme);
+                syncThemeColor(theme);
             })();
+            // Match the browser/status-bar chrome to the page background.
+            function syncThemeColor(theme) {
+                var meta = document.querySelector('meta[name="theme-color"]');
+                if (meta) meta.setAttribute('content', theme === 'dark' ? '#1e1e2e' : '#ffffff');
+            }
         </script>
         <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
         <script>
@@ -1744,6 +1770,7 @@
                 var next = current === 'dark' ? 'light' : 'dark';
                 document.documentElement.setAttribute('data-theme', next);
                 localStorage.setItem('rv-theme', next);
+                syncThemeColor(next);
                 updateThemeIcon(next);
                 updateMermaidTheme(next);
             }
@@ -1781,6 +1808,7 @@
                     if (!localStorage.getItem('rv-theme')) {
                         var theme = e.matches ? 'dark' : 'light';
                         document.documentElement.setAttribute('data-theme', theme);
+                        syncThemeColor(theme);
                         updateThemeIcon(theme);
                         updateMermaidTheme(theme);
                     }

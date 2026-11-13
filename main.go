@@ -37,7 +37,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-//go:embed static/index.html
+//go:embed static/index.html static/icons/*.png
 var staticFiles embed.FS
 
 var version = "dev"
@@ -157,6 +157,7 @@ func main() {
 		log.Fatal(err)
 	}
 	indexHTML = prepareIndexHTML(indexHTML, filepath.Base(rootDir))
+	registerPWARoutes(http.DefaultServeMux, filepath.Base(rootDir))
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.Write(indexHTML)

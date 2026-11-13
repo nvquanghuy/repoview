@@ -401,6 +401,26 @@ test.describe("Binary file handling", () => {
     await expect(content.locator(".source-code")).not.toBeVisible();
   });
 
+  test("HTML shows rendered preview iframe with toggle to code view", async ({ page }) => {
+    await page.goto("/");
+    await page.locator(".tree-item .label", { hasText: "sample.html" }).click();
+    const content = page.locator("#content-area");
+    // Preview mode: rendered page inside a sandboxed iframe
+    await expect(content.locator("iframe.html-preview")).toBeVisible();
+    const frame = page.frameLocator("iframe.html-preview");
+    await expect(frame.locator("h1")).toHaveText("Hello from HTML");
+
+    // Switch to code view
+    await page.locator(".view-toggle button", { hasText: "Code" }).click();
+    await expect(content.locator(".source-code")).toBeVisible();
+    await expect(content.locator(".source-code")).toContainText("<h1>Hello from HTML</h1>");
+    await expect(content.locator("iframe.html-preview")).toHaveCount(0);
+
+    // Switch back to preview
+    await page.locator(".view-toggle button", { hasText: "Preview" }).click();
+    await expect(page.frameLocator("iframe.html-preview").locator("h1")).toHaveText("Hello from HTML");
+  });
+
   test("non-image binary shows 'Binary file not displayed' with download link", async ({ page }) => {
     await page.goto("/");
     await page.locator(".tree-item .label", { hasText: "tiny.bin" }).click();
@@ -601,5 +621,51 @@ test.describe("Wiki links", () => {
     const href = await linkWithHeading.getAttribute("href");
     // href should have lowercase, hyphenated anchor
     expect(href).toBe("/hello.md#code-block");
+  });
+});
+
+test.describe("PWA (Add to Home Screen)", () => {
+  test("manifest is linked and lists icons that load", async ({ page, request }) => {
+    await page.goto("/");
+    const href = await page.locator('link[rel="manifest"]').getAttribute("href");
+    expect(href).toBe("/api/manifest.webmanifest");
+
+    const res = await request.get(href!);
+    expect(res.ok()).toBeTruthy();
+    const manifest = await res.json();
+    expect(manifest.display).toBe("standalone");
+    expect(manifest.short_name).toBe("testdata");
+    for (const icon of manifest.icons) {
+      const iconRes = await request.get(icon.src);
+      expect(iconRes.ok()).toBeTruthy();
+      expect(iconRes.headers()["content-type"]).toBe("image/png");
+    }
+
+    const touchIcon = await page.locator('link[rel="apple-touch-icon"]').getAttribute("href");
+    expect((await request.get(touchIcon!)).ok()).toBeTruthy();
+  });
+
+  test("theme-color meta follows the light/dark toggle", async ({ page }) => {
+    await page.emulateMedia({ colorScheme: "light" });
+    await page.goto("/");
+    await page.evaluate(() => localStorage.removeItem("rv-theme"));
+    await page.reload();
+    const meta = page.locator('meta[name="theme-color"]');
+    await expect(meta).toHaveAttribute("content", "#ffffff");
+
+    await page.locator("#theme-toggle").click();
+    await expect(meta).toHaveAttribute("content", "#1e1e2e");
+
+    // Persisted dark theme is applied on load, before any toggle.
+    await page.reload();
+    await expect(meta).toHaveAttribute("content", "#1e1e2e");
+
+    await page.locator("#theme-toggle").click();
+    await expect(meta).toHaveAttribute("content", "#ffffff");
+  });
+
+  test("an unrelated user file is still routed to the SPA, not shadowed", async ({ page }) => {
+    await page.goto("/hello.md");
+    await expect(page.locator("#content-area")).toContainText("Hello");
   });
 });

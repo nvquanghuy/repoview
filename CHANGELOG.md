@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- [added] Installable as a home-screen web app (PWA): web app manifest, app icons, and iOS standalone meta tags, so RepoView on a remote server can be used as a phone notes viewer via "Add to Home Screen"
+- [added] Mobile layout respects notch / home-indicator safe areas, and the browser theme color follows the light/dark toggle
 
 ## [v0.18.0] - 2026-11-11
 
