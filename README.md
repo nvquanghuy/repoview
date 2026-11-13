@@ -14,6 +14,7 @@ I noticed my marketing team, when working with Claude Code and lots of markdown 
 - **Markdown rendering** — GitHub-Flavored Markdown via goldmark (tables, task lists, code blocks)
 - **CSV rendering** — automatic conversion to styled HTML tables
 - **Fuzzy file search** — press `t` to open a "Go to file" modal with fuzzy matching
+- **Full-text search** — press `/` (or tap the search icon) to search inside every file; all words must match, `"quoted phrases"` match exactly, and opening a result scrolls to the first hit. `Tab` switches between file and content search
 - **Live reload** — WebSocket-based file watching with fsnotify; changes appear instantly
 - **Single binary** — all HTML/CSS/JS embedded via `go:embed`, no external dependencies at runtime
 - **Lazy-loading tree** — sidebar fetches directory contents on demand for fast startup on large repos
@@ -110,6 +111,7 @@ On the iPhone (with Tailscale connected), open `http://<tailscale-ip>:7777` in S
 | `GET /api/tree?path=` | Returns immediate children of a directory as JSON |
 | `GET /api/file?path=` | Returns rendered file content as JSON (`content`, `name`, `path`, `isMarkdown`, `isCSV`) |
 | `GET /api/files` | Returns a flat list of all file paths (uses `git ls-files` when available) |
+| `GET /api/search?q=&limit=` | Case-insensitive full-text search over text files (≤2 MB). Every term must appear in the file's contents or path; `"quoted phrases"` are matched exactly. Returns ranked results with up to 3 matching lines each |
 | `GET /api/manifest.webmanifest` | Web app manifest (enables "Add to Home Screen") |
 | `WS /ws` | WebSocket for file change notifications |
 
