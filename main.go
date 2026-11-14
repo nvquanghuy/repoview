@@ -140,6 +140,7 @@ func main() {
 	http.HandleFunc("/api/file", handleFile)
 	http.HandleFunc("/api/files", handleFiles)
 	http.HandleFunc("/api/search", handleSearch)
+	http.HandleFunc("/api/backlinks", handleBacklinks)
 	http.HandleFunc("/api/raw", handleRaw)
 	http.HandleFunc("/api/jsonl", handleJSONL)
 	http.HandleFunc("/api/editors", handleEditors)

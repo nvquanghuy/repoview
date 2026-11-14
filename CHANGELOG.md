@@ -5,6 +5,7 @@
 - [added] Installable as a home-screen web app (PWA): web app manifest, app icons, and iOS standalone meta tags, so RepoView on a remote server can be used as a phone notes viewer via "Add to Home Screen"
 - [added] Mobile layout respects notch / home-indicator safe areas, and the browser theme color follows the light/dark toggle
 - [added] Full-text search across note contents: press `/` or tap the new search icon in the top bar. All words must match (in contents or path), `"quoted phrases"` match exactly, results show matching lines with highlights, and opening a result scrolls to the first hit. `Tab` switches between Files and Contents modes. Backed by a new `GET /api/search` endpoint
+- [added] Backlinks: markdown notes show a "Backlinks" section listing notes that link to them via `[[wiki links]]`, `![[embeds]]`, or relative/root-relative markdown links (code blocks ignored), most recently modified first. Clicking one opens it and highlights the link. Backed by a new `GET /api/backlinks` endpoint
 - [fixed] Closing the search modal with Escape no longer leaves focus in the hidden input, so `t` works again immediately
 
 ## [v0.18.0] - 2026-11-11

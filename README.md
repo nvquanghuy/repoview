@@ -15,6 +15,7 @@ I noticed my marketing team, when working with Claude Code and lots of markdown 
 - **CSV rendering** — automatic conversion to styled HTML tables
 - **Fuzzy file search** — press `t` to open a "Go to file" modal with fuzzy matching
 - **Full-text search** — press `/` (or tap the search icon) to search inside every file; all words must match, `"quoted phrases"` match exactly, and opening a result scrolls to the first hit. `Tab` switches between file and content search
+- **Backlinks** — markdown notes list the notes that link to them (`[[wiki links]]`, `![[embeds]]`, and relative `[text](note.md)` links), most recently edited first; tap one to jump to the link
 - **Live reload** — WebSocket-based file watching with fsnotify; changes appear instantly
 - **Single binary** — all HTML/CSS/JS embedded via `go:embed`, no external dependencies at runtime
 - **Lazy-loading tree** — sidebar fetches directory contents on demand for fast startup on large repos
@@ -113,6 +114,7 @@ On the iPhone (with Tailscale connected), open `http://<tailscale-ip>:7777` in S
 | `GET /api/files` | Returns a flat list of all file paths (uses `git ls-files` when available) |
 | `GET /api/search?q=&limit=` | Case-insensitive full-text search over text files (≤2 MB). Every term must appear in the file's contents or path; `"quoted phrases"` are matched exactly. Returns ranked results with up to 3 matching lines each |
 | `GET /api/manifest.webmanifest` | Web app manifest (enables "Add to Home Screen") |
+| `GET /api/backlinks?path=` | Markdown notes linking to `path`, most recently modified first, with up to 3 linking lines each. Counts wiki links (in Obsidian vaults) and relative/root-relative markdown links; ignores code blocks |
 | `WS /ws` | WebSocket for file change notifications |
 
 ## Development
