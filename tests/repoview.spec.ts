@@ -349,6 +349,63 @@ test.describe("Full-text search", () => {
   });
 });
 
+test.describe("Backlinks", () => {
+  test("note shows notes that link to it, and clicking reveals the link", async ({ page }) => {
+    await page.goto("/hello.md");
+    const section = page.locator("#content-area .backlinks");
+    await expect(section).toBeVisible();
+    await expect(section.locator(".backlinks-count")).toHaveText("1");
+    const item = section.locator(".backlink-item");
+    await expect(item).toHaveCount(1);
+    await expect(item).toHaveAttribute("data-path", "wiki-test.md");
+    await expect(item.locator(".bl-name")).toHaveText("wiki-test");
+    await expect(item.locator(".bl-snippet").first()).toContainText("Simple link: [[hello]]");
+    // Section sits below the note body
+    await expect(page.locator("#content-area .markdown-body + .backlinks")).toHaveCount(1);
+
+    await item.click();
+    await expect(page).toHaveURL(/\/wiki-test\.md$/);
+    const hit = page.locator("#content-area a.backlink-hit");
+    await expect(hit).toHaveCount(1);
+    await expect(hit).toHaveAttribute("href", "/hello.md");
+    await expect(hit).toBeInViewport();
+  });
+
+  test("works for notes in subfolders", async ({ page }) => {
+    await page.goto("/subdir/nested.md");
+    const item = page.locator("#content-area .backlinks .backlink-item");
+    await expect(item).toHaveAttribute("data-path", "wiki-test.md");
+    await expect(item.locator(".bl-snippet")).toContainText("[[subdir/nested]]");
+  });
+
+  test("no section when nothing links to the note", async ({ page }) => {
+    await page.goto("/frontmatter.md");
+    await expect(page.locator("#content-area .markdown-body")).toBeVisible();
+    // Give the backlinks request time to land before asserting absence
+    await page.waitForLoadState("networkidle");
+    await expect(page.locator("#content-area .backlinks")).toHaveCount(0);
+  });
+
+  test("not shown in Code view, reappears in Preview", async ({ page }) => {
+    await page.goto("/hello.md");
+    await expect(page.locator("#content-area .backlinks")).toBeVisible();
+    await page.locator(".view-toggle button", { hasText: "Code" }).click();
+    await expect(page.locator("#content-area .source-code")).toBeVisible();
+    await expect(page.locator("#content-area .backlinks")).toHaveCount(0);
+    await page.locator(".view-toggle button", { hasText: "Preview" }).click();
+    await expect(page.locator("#content-area .backlinks")).toBeVisible();
+  });
+
+  test("backlinks from a previous note don't leak into the next one", async ({ page }) => {
+    await page.goto("/hello.md");
+    await expect(page.locator("#content-area .backlinks")).toBeVisible();
+    await page.locator(".tree-item .label", { hasText: "frontmatter.md" }).click();
+    await expect(page).toHaveURL(/\/frontmatter\.md$/);
+    await page.waitForLoadState("networkidle");
+    await expect(page.locator("#content-area .backlinks")).toHaveCount(0);
+  });
+});
+
 test.describe("Anchor links", () => {
   test("headings have id attributes", async ({ page }) => {
     await page.goto("/");

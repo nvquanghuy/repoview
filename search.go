@@ -117,35 +117,9 @@ func searchFiles(ctx context.Context, files []string, terms []string) []SearchRe
 		return nil
 	}
 
-	jobs := make(chan string)
-	var mu sync.Mutex
-	var results []SearchResult
-	var wg sync.WaitGroup
-
-	for i := 0; i < runtime.NumCPU(); i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for rel := range jobs {
-				if res, ok := searchFile(rel, terms); ok {
-					mu.Lock()
-					results = append(results, res)
-					mu.Unlock()
-				}
-			}
-		}()
-	}
-
-feed:
-	for _, f := range files {
-		select {
-		case jobs <- f:
-		case <-ctx.Done():
-			break feed
-		}
-	}
-	close(jobs)
-	wg.Wait()
+	results := parallelMap(ctx, files, func(rel string) (SearchResult, bool) {
+		return searchFile(rel, terms)
+	})
 
 	sort.Slice(results, func(i, j int) bool {
 		a, b := results[i], results[j]
@@ -247,5 +221,41 @@ func snippetAround(line string, at int) string {
 	if end < len(runes) {
 		out += "…"
 	}
+	return out
+}
+
+// parallelMap applies fn to every item using one worker per CPU and returns
+// the results for which fn reported ok, in no particular order. It stops
+// handing out work once ctx is cancelled (e.g. the client disconnected).
+func parallelMap[T any](ctx context.Context, items []string, fn func(string) (T, bool)) []T {
+	jobs := make(chan string)
+	var mu sync.Mutex
+	var out []T
+	var wg sync.WaitGroup
+
+	for i := 0; i < runtime.NumCPU(); i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for item := range jobs {
+				if v, ok := fn(item); ok {
+					mu.Lock()
+					out = append(out, v)
+					mu.Unlock()
+				}
+			}
+		}()
+	}
+
+feed:
+	for _, item := range items {
+		select {
+		case jobs <- item:
+		case <-ctx.Done():
+			break feed
+		}
+	}
+	close(jobs)
+	wg.Wait()
 	return out
 }

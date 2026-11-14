@@ -513,7 +513,8 @@
                 -webkit-box-orient: vertical;
                 overflow: hidden;
             }
-            .content-result .cr-line {
+            .content-result .cr-line,
+            .backlink-item .cr-line {
                 color: var(--rv-text-tertiary);
                 margin-right: 6px;
                 font-variant-numeric: tabular-nums;
@@ -528,6 +529,81 @@
             [data-theme="dark"] .content-result .cr-snippet mark,
             [data-theme="dark"] mark.search-hit {
                 background: #5c4d1f;
+            }
+            /* ── Backlinks ────────────────────────────────────────────── */
+            .backlinks {
+                margin-top: 48px;
+                padding-top: 16px;
+                border-top: 1px solid var(--rv-border);
+            }
+            .backlinks-title {
+                font-size: 13px;
+                font-weight: 600;
+                text-transform: uppercase;
+                letter-spacing: 0.04em;
+                color: var(--rv-text-secondary);
+                margin-bottom: 8px;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
+            .backlinks-count {
+                font-size: 12px;
+                font-weight: 600;
+                background: var(--rv-bg-tertiary);
+                color: var(--rv-text-secondary);
+                border-radius: 10px;
+                padding: 0 7px;
+                letter-spacing: 0;
+            }
+            .backlink-item {
+                display: block;
+                padding: 10px 12px;
+                margin: 0 -12px;
+                border-radius: 8px;
+                cursor: pointer;
+                color: inherit;
+                text-decoration: none;
+            }
+            .backlink-item:hover {
+                background: var(--rv-bg-hover);
+                text-decoration: none;
+            }
+            .backlink-item .bl-head {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                font-size: 14px;
+            }
+            .backlink-item .bl-head .sr-icon {
+                flex-shrink: 0;
+                color: var(--rv-text-secondary);
+                width: 16px;
+            }
+            .backlink-item .bl-dir {
+                color: var(--rv-text-secondary);
+            }
+            .backlink-item .bl-name {
+                font-weight: 600;
+                color: var(--rv-link);
+            }
+            .backlink-item .bl-snippet {
+                margin: 4px 0 0 24px;
+                font-size: 13px;
+                color: var(--rv-text-secondary);
+                overflow-wrap: anywhere;
+                display: -webkit-box;
+                -webkit-line-clamp: 2;
+                -webkit-box-orient: vertical;
+                overflow: hidden;
+            }
+            a.backlink-hit {
+                background: var(--rv-search-hit, #fff8c5);
+                border-radius: 3px;
+                box-shadow: 0 0 0 3px var(--rv-search-hit, #fff8c5);
+            }
+            [data-theme="dark"] a.backlink-hit {
+                --rv-search-hit: #5c4d1f;
             }
             #search-btn {
                 margin-left: auto;
@@ -3219,6 +3295,7 @@
                                 rewriteMarkdownImages(mdBody, path);
                                 resolveWikiLinks(mdBody, path);
                                 wrapCollapsibleSections(mdBody, currentFilePath);
+                                loadBacklinks(path, area);
                                 renderMermaidDiagrams(mdBody);
                                 hasOutline = buildOutline(mdBody);
                                 if (
@@ -3674,6 +3751,83 @@
                         revealSearchHit(data.terms);
                     };
                 });
+            }
+
+            /* ── Backlinks ────────────────────────────────────────────── */
+            var backlinksSeq = 0;
+
+            // Append a "Backlinks" section below a rendered markdown note,
+            // listing notes that link to it. Hidden when there are none.
+            async function loadBacklinks(path, area) {
+                var seq = ++backlinksSeq;
+                var result = await apiFetch("/api/backlinks?path=" + encodeURIComponent(path));
+                // Drop stale responses (navigated away or switched to Code view).
+                if (seq !== backlinksSeq || currentFilePath !== path || !result.ok) return;
+                if (!area.querySelector(".markdown-body")) return;
+                var old = area.querySelector(".backlinks");
+                if (old) old.remove();
+                var list = result.data.backlinks || [];
+                if (list.length === 0) return;
+
+                var html =
+                    '<h2 class="backlinks-title">Backlinks <span class="backlinks-count">' +
+                    list.length + "</span></h2>";
+                for (var i = 0; i < list.length; i++) {
+                    var b = list[i];
+                    var slash = b.path.lastIndexOf("/");
+                    var dir = slash >= 0 ? b.path.substring(0, slash + 1) : "";
+                    var name = b.path.substring(slash + 1).replace(/\.(md|markdown)$/i, "");
+                    html +=
+                        '<a class="backlink-item" href="/' + escAttr(b.path) + '" data-path="' + escAttr(b.path) + '">' +
+                        '<div class="bl-head"><span class="sr-icon">' + getFileIcon(b.path) + "</span>" +
+                        '<span><span class="bl-dir">' + esc(dir) + '</span><span class="bl-name">' + esc(name) + "</span></span></div>";
+                    for (var j = 0; j < b.snippets.length; j++) {
+                        html +=
+                            '<div class="bl-snippet"><span class="cr-line">' + b.snippets[j].line + "</span>" +
+                            esc(b.snippets[j].text) + "</div>";
+                    }
+                    html += "</a>";
+                }
+                var section = document.createElement("section");
+                section.className = "backlinks";
+                section.innerHTML = html;
+                area.appendChild(section);
+                section.querySelectorAll(".backlink-item").forEach(function (el) {
+                    el.onclick = async function (e) {
+                        if (e.metaKey || e.ctrlKey || e.shiftKey) return; // let the browser open a new tab
+                        e.preventDefault();
+                        await ensureAllFiles(); // wiki links resolve synchronously on render
+                        await loadFile(el.dataset.path);
+                        revealLinkTo(path);
+                    };
+                });
+            }
+
+            // Scroll to and highlight the first link in the current note that
+            // points at `target` (wiki link or ordinary markdown link).
+            function revealLinkTo(target) {
+                var links = document.querySelectorAll("#content-area .markdown-body a[href]");
+                for (var i = 0; i < links.length; i++) {
+                    var a = links[i];
+                    var u;
+                    try {
+                        u = new URL(a.getAttribute("href"), location.href);
+                    } catch (err) {
+                        continue;
+                    }
+                    var p;
+                    try {
+                        p = decodeURIComponent(u.pathname);
+                    } catch (err) {
+                        p = u.pathname;
+                    }
+                    if (u.origin !== location.origin || p !== "/" + target) continue;
+                    expandSectionForElement(a);
+                    a.classList.add("backlink-hit");
+                    a.scrollIntoView({ block: "center" });
+                    return true;
+                }
+                return false;
             }
 
             // After opening a note from content search, scroll to and mark

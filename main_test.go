@@ -792,6 +792,7 @@ func newTestServer(t *testing.T) *httptest.Server {
 	mux.HandleFunc("/api/raw", handleRaw)
 	mux.HandleFunc("/api/files", handleFiles)
 	mux.HandleFunc("/api/search", handleSearch)
+	mux.HandleFunc("/api/backlinks", handleBacklinks)
 	sub, _ := fs.Sub(staticFiles, "static")
 	rawHTML, _ := fs.ReadFile(sub, "index.html")
 	indexHTML := prepareIndexHTML(rawHTML, filepath.Base(rootDir))
