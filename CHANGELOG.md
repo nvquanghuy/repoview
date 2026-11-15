@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- [added] Files search (`t`) now finds folders too: they appear in the results with a folder icon and a trailing `/`, and opening one shows the folder view
+- [changed] Files search ranks contiguous matches far above scattered letters, especially when the match is in the file or folder's own name, and highlights the whole matched run. A query like `sadora` no longer puts `concepts/Anxiety Disorder.md` near the top
+- [fixed] Files with non-ASCII names (e.g. Vietnamese) in git repos showed up in search as octal-escaped, quoted paths like `"T\341\273\255 vi/…"` and couldn't be opened; they now show and open normally
 
 ## [v0.19.0] - 2026-11-14
 

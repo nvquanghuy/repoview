@@ -452,6 +452,9 @@
                 color: var(--rv-text-secondary);
                 width: 16px;
             }
+            .search-result .sr-icon.folder {
+                color: var(--rv-icon-folder);
+            }
             .search-result .sr-path {
                 overflow: hidden;
                 text-overflow: ellipsis;
@@ -3641,7 +3644,7 @@
                 if (!q) {
                     renderSearchResults(allFiles.slice(0, 50), false);
                 } else {
-                    var results = fuzzysort(q, allFiles, 50);
+                    var results = fuzzysort(q, getSearchTargets(), 50);
                     renderSearchResults(results, true);
                 }
                 searchIdx = 0;
@@ -3893,12 +3896,20 @@
                         display = esc(item);
                         raw = item;
                     }
+                    // Folder targets end with "/" (see getSearchTargets).
+                    var isDir = raw.endsWith("/");
                     html +=
-                        '<div class="search-result" data-path="' +
-                        escAttr(raw) +
+                        '<div class="search-result' +
+                        (isDir ? ' search-dir' : '') +
+                        '" data-path="' +
+                        escAttr(isDir ? raw.slice(0, -1) : raw) +
+                        '"' +
+                        (isDir ? ' data-isdir="true"' : '') +
+                        '>' +
+                        '<span class="sr-icon' +
+                        (isDir ? ' folder' : '') +
                         '">' +
-                        '<span class="sr-icon">' +
-                        getFileIcon(raw) +
+                        (isDir ? SVG.folderClosed : getFileIcon(raw)) +
                         "</span>" +
                         '<span class="sr-path">' +
                         display +
@@ -3910,12 +3921,66 @@
                     .forEach(function (el) {
                         el.onclick = function () {
                             closeSearch();
-                            loadFile(el.dataset.path);
+                            if (el.dataset.isdir) navigateTo(el.dataset.path);
+                            else loadFile(el.dataset.path);
                         };
                     });
             }
 
+            // Files plus every folder that contains a file (folders get a
+            // trailing "/"), rebuilt whenever allFiles is reloaded.
+            var searchTargets = null, searchTargetsSrc = null;
+            function getSearchTargets() {
+                if (searchTargetsSrc === allFiles && searchTargets) return searchTargets;
+                var dirs = new Set();
+                for (var i = 0; i < allFiles.length; i++) {
+                    var parts = allFiles[i].split("/");
+                    for (var j = 1; j < parts.length; j++) {
+                        dirs.add(parts.slice(0, j).join("/") + "/");
+                    }
+                }
+                searchTargets = Array.from(dirs).concat(allFiles);
+                searchTargetsSrc = allFiles;
+                return searchTargets;
+            }
+
             /* ── Minimal fuzzysort implementation ─────────────────────── */
+            function isBoundary(target, i) {
+                if (i === 0) return true;
+                var p = target[i - 1];
+                return p === "/" || p === "." || p === "-" || p === "_" || p === " " || p === "(";
+            }
+
+            // Score one query term against a path. Contiguous substring hits
+            // dominate (most in the file/folder's own name), and scattered
+            // fuzzy matches only fill in below them.
+            function matchTerm(term, tl, target) {
+                var trimmed = tl.endsWith("/") ? tl.length - 1 : tl.length;
+                var nameStart = tl.lastIndexOf("/", trimmed - 1) + 1;
+                var idx = tl.lastIndexOf(term, trimmed - term.length);
+                if (idx !== -1) {
+                    // Prefer a boundary-aligned occurrence if there is one.
+                    for (var k = idx; k !== -1; k = k > 0 ? tl.lastIndexOf(term, k - 1) : -1) {
+                        if (isBoundary(target, k)) { idx = k; break; }
+                    }
+                    var score = idx >= nameStart ? 200 : 100;
+                    if (isBoundary(target, idx)) score += 20;
+                    if (idx === nameStart && idx + term.length === trimmed) score += 40; // whole name
+                    else if (idx >= nameStart) {
+                        // Whole name minus extension, e.g. "sadora" vs "Sadora.md"
+                        var dot = tl.lastIndexOf(".");
+                        if (idx === nameStart && dot === idx + term.length) score += 30;
+                    }
+                    var indices = [];
+                    for (var n = 0; n < term.length; n++) indices.push(idx + n);
+                    return { score: score, indices: indices };
+                }
+                var m = fuzzyMatchTerm(term, tl, target, 0);
+                if (!m) return null;
+                return { score: Math.min(m.score, 60), indices: m.indices };
+            }
+
+
             function fuzzyMatchTerm(term, tl, target, startFrom) {
                 var qi = 0,
                     score = 0,
@@ -3963,7 +4028,7 @@
                         allIndices = [],
                         matched = true;
                     for (var ti = 0; ti < terms.length; ti++) {
-                        var m = fuzzyMatchTerm(terms[ti], tl, target, 0);
+                        var m = matchTerm(terms[ti], tl, target);
                         if (!m) {
                             matched = false;
                             break;
@@ -3974,6 +4039,8 @@
                     }
                     if (matched) {
                         totalScore -= target.length * 0.1;
+                        // Tie-break: a folder ranks just above files inside it.
+                        if (target.endsWith("/")) totalScore += 1;
                         allIndices.sort(function (a, b) {
                             return a - b;
                         });

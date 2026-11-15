@@ -264,6 +264,31 @@ test.describe("Fuzzy search", () => {
     await expect(page.locator(".search-result").first()).toBeVisible();
     await expect(page.locator(".search-result .sr-path", { hasText: "nested" })).toBeVisible();
   });
+
+  test("folders are searchable and open the folder view", async ({ page }) => {
+    await page.goto("/");
+    await expect(page.locator("#tree-container .tree-item")).not.toHaveCount(0);
+    await page.keyboard.press("t");
+    await page.locator("#search-input").fill("subdir");
+    // The folder itself ranks first, above the files inside it
+    const first = page.locator(".search-result").first();
+    await expect(first).toHaveClass(/search-dir/);
+    await expect(first.locator(".sr-path")).toHaveText("subdir/");
+    await first.click();
+    await expect(page.locator("#search-overlay")).not.toHaveClass(/open/);
+    await expect(page).toHaveURL(/\/subdir\/$/);
+    await expect(page.locator("#content-area .dir-listing-row .name", { hasText: "nested.md" })).toBeVisible();
+  });
+
+  test("contiguous name matches outrank scattered letters", async ({ page }) => {
+    await page.goto("/");
+    await expect(page.locator("#tree-container .tree-item")).not.toHaveCount(0);
+    await page.keyboard.press("t");
+    await page.locator("#search-input").fill("data");
+    const first = page.locator(".search-result").first();
+    await expect(first.locator(".sr-path")).toHaveText("data.csv");
+    await expect(first.locator("mark")).toHaveCount(4);
+  });
 });
 
 test.describe("Full-text search", () => {
