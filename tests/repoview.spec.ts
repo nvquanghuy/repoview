@@ -10,6 +10,12 @@ test.describe("Sidebar tree", () => {
     await expect(sidebar.locator(".tree-item .label", { hasText: "subdir" })).toBeVisible();
   });
 
+  test("html files get the HTML file icon", async ({ page }) => {
+    await page.goto("/");
+    const row = page.locator("#tree-container .tree-item", { hasText: "sample.html" }).first();
+    await expect(row.locator(".icon text")).toHaveText("HTML");
+  });
+
   test("clicking chevron collapses an expanded folder", async ({ page }) => {
     await page.goto("/");
     const sidebar = page.locator("#tree-container");
