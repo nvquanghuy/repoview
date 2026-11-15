@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- [added] HTML files (`.html`, `.htm`) get their own file icon in the tree and search results
 
 ## [v0.20.0] - 2026-11-15
 
