@@ -690,13 +690,14 @@ func handleFiles(w http.ResponseWriter, r *http.Request) {
 func listFiles() []string {
 	var files []string
 
-	// Try git ls-files first.
-	cmd := exec.Command("git", "-C", rootDir, "ls-files")
+	// Try git ls-files first. -z gives raw NUL-separated paths; without it git
+	// C-quotes non-ASCII names (e.g. "T\341\273\255.md") and they can't be opened.
+	cmd := exec.Command("git", "-C", rootDir, "ls-files", "-z")
 	out, err := cmd.Output()
 	if err == nil && len(out) > 0 {
-		for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
-			if line != "" {
-				files = append(files, line)
+		for _, name := range strings.Split(string(out), "\x00") {
+			if name != "" {
+				files = append(files, name)
 			}
 		}
 		return files

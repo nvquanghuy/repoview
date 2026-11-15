@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -254,5 +255,29 @@ func TestSnippetAround(t *testing.T) {
 
 	if got := snippetAround("  short line  ", 2); got != "short line" {
 		t.Errorf("short line = %q", got)
+	}
+}
+
+func TestListFilesGitNonASCII(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not installed")
+	}
+	dir := t.TempDir()
+	names := []string{"Tử vi/phong thủy.md", "plain.md"}
+	for _, n := range names {
+		p := filepath.Join(dir, filepath.FromSlash(n))
+		os.MkdirAll(filepath.Dir(p), 0o755)
+		os.WriteFile(p, []byte("x"), 0o644)
+	}
+	for _, args := range [][]string{{"init", "-q"}, {"add", "."}} {
+		if out, err := exec.Command("git", append([]string{"-C", dir}, args...)...).CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v %s", args, err, out)
+		}
+	}
+	setRoot(t, dir)
+	got := listFiles()
+	want := map[string]bool{"Tử vi/phong thủy.md": true, "plain.md": true}
+	if len(got) != 2 || !want[got[0]] || !want[got[1]] {
+		t.Fatalf("listFiles() = %q, want unquoted UTF-8 paths %v", got, names)
 	}
 }
