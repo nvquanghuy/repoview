@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+- [added] Password login for running RepoView on the internet: set `REPOVIEW_PASSWORD` (or `REPOVIEW_PASSWORD_HASH`) and sign in at `/login`. Sessions last 30 days, and repeated wrong passwords lock that IP out for 15 minutes
+- [added] Share links: share any file or folder as `/s/<name>-<id>` with an optional password and an expiry. Visitors see the viewer limited to that item, and the shared-links button in the header lists and revokes them
+- [security] Raw HTML/SVG files are served sandboxed, and the live-reload websocket only accepts connections from RepoView's own pages
+- [security] Fixed script injection through mermaid diagrams (on theme change) and `<javascript:…>` autolinks in markdown; mermaid and mammoth are pinned with integrity hashes
+- [security] Built with Go 1.26.11 and goldmark 1.7.17, which fix known vulnerabilities
+- [security] Listing files never runs commands configured in a repository's `.git/config`
+- [changed] Files over 2 MB are no longer previewed; you get a download link instead
 
 ## [v0.22.1] - 2026-11-16
 

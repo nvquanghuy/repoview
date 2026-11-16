@@ -646,8 +646,9 @@ func TestWebSocket(t *testing.T) {
 	defer watcher.Close()
 
 	mux := http.NewServeMux()
+	sc := scope{root: rootDir} // captured now: later tests reassign rootDir
 	mux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
-		handleWS(w, r, h, watcher)
+		handleWS(w, r.WithContext(withScope(r.Context(), sc)), h, watcher)
 	})
 	srv := httptest.NewServer(mux)
 	defer srv.Close()
@@ -786,7 +787,7 @@ func TestNotifyFile_NoMatchingWatch(t *testing.T) {
 // newTestServer creates a test server with the same routing as production.
 func newTestServer(t *testing.T) *httptest.Server {
 	t.Helper()
-	return httptest.NewServer(newMux(filepath.Base(rootDir), nil))
+	return httptest.NewServer(newServer(serverConfig{root: rootDir}).handler())
 }
 
 func TestStaticFileServed(t *testing.T) {

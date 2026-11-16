@@ -90,9 +90,14 @@ func handleSearch(w http.ResponseWriter, r *http.Request) {
 		limit = min(l, searchMaxLimit)
 	}
 
+	if !acquireHeavy(w, r) {
+		return
+	}
+	defer releaseHeavy()
+
 	resp := SearchResponse{Query: q, Terms: parseSearchQuery(q), Results: []SearchResult{}}
 	if utf8.RuneCountInString(strings.Join(resp.Terms, "")) >= searchMinQueryRunes {
-		results := searchFiles(r.Context(), listFiles(), resp.Terms)
+		results := searchFilesIn(r.Context(), scopeOf(r), resp.Terms)
 		resp.Total = len(results)
 		if len(results) > limit {
 			results = results[:limit]
@@ -113,12 +118,24 @@ func handleSearch(w http.ResponseWriter, r *http.Request) {
 // searchFiles scans files in parallel and returns ranked matches:
 // file-name matches first, then by number of matching lines, then by path.
 func searchFiles(ctx context.Context, files []string, terms []string) []SearchResult {
+	return searchFilesUnder(ctx, rootDir, files, terms)
+}
+
+// searchFilesIn searches every file visible in the scope.
+func searchFilesIn(ctx context.Context, sc scope, terms []string) []SearchResult {
+	if len(terms) == 0 {
+		return nil
+	}
+	return searchFilesUnder(ctx, sc.root, sc.files(), terms)
+}
+
+func searchFilesUnder(ctx context.Context, root string, files []string, terms []string) []SearchResult {
 	if len(terms) == 0 {
 		return nil
 	}
 
 	results := parallelMap(ctx, files, func(rel string) (SearchResult, bool) {
-		return searchFile(rel, terms)
+		return searchFile(root, rel, terms)
 	})
 
 	sort.Slice(results, func(i, j int) bool {
@@ -136,8 +153,8 @@ func searchFiles(ctx context.Context, files []string, terms []string) []SearchRe
 
 // searchFile checks a single file. ok is false when the file doesn't match,
 // can't be read, is too large, or looks binary.
-func searchFile(rel string, terms []string) (res SearchResult, ok bool) {
-	abs := filepath.Join(rootDir, filepath.FromSlash(rel))
+func searchFile(root, rel string, terms []string) (res SearchResult, ok bool) {
+	abs := filepath.Join(root, filepath.FromSlash(rel))
 	info, err := os.Stat(abs)
 	if err != nil || !info.Mode().IsRegular() || info.Size() > searchMaxFileSize {
 		return res, false
@@ -259,3 +276,21 @@ feed:
 	wg.Wait()
 	return out
 }
+
+// heavySlots bounds concurrent whole-tree scans (search, backlinks), which
+// read up to every file; each already fans out across CPUs.
+var heavySlots = make(chan struct{}, 4)
+
+// acquireHeavy waits for a slot; if the client goes away first it answers
+// 503 and returns false.
+func acquireHeavy(w http.ResponseWriter, r *http.Request) bool {
+	select {
+	case heavySlots <- struct{}{}:
+		return true
+	case <-r.Context().Done():
+		http.Error(w, "busy, try again", http.StatusServiceUnavailable)
+		return false
+	}
+}
+
+func releaseHeavy() { <-heavySlots }

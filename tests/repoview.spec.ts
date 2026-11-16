@@ -1,5 +1,19 @@
 import { test, expect } from "@playwright/test";
 
+test.describe("Local mode (no auth)", () => {
+  test("hides login and sharing controls", async ({ page }) => {
+    await page.goto("/");
+    await expect(page.locator("#tree-container .tree-item").first()).toBeVisible();
+    await expect(page.locator("#share-btn")).toBeHidden();
+    await expect(page.locator("#shares-btn")).toBeHidden();
+    await expect(page.locator("#logout-form")).toBeHidden();
+    // The theme toggle still sits right after the search button.
+    const search = await page.locator("#search-btn").boundingBox();
+    const theme = await page.locator("#theme-toggle").boundingBox();
+    expect(theme!.x - (search!.x + search!.width)).toBeLessThan(12);
+  });
+});
+
 test.describe("Sidebar tree", () => {
   test("root loads and contains known files", async ({ page }) => {
     await page.goto("/");
@@ -571,8 +585,10 @@ test.describe("Binary file handling", () => {
     await page.goto("/");
     await page.locator(".tree-item .label", { hasText: "icon.svg" }).click();
     const content = page.locator("#content-area");
-    // Preview mode: shows inline SVG element
-    await expect(content.locator(".svg-preview svg")).toBeVisible();
+    // Preview mode: rendered as an <img>, so scripts and event handlers
+    // inside the SVG never run with the viewer's session.
+    await expect(content.locator(".svg-preview img")).toBeVisible();
+    await expect(content.locator(".svg-preview svg")).toHaveCount(0);
     // Toggle should be visible
     await expect(page.locator(".view-toggle")).toBeVisible();
     await expect(page.locator(".view-toggle button", { hasText: "Preview" })).toBeVisible();
@@ -585,7 +601,7 @@ test.describe("Binary file handling", () => {
 
     // Switch back to preview
     await page.locator(".view-toggle button", { hasText: "Preview" }).click();
-    await expect(content.locator(".svg-preview svg")).toBeVisible();
+    await expect(content.locator(".svg-preview img")).toBeVisible();
     await expect(content.locator(".source-code")).not.toBeVisible();
   });
 
@@ -913,5 +929,56 @@ test.describe("Desktop sidebar toggle", () => {
     await page.keyboard.press("Control+Backslash");
     await expect(page.locator("#sidebar")).toHaveClass(/open/);
     await expect(page.locator("#sidebar")).not.toHaveClass(/collapsed/);
+  });
+});
+
+test.describe("Rendering safety", () => {
+  // Serve a crafted markdown file without touching the fixtures.
+  async function serveMarkdown(page, html: string) {
+    await page.route("**/api/file?path=evil.md", (route) =>
+      route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({ name: "evil.md", path: "evil.md", isMarkdown: true, content: html, rawContent: "" }),
+      }),
+    );
+  }
+
+  test("mermaid source is never re-inserted as HTML on theme change", async ({ page }) => {
+    await serveMarkdown(
+      page,
+      '<pre><code class="language-mermaid">graph TD\n  A--&gt;B\n%% &lt;img src=x onerror="window.__pwned=1"&gt;</code></pre>',
+    );
+    await page.goto("/evil.md");
+    await expect(page.locator("#content-area .mermaid")).toHaveCount(1);
+    await page.locator("#theme-toggle").click();
+    await page.emulateMedia({ colorScheme: "dark" });
+    await page.waitForTimeout(500);
+    expect(await page.evaluate(() => (window as any).__pwned)).toBeUndefined();
+    await expect(page.locator("#content-area .mermaid img")).toHaveCount(0);
+  });
+
+  test("files too large to render offer a download", async ({ page }) => {
+    await page.route("**/api/file?path=huge.log", (route) =>
+      route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({ name: "huge.log", path: "huge.log", isTooLarge: true, size: 50 << 20 }),
+      }),
+    );
+    await page.goto("/huge.log");
+    await expect(page.locator("#content-area")).toContainText("Too large to preview");
+    await expect(page.locator("#content-area .binary-download")).toHaveAttribute("href", "/_raw/huge.log");
+  });
+
+  test("script URLs are stripped from rendered links", async ({ page }) => {
+    await serveMarkdown(
+      page,
+      '<p><a id="a1" href="javascript:window.__pwned=1">a</a> <a id="a2" href="java&#9;script:window.__pwned=2">b</a> ' +
+        '<a id="a3" href="VBScript:x">c</a> <a id="a4" href="data:text/html,x">d</a> <a id="ok" href="https://example.com/">ok</a></p>',
+    );
+    await page.goto("/evil.md");
+    await expect(page.locator("#content-area #ok")).toHaveAttribute("href", "https://example.com/");
+    for (const id of ["a1", "a2", "a3", "a4"]) {
+      await expect(page.locator(`#content-area #${id}`)).not.toHaveAttribute("href", /.*/);
+    }
   });
 });

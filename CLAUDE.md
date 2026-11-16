@@ -20,4 +20,8 @@
 - Single Go binary with embedded static files (`static/index.html`).
 - `main.go` — HTTP server, API handlers, WebSocket hub, file watcher.
 - `main_test.go` — tests using `httptest`.
+- `scope.go` — the per-request scope every handler resolves paths through (whole root for the owner, the shared item for share visitors). Use `scopeOf(r).resolve(path)`, never `rootDir` directly, in handlers.
+- `auth.go` — pure core for login and sharing (tokens, credentials, rate limiter, share ids); `gate.go` — routing, sessions, shares API; `pages.go` — server-rendered login/prompt pages; `sharestore.go` — share and secret persistence (cross-process safe).
+- Password mode tests: `newAuthEnv(t)` in `gate_test.go` serves a copy of testdata with a password, an injectable clock and a temp config dir.
+- Login/sharing design, security model and the rules for adding endpoints: `docs/design/public-access-and-sharing.md`. Read it before touching routing, scopes, sessions or raw file serving.
 - SPA routing: all non-API paths serve index.html; frontend uses History API (`pushState`/`popstate`) with clean URLs (e.g. `/readme.md`, `/src/main.go`).

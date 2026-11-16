@@ -4,7 +4,7 @@
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
         <!-- PWA: installable via "Add to Home Screen", launches standalone -->
-        <link rel="manifest" href="/api/manifest.webmanifest" />
+        <link rel="manifest" href="/api/manifest.webmanifest" crossorigin="use-credentials" />
         <link rel="apple-touch-icon" href="/api/icons/icon-180.png" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -640,7 +640,8 @@
                 background: var(--rv-bg-hover);
                 color: var(--rv-text);
             }
-            #search-btn + #theme-toggle {
+            #search-btn + #theme-toggle,
+            #search-btn ~ #theme-toggle {
                 margin-left: 0;
             }
             #search-empty {
@@ -1478,7 +1479,8 @@
                 background: var(--rv-bg-secondary);
                 overflow: auto;
             }
-            .svg-preview svg {
+            .svg-preview svg,
+            .svg-preview img {
                 max-width: 100%;
                 max-height: 70vh;
             }
@@ -1841,6 +1843,261 @@
                 background: var(--rv-bg-hover);
                 color: var(--rv-text);
             }
+
+            /* ── Auth modes: owner / share ───────────────────────────── */
+            .owner-only {
+                display: none !important;
+            }
+            .rv-mode-owner .owner-only {
+                display: flex !important;
+            }
+            .rv-file-share #sidebar,
+            .rv-file-share #sidebar-overlay,
+            .rv-file-share #menu-toggle {
+                display: none !important;
+            }
+            .rv-file-share #breadcrumb-bar .crumb.root {
+                color: var(--rv-text);
+                font-weight: 600;
+                cursor: default;
+                text-decoration: none;
+            }
+            .header-btn {
+                background: none;
+                border: none;
+                padding: 6px;
+                cursor: pointer;
+                color: var(--rv-text-secondary);
+                border-radius: 6px;
+                display: flex;
+                align-items: center;
+                gap: 4px;
+                flex-shrink: 0;
+                font-family: inherit;
+                font-size: 13px;
+            }
+            .header-btn:hover {
+                background: var(--rv-bg-hover);
+                color: var(--rv-text);
+            }
+            #logout-form {
+                margin: 0;
+            }
+            @media (max-width: 480px) {
+                .header-btn-label {
+                    display: none;
+                }
+            }
+
+            /* ── Share dialogs ───────────────────────────────────────── */
+            .rv-modal-overlay {
+                display: none;
+                position: fixed;
+                inset: 0;
+                z-index: 100;
+                background: var(--rv-overlay);
+                justify-content: center;
+                align-items: flex-start;
+                padding: 80px 16px 16px;
+                overflow-y: auto;
+            }
+            .rv-modal-overlay.open {
+                display: flex;
+            }
+            .rv-modal {
+                width: 440px;
+                max-width: 100%;
+                background: var(--rv-bg);
+                color: var(--rv-text);
+                border: 1px solid var(--rv-border);
+                border-radius: 12px;
+                box-shadow: 0 8px 24px var(--rv-shadow);
+                overflow: hidden;
+            }
+            .rv-modal-wide {
+                width: 640px;
+            }
+            .rv-modal-header {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                padding: 12px 16px;
+                font-weight: 600;
+                font-size: 14px;
+                border-bottom: 1px solid var(--rv-border);
+                background: var(--rv-bg-secondary);
+            }
+            .rv-modal-close {
+                background: none;
+                border: none;
+                font-size: 20px;
+                line-height: 1;
+                cursor: pointer;
+                color: var(--rv-text-secondary);
+                padding: 0 4px;
+                border-radius: 6px;
+            }
+            .rv-modal-close:hover {
+                background: var(--rv-bg-hover);
+                color: var(--rv-text);
+            }
+            .rv-modal-body {
+                padding: 16px;
+                font-size: 13px;
+            }
+            .share-target {
+                margin-bottom: 12px;
+                color: var(--rv-text-secondary);
+                word-break: break-all;
+            }
+            .share-target code,
+            .share-row-path code {
+                color: var(--rv-text);
+                font-size: 12px;
+                padding: 2px 6px;
+                background: var(--rv-bg-tertiary);
+                border-radius: 6px;
+            }
+            .rv-field-label {
+                display: block;
+                font-weight: 600;
+                margin: 12px 0 6px;
+            }
+            .rv-input-row {
+                display: flex;
+                gap: 8px;
+                align-items: center;
+            }
+            .rv-input-row input,
+            .rv-input-row select {
+                padding: 5px 8px;
+                font-size: 13px;
+                font-family: inherit;
+                color: var(--rv-text);
+                background: var(--rv-bg);
+                border: 1px solid var(--rv-border);
+                border-radius: 6px;
+                min-width: 0;
+            }
+            .rv-input-row input[type="text"] {
+                flex: 1;
+                font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+            }
+            .rv-input-row input:focus,
+            .rv-input-row select:focus {
+                outline: none;
+                border-color: var(--rv-border-active);
+                box-shadow: 0 0 0 3px var(--rv-resize-handle);
+            }
+            #share-custom-amount {
+                width: 72px;
+            }
+            .rv-hint {
+                margin-top: 6px;
+                color: var(--rv-text-secondary);
+                font-size: 12px;
+            }
+            .rv-hint.rv-warn {
+                color: var(--rv-warning-text);
+            }
+            .rv-error {
+                margin-top: 12px;
+                padding: 8px 12px;
+                border: 1px solid var(--rv-error-border);
+                background: var(--rv-error-bg);
+                color: var(--rv-error-text);
+                border-radius: 6px;
+                white-space: pre-wrap;
+            }
+            .rv-modal-actions {
+                display: flex;
+                justify-content: flex-end;
+                gap: 8px;
+                margin-top: 16px;
+            }
+            .rv-btn {
+                display: inline-flex;
+                align-items: center;
+                gap: 6px;
+                padding: 5px 12px;
+                font-size: 12px;
+                font-weight: 500;
+                font-family: inherit;
+                color: var(--rv-text);
+                background: var(--rv-bg-secondary);
+                border: 1px solid var(--rv-border);
+                border-radius: 6px;
+                cursor: pointer;
+                white-space: nowrap;
+                flex-shrink: 0;
+            }
+            .rv-btn:hover {
+                background: var(--rv-bg-hover);
+            }
+            .rv-btn:disabled {
+                opacity: 0.6;
+                cursor: default;
+            }
+            .rv-btn-primary {
+                color: #fff;
+                background: #1f883d;
+                border-color: #1a7f37;
+            }
+            .rv-btn-primary:hover {
+                background: #1a7f37;
+            }
+            .rv-btn-danger {
+                color: var(--rv-error-text);
+            }
+            .rv-btn-danger:hover {
+                color: #fff;
+                background: var(--rv-error-text);
+                border-color: var(--rv-error-text);
+            }
+            .share-row {
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                padding: 10px 0;
+                border-bottom: 1px solid var(--rv-border);
+            }
+            .share-row:last-child {
+                border-bottom: none;
+            }
+            .share-row-main {
+                flex: 1;
+                min-width: 0;
+            }
+            .share-row-path {
+                word-break: break-all;
+            }
+            .share-row-meta {
+                margin-top: 4px;
+                color: var(--rv-text-secondary);
+                font-size: 12px;
+            }
+            .share-row.expired .share-row-path {
+                opacity: 0.6;
+            }
+            .share-row-actions {
+                display: flex;
+                gap: 6px;
+            }
+            .shares-empty {
+                color: var(--rv-text-secondary);
+                text-align: center;
+                padding: 16px 0;
+            }
+            @media (max-width: 480px) {
+                .rv-modal-overlay {
+                    padding-top: calc(16px + env(safe-area-inset-top));
+                }
+                .share-row {
+                    flex-direction: column;
+                    align-items: stretch;
+                    gap: 8px;
+                }
+            }
         </style>
         <script>
             (function() {
@@ -1860,10 +2117,14 @@
                 if (meta) meta.setAttribute('content', theme === 'dark' ? '#1e1e2e' : '#ffffff');
             }
         </script>
-        <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+        <!-- Pinned with SRI: third-party code runs with the viewer's session. -->
+        <script src="https://cdn.jsdelivr.net/npm/mermaid@11.17.2/dist/mermaid.min.js"
+                integrity="sha384-EOXBFmc3gx5mb+vn0vPvvGqACToJD24hhacX5Yx+8NUUQrHIle/Qi5Bg9o3zKwW2"
+                crossorigin="anonymous"></script>
         <script>
             mermaid.initialize({
                 startOnLoad: false,
+                securityLevel: 'strict',
                 theme: document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'default'
             });
         </script>
@@ -1906,13 +2167,24 @@
                             <path d="M1 2.75A.75.75 0 0 1 1.75 2h12.5a.75.75 0 0 1 0 1.5H1.75A.75.75 0 0 1 1 2.75Zm0 5A.75.75 0 0 1 1.75 7h12.5a.75.75 0 0 1 0 1.5H1.75A.75.75 0 0 1 1 7.75ZM1.75 12h12.5a.75.75 0 0 1 0 1.5H1.75a.75.75 0 0 1 0-1.5Z"/>
                         </svg>
                     </button>
-                    <span class="crumb root" onclick="navigateTo('')"
+                    <span class="crumb root" onclick="if (!RV.file) navigateTo('')"
                         >__ROOT_DIR_NAME__</span
                     >
                     <span id="breadcrumb-path"></span>
                     <button id="search-btn" onclick="openSearch('content')" title="Search note contents (/)" aria-label="Search note contents">
                         <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
                             <path d="M10.68 11.74a6 6 0 0 1-7.922-8.982 6 6 0 0 1 8.982 7.922l3.04 3.04a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215ZM11.5 7a4.499 4.499 0 1 0-8.997 0A4.499 4.499 0 0 0 11.5 7Z"/>
+                        </svg>
+                    </button>
+                    <button id="share-btn" class="owner-only header-btn" onclick="openShareDialog()" title="Share this file or folder" aria-label="Share">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                            <path d="M7.775 3.275a.75.75 0 0 0 1.06 1.06l1.25-1.25a2 2 0 1 1 2.83 2.83l-2.5 2.5a2 2 0 0 1-2.83 0 .75.75 0 0 0-1.06 1.06 3.5 3.5 0 0 0 4.95 0l2.5-2.5a3.5 3.5 0 0 0-4.95-4.95l-1.25 1.25Zm-4.69 9.64a2 2 0 0 1 0-2.83l2.5-2.5a2 2 0 0 1 2.83 0 .75.75 0 0 0 1.06-1.06 3.5 3.5 0 0 0-4.95 0l-2.5 2.5a3.5 3.5 0 0 0 4.95 4.95l1.25-1.25a.75.75 0 0 0-1.06-1.06l-1.25 1.25a2 2 0 0 1-2.83 0Z"/>
+                        </svg>
+                        <span class="header-btn-label">Share</span>
+                    </button>
+                    <button id="shares-btn" class="owner-only header-btn" onclick="openSharesPanel()" title="Manage shared links" aria-label="Manage shared links">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                            <path d="M5.75 7.5a.75.75 0 0 1 .75.75v.5a.75.75 0 0 1-1.5 0v-.5a.75.75 0 0 1 .75-.75Zm0 3a.75.75 0 0 1 .75.75v.5a.75.75 0 0 1-1.5 0v-.5a.75.75 0 0 1 .75-.75ZM2 1.75C2 .784 2.784 0 3.75 0h8.5C13.216 0 14 .784 14 1.75v12.5A1.75 1.75 0 0 1 12.25 16h-8.5A1.75 1.75 0 0 1 2 14.25Zm1.75-.25a.25.25 0 0 0-.25.25v12.5c0 .138.112.25.25.25h8.5a.25.25 0 0 0 .25-.25V1.75a.25.25 0 0 0-.25-.25ZM5 4.75A.75.75 0 0 1 5.75 4h4.5a.75.75 0 0 1 0 1.5h-4.5A.75.75 0 0 1 5 4.75Zm3 3.5A.75.75 0 0 1 8.75 7.5h1.5a.75.75 0 0 1 0 1.5h-1.5A.75.75 0 0 1 8 8.25Zm0 3a.75.75 0 0 1 .75-.75h1.5a.75.75 0 0 1 0 1.5h-1.5a.75.75 0 0 1-.75-.75Z"/>
                         </svg>
                     </button>
                     <button id="theme-toggle" onclick="toggleTheme()" title="Toggle dark mode">
@@ -1923,6 +2195,13 @@
                             <path d="M8 12a4 4 0 1 1 0-8 4 4 0 0 1 0 8Zm0-1.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Zm5.657-8.157a.75.75 0 0 1 0 1.061l-1.061 1.06a.749.749 0 0 1-1.275-.326.749.749 0 0 1 .215-.734l1.06-1.06a.75.75 0 0 1 1.06 0Zm-9.193 9.193a.75.75 0 0 1 0 1.06l-1.06 1.061a.75.75 0 1 1-1.061-1.06l1.06-1.061a.75.75 0 0 1 1.061 0ZM8 0a.75.75 0 0 1 .75.75v1.5a.75.75 0 0 1-1.5 0V.75A.75.75 0 0 1 8 0ZM3 8a.75.75 0 0 1-.75.75H.75a.75.75 0 0 1 0-1.5h1.5A.75.75 0 0 1 3 8Zm13 0a.75.75 0 0 1-.75.75h-1.5a.75.75 0 0 1 0-1.5h1.5A.75.75 0 0 1 16 8Zm-8 5a.75.75 0 0 1 .75.75v1.5a.75.75 0 0 1-1.5 0v-1.5A.75.75 0 0 1 8 13ZM2.343 2.343a.75.75 0 0 1 1.061 0l1.06 1.061a.751.751 0 0 1-.018 1.042.751.751 0 0 1-1.042.018l-1.06-1.06a.75.75 0 0 1 0-1.06Zm9.193 9.193a.75.75 0 0 1 1.06 0l1.061 1.06a.75.75 0 0 1-1.06 1.061l-1.061-1.06a.75.75 0 0 1 0-1.061Z"/>
                         </svg>
                     </button>
+                    <form id="logout-form" class="owner-only" method="post" action="/logout">
+                        <button type="submit" class="header-btn" title="Log out" aria-label="Log out">
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                                <path d="M2 2.75C2 1.784 2.784 1 3.75 1h2.5a.75.75 0 0 1 0 1.5h-2.5a.25.25 0 0 0-.25.25v10.5c0 .138.112.25.25.25h2.5a.75.75 0 0 1 0 1.5h-2.5A1.75 1.75 0 0 1 2 13.25Zm10.44 4.5-1.97-1.97a.749.749 0 0 1 .326-1.275.749.749 0 0 1 .734.215l3.25 3.25a.75.75 0 0 1 0 1.06l-3.25 3.25a.749.749 0 0 1-1.275-.326.749.749 0 0 1 .215-.734l1.97-1.97H6.75a.75.75 0 0 1 0-1.5Z"/>
+                            </svg>
+                        </button>
+                    </form>
                 </div>
                 <div id="file-header-bar">
                     <div class="file-header-left"></div>
@@ -1964,6 +2243,77 @@
                             <div class="outline-empty">No headings found</div>
                         </div>
                     </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="share-overlay" class="rv-modal-overlay" onclick="if (event.target === this) closeShareDialog();">
+            <div class="rv-modal" role="dialog" aria-modal="true" aria-labelledby="share-title">
+                <div class="rv-modal-header">
+                    <span id="share-title">Share</span>
+                    <button type="button" class="rv-modal-close" onclick="closeShareDialog()" aria-label="Close">&times;</button>
+                </div>
+                <form id="share-form" class="rv-modal-body" onsubmit="event.preventDefault(); createShare();">
+                    <div class="share-target"><span class="share-target-kind"></span> <code class="share-target-path"></code></div>
+                    <label class="rv-field-label" for="share-password">Password</label>
+                    <div class="rv-input-row">
+                        <input id="share-password" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="No password" oninput="updateShareHint()" />
+                        <button type="button" class="rv-btn" onclick="regenerateSharePassword()" title="Generate a new password">New</button>
+                    </div>
+                    <div class="rv-hint" id="share-password-hint"></div>
+                    <label class="rv-field-label" for="share-expiry">Expires after</label>
+                    <div class="rv-input-row">
+                        <select id="share-expiry" onchange="updateShareExpiry()">
+                            <option value="3600">1 hour</option>
+                            <option value="86400" selected>1 day</option>
+                            <option value="604800">7 days</option>
+                            <option value="2592000">30 days</option>
+                            <option value="0">Never</option>
+                            <option value="custom">Custom…</option>
+                        </select>
+                        <input id="share-custom-amount" type="number" min="1" step="1" value="3" hidden />
+                        <select id="share-custom-unit" hidden>
+                            <option value="3600">hours</option>
+                            <option value="86400" selected>days</option>
+                        </select>
+                    </div>
+                    <div class="rv-error" id="share-error" hidden></div>
+                    <div class="rv-modal-actions">
+                        <button type="button" class="rv-btn" onclick="closeShareDialog()">Cancel</button>
+                        <button type="submit" class="rv-btn rv-btn-primary" id="share-create-btn">Create link</button>
+                    </div>
+                </form>
+                <div id="share-result" class="rv-modal-body" hidden>
+                    <div class="share-target"><span class="share-target-kind"></span> <code class="share-target-path"></code></div>
+                    <label class="rv-field-label" for="share-result-url">Link</label>
+                    <div class="rv-input-row">
+                        <input id="share-result-url" type="text" readonly onfocus="this.select()" />
+                        <button type="button" class="rv-btn" onclick="copyField('share-result-url', this)">Copy</button>
+                    </div>
+                    <div id="share-result-password-block">
+                        <label class="rv-field-label" for="share-result-password">Password</label>
+                        <div class="rv-input-row">
+                            <input id="share-result-password" type="text" readonly onfocus="this.select()" />
+                            <button type="button" class="rv-btn" onclick="copyField('share-result-password', this)">Copy</button>
+                        </div>
+                    </div>
+                    <div class="rv-hint" id="share-result-note"></div>
+                    <div class="rv-modal-actions">
+                        <button type="button" class="rv-btn rv-btn-primary" onclick="closeShareDialog()">Done</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="shares-overlay" class="rv-modal-overlay" onclick="if (event.target === this) closeSharesPanel();">
+            <div class="rv-modal rv-modal-wide" role="dialog" aria-modal="true" aria-labelledby="shares-title">
+                <div class="rv-modal-header">
+                    <span id="shares-title">Shared links</span>
+                    <button type="button" class="rv-modal-close" onclick="closeSharesPanel()" aria-label="Close">&times;</button>
+                </div>
+                <div class="rv-modal-body">
+                    <div class="rv-error" id="shares-error" hidden></div>
+                    <div id="shares-list"></div>
                 </div>
             </div>
         </div>
@@ -2017,6 +2367,7 @@
             function updateMermaidTheme(theme) {
                 mermaid.initialize({
                     startOnLoad: false,
+                    securityLevel: 'strict',
                     theme: theme === 'dark' ? 'dark' : 'default'
                 });
                 var diagrams = document.querySelectorAll('.mermaid[data-processed="true"]');
@@ -2024,7 +2375,8 @@
                     var original = el.getAttribute('data-original');
                     if (original) {
                         el.removeAttribute('data-processed');
-                        el.innerHTML = original;
+                        // textContent: the source is untrusted text, never markup.
+                        el.textContent = original;
                     }
                 });
                 if (diagrams.length > 0) {
@@ -2046,6 +2398,42 @@
             })();
 
             var rootDirName = __ROOT_DIR_NAME_JS__;
+            // Server-injected config: {base, mode: "local"|"owner"|"share", file}.
+            var RV;
+            try {
+                RV = __RV_CONFIG_JS__;
+            } catch (e) {}
+            if (!RV || typeof RV !== "object") RV = {};
+            RV.base = RV.base || "";
+            RV.mode = RV.mode || "local";
+            RV.file = RV.file || null;
+            document.documentElement.classList.add("rv-mode-" + RV.mode);
+            if (RV.file) document.documentElement.classList.add("rv-file-share");
+
+            // Page URL for a path relative to the served root.
+            function pageURL(path) {
+                return RV.base + "/" + encodePath(path);
+            }
+
+            // Where to send the browser when the server says 401.
+            function redirectToLogin() {
+                if (redirectToLogin.done) return;
+                redirectToLogin.done = true;
+                if (RV.mode === "share") {
+                    location.href = RV.base + "/";
+                } else {
+                    location.href =
+                        "/login?next=" +
+                        encodeURIComponent(location.pathname + location.search);
+                }
+            }
+
+            // fetch() that redirects to the login/unlock page on 401.
+            async function rvFetch(url, opts) {
+                var res = await fetch(url, opts);
+                if (res.status === 401) redirectToLogin();
+                return res;
+            }
             /* ── SVG helpers ──────────────────────────────────────────── */
             const SVG = {
                 folderClosed:
@@ -2106,7 +2494,7 @@
 
             async function retryConnection() {
                 try {
-                    var res = await fetch("/api/tree?path=.");
+                    var res = await rvFetch(RV.base + "/api/tree?path=.");
                     if (res.ok) {
                         hideConnectionError();
                         treeCache = {};
@@ -2124,7 +2512,7 @@
             // Returns {ok, data, status, error} - distinguishes network vs HTTP errors
             async function apiFetch(url) {
                 try {
-                    var res = await fetch(url);
+                    var res = await rvFetch(url);
                     hideConnectionError();
                     if (!res.ok) {
                         var errorText = await res.text().catch(function () {
@@ -2160,7 +2548,8 @@
             };
 
             async function loadEditors() {
-                var result = await apiFetch("/api/editors");
+                if (RV.mode === "share") return;
+                var result = await apiFetch(RV.base + "/api/editors");
                 if (result.ok) {
                     availableEditors = result.data || [];
                 }
@@ -2280,8 +2669,8 @@
                 preferredEditor = editorId;
                 localStorage.setItem("preferredEditor", editorId);
 
-                var res = await fetch(
-                    "/api/open?path=" +
+                var res = await rvFetch(
+                    RV.base + "/api/open?path=" +
                         encodeURIComponent(currentFilePath) +
                         "&editor=" +
                         encodeURIComponent(editorId),
@@ -2328,7 +2717,7 @@
             async function fetchTree(path) {
                 if (treeCache[path]) return treeCache[path];
                 var result = await apiFetch(
-                    "/api/tree?path=" + encodeURIComponent(path),
+                    RV.base + "/api/tree?path=" + encodeURIComponent(path),
                 );
                 if (!result.ok) {
                     if (result.isNetworkError) throw new Error("Network error");
@@ -2499,7 +2888,7 @@
                 // Hide file header bar when navigating to a directory
                 hideFileHeaderBar();
                 if (getViewParam()) setViewParam(null);
-                var url = path ? "/" + encodePath(path) + "/" : "/";
+                var url = path ? pageURL(path) + "/" : RV.base + "/";
                 if (location.pathname !== url) {
                     history.pushState(null, "", url);
                 }
@@ -2532,7 +2921,7 @@
                     );
                 });
                 if (readme) {
-                    fetch("/api/file?path=" + encodeURIComponent(readme.path))
+                    rvFetch(RV.base + "/api/file?path=" + encodeURIComponent(readme.path))
                         .then(function (res) {
                             return res.json();
                         })
@@ -2554,7 +2943,7 @@
                                     container.querySelector(".markdown-body");
                                 if (mdBody) {
                                     addHeadingAnchors(mdBody);
-                                    rewriteMarkdownImages(mdBody, readme.path);
+                                    prepareMarkdown(mdBody, readme.path);
                                 }
                                 bindAnchorLinks(container);
                             }
@@ -2617,13 +3006,47 @@
             }
 
             /* ── File loading ─────────────────────────────────────────── */
+            // A link URL that would run script when followed. URL parsing
+            // normalises case, whitespace and control characters the way the
+            // browser does, so obfuscations like "java\tscript:" are caught.
+            function isScriptURL(href) {
+                try {
+                    var protocol = new URL(href, location.href).protocol;
+                    return protocol === "javascript:" || protocol === "vbscript:" || protocol === "data:";
+                } catch (e) {
+                    return true;
+                }
+            }
+
+            function stripScriptLinks(container) {
+                container.querySelectorAll("a[href]").forEach(function (a) {
+                    if (isScriptURL(a.getAttribute("href"))) a.removeAttribute("href");
+                });
+            }
+
+            // Post-process server-rendered markdown before it is shown.
+            function prepareMarkdown(container, filePath) {
+                stripScriptLinks(container);
+                rewriteMarkdownImages(container, filePath);
+            }
+
             function rewriteMarkdownImages(container, filePath) {
+                // In a share the shared item is the visitor's root, so
+                // root-relative links ("/foo.md") resolve under RV.base.
+                if (RV.base) {
+                    container.querySelectorAll("a[href]").forEach(function (a) {
+                        var href = a.getAttribute("href");
+                        if (/^\/(?![\/\\])/.test(href) && href.indexOf(RV.base + "/") !== 0) {
+                            a.setAttribute("href", RV.base + href);
+                        }
+                    });
+                }
                 var dir = filePath.split("/").slice(0, -1).join("/");
                 container.querySelectorAll("img").forEach(function (img) {
                     var src = img.getAttribute("src");
                     if (!src) return;
                     // Skip absolute URLs (http://, https://, data:, /api/)
-                    if (/^https?:\/\/|^data:|^\/api\//.test(src)) return;
+                    if (/^https?:\/\/|^data:|^\/api\/|^\/_raw\//.test(src) || (RV.base && (src.indexOf(RV.base + "/api/") === 0 || src.indexOf(RV.base + "/_raw/") === 0))) return;
                     var resolved;
                     if (src.startsWith("/")) {
                         // Root-relative: strip leading slash
@@ -2719,7 +3142,7 @@
 
                 // Ensure file list is loaded for resolution
                 if (!allFiles) {
-                    apiFetch('/api/files').then(function(result) {
+                    apiFetch(RV.base + '/api/files').then(function(result) {
                         if (result.ok) {
                             allFiles = result.data;
                             wikiLinkIndex = null;
@@ -2761,7 +3184,7 @@
                     var resolved = resolveWikiTarget(target, currentDir);
 
                     if (resolved) {
-                        link.href = '/' + resolved + (headingSlug ? '#' + headingSlug : '');
+                        link.href = pageURL(resolved) + (headingSlug ? '#' + headingSlug : '');
                         link.classList.add('wiki-link-valid');
                         link.onclick = async function(e) {
                             e.preventDefault();
@@ -3105,6 +3528,8 @@
                     mammothPromise = new Promise(function (resolve, reject) {
                         var s = document.createElement("script");
                         s.src = "https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js";
+                        s.integrity = "sha384-/cXAMbzovUIKbBERjPmR3SnPTh8siWr5lsvFYj1Uq4XP0yaJUZJmsh0YXyGv5P0y";
+                        s.crossOrigin = "anonymous";
                         s.onload = function () { resolve(window.mammoth); };
                         s.onerror = function () {
                             mammothPromise = null;
@@ -3123,7 +3548,7 @@
                 area.innerHTML = '<div class="markdown-body word-doc"><div class="word-doc-status">Loading document…</div></div>';
                 try {
                     var [resp, mammoth] = await Promise.all([
-                        fetch(rawURL),
+                        rvFetch(rawURL),
                         loadMammoth(),
                     ]);
                     if (!resp.ok) throw new Error((await resp.text()).trim() || resp.statusText);
@@ -3134,7 +3559,7 @@
                     tmp.innerHTML = result.value;
                     tmp.querySelectorAll("a[href]").forEach(function (a) {
                         var href = a.getAttribute("href").trim();
-                        if (/^(javascript|data|vbscript):/i.test(href)) a.removeAttribute("href");
+                        if (isScriptURL(href)) a.removeAttribute("href");
                         else if (!href.startsWith("#")) { a.target = "_blank"; a.rel = "noopener noreferrer"; }
                     });
                     var body = area.querySelector(".word-doc");
@@ -3176,7 +3601,7 @@
                 }
 
                 var result = await apiFetch(
-                    "/api/file?path=" + encodeURIComponent(path),
+                    RV.base + "/api/file?path=" + encodeURIComponent(path),
                 );
                 if (!result.ok) {
                     var area = document.getElementById("content-area");
@@ -3235,6 +3660,20 @@
                     return;
                 }
 
+                if (data.isTooLarge) {
+                    // The server doesn't render files over 2 MB; offer the raw file.
+                    if (getViewParam()) setViewParam(null);
+                    var largeURL = rawURLFor(path);
+                    area.innerHTML =
+                        '<div class="binary-info"><div class="binary-filename">' + esc(data.name) + "</div>" +
+                        '<div class="binary-meta"><span>' + esc(formatFileSize(data.size)) + "</span></div>" +
+                        "<p>Too large to preview (over 2 MB)</p>" +
+                        '<a class="binary-download" href="' + escAttr(largeURL) + '" download="' + escAttr(data.name) + '">Download</a></div>';
+                    showFileHeaderBar(null, "<span>" + esc(formatFileSize(data.size)) + "</span>");
+                    wsWatch(path);
+                    document.title = path.split("/").pop() + " - RepoView";
+                    return;
+                }
                 if (data.isBinary) {
                     // Strip ?view param for binary files
                     if (getViewParam()) setViewParam(null);
@@ -3381,10 +3820,15 @@
                             data.content +
                             "</div>";
                     } else {
+                        // As an <img>, an SVG's scripts and event handlers
+                        // never run; inlined via innerHTML they would run
+                        // with the viewer's session.
                         previewHTML =
-                            '<div class="svg-preview">' +
-                            data.rawSVG +
-                            "</div>";
+                            '<div class="svg-preview"><img alt="' +
+                            escAttr(data.name) +
+                            '" src="' +
+                            escAttr(rawURLFor(path)) +
+                            '"></div>';
                     }
                     codeHTML =
                         '<div class="source-code">' +
@@ -3400,7 +3844,7 @@
                             var mdBody = area.querySelector(".markdown-body");
                             if (mdBody) {
                                 addHeadingAnchors(mdBody);
-                                rewriteMarkdownImages(mdBody, path);
+                                prepareMarkdown(mdBody, path);
                                 resolveWikiLinks(mdBody, path);
                                 wrapCollapsibleSections(mdBody, currentFilePath);
                                 loadBacklinks(path, area);
@@ -3623,7 +4067,7 @@
             /* ── Breadcrumb ───────────────────────────────────────────── */
             function updateBreadcrumb(path) {
                 var bc = document.getElementById("breadcrumb-path");
-                if (!path) {
+                if (!path || RV.file) {
                     bc.innerHTML = "";
                     return;
                 }
@@ -3733,7 +4177,7 @@
 
             async function ensureAllFiles() {
                 if (allFiles) return true;
-                var result = await apiFetch("/api/files");
+                var result = await apiFetch(RV.base + "/api/files");
                 if (!result.ok) {
                     if (!result.isNetworkError) {
                         // API error - just close search, don't show connection banner
@@ -3825,7 +4269,7 @@
                     return;
                 }
                 contentSearchTimer = setTimeout(async function () {
-                    var result = await apiFetch("/api/search?q=" + encodeURIComponent(q));
+                    var result = await apiFetch(RV.base + "/api/search?q=" + encodeURIComponent(q));
                     // Ignore stale responses and results for a closed modal.
                     if (seq !== contentSearchSeq || searchMode !== "content") return;
                     if (!result.ok) {
@@ -3901,7 +4345,7 @@
             // listing notes that link to it. Hidden when there are none.
             async function loadBacklinks(path, area) {
                 var seq = ++backlinksSeq;
-                var result = await apiFetch("/api/backlinks?path=" + encodeURIComponent(path));
+                var result = await apiFetch(RV.base + "/api/backlinks?path=" + encodeURIComponent(path));
                 // Drop stale responses (navigated away or switched to Code view).
                 if (seq !== backlinksSeq || currentFilePath !== path || !result.ok) return;
                 if (!area.querySelector(".markdown-body")) return;
@@ -3919,7 +4363,7 @@
                     var dir = slash >= 0 ? b.path.substring(0, slash + 1) : "";
                     var name = b.path.substring(slash + 1).replace(/\.(md|markdown)$/i, "");
                     html +=
-                        '<a class="backlink-item" href="/' + escAttr(b.path) + '" data-path="' + escAttr(b.path) + '">' +
+                        '<a class="backlink-item" href="' + escAttr(pageURL(b.path)) + '" data-path="' + escAttr(b.path) + '">' +
                         '<div class="bl-head"><span class="sr-icon">' + getFileIcon(b.path) + "</span>" +
                         '<span><span class="bl-dir">' + esc(dir) + '</span><span class="bl-name">' + esc(name) + "</span></span></div>";
                     for (var j = 0; j < b.snippets.length; j++) {
@@ -3962,7 +4406,7 @@
                     } catch (err) {
                         p = u.pathname;
                     }
-                    if (u.origin !== location.origin || p !== "/" + target) continue;
+                    if (u.origin !== location.origin || p !== RV.base + "/" + target) continue;
                     expandSectionForElement(a);
                     a.classList.add("backlink-hit");
                     a.scrollIntoView({ block: "center" });
@@ -4218,7 +4662,7 @@
             var wsRetryCount = 0;
             function connectWS() {
                 var proto = location.protocol === "https:" ? "wss:" : "ws:";
-                ws = new WebSocket(proto + "//" + location.host + "/ws");
+                ws = new WebSocket(proto + "//" + location.host + RV.base + "/ws");
                 ws.onopen = function () {
                     wsRetryCount = 0;
                     hideConnectionError();
@@ -4468,7 +4912,7 @@
                     '<div class="jsonl-loading">Loading...</div>';
 
                 var url =
-                    "/api/jsonl?path=" +
+                    RV.base + "/api/jsonl?path=" +
                     encodeURIComponent(jsonlState.path) +
                     "&page=" +
                     jsonlState.page +
@@ -4830,8 +5274,291 @@
                 return mon[d.getMonth()] + " " + d.getDate() + ", " + d.getFullYear();
             }
 
+            /* ── Sharing (owner mode) ─────────────────────────────────── */
+            var sharePath = ".";
+            var shareIsDir = true;
+
+            function randomSharePassword() {
+                // No 0/O, 1/l/I: easy to read aloud or retype.
+                var alphabet = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ23456789";
+                var limit = 256 - (256 % alphabet.length);
+                var out = "";
+                while (out.length < 16) {
+                    var bytes = new Uint8Array(32);
+                    crypto.getRandomValues(bytes);
+                    for (var i = 0; i < bytes.length && out.length < 16; i++) {
+                        if (bytes[i] < limit) out += alphabet[bytes[i] % alphabet.length];
+                    }
+                }
+                return out;
+            }
+
+            function regenerateSharePassword() {
+                document.getElementById("share-password").value = randomSharePassword();
+                updateShareHint();
+            }
+
+            function updateShareHint() {
+                var hint = document.getElementById("share-password-hint");
+                if (document.getElementById("share-password").value) {
+                    hint.textContent = "Viewers need this password to open the link.";
+                    hint.classList.remove("rv-warn");
+                } else {
+                    hint.textContent = "No password: anyone with the link can view.";
+                    hint.classList.add("rv-warn");
+                }
+            }
+
+            function updateShareExpiry() {
+                var custom = document.getElementById("share-expiry").value === "custom";
+                document.getElementById("share-custom-amount").hidden = !custom;
+                document.getElementById("share-custom-unit").hidden = !custom;
+            }
+
+            // Selected expiry in seconds (0 = never), or null if the custom value is invalid.
+            function shareExpirySeconds() {
+                var v = document.getElementById("share-expiry").value;
+                if (v !== "custom") return parseInt(v, 10);
+                var n = parseFloat(document.getElementById("share-custom-amount").value);
+                if (!(n > 0)) return null;
+                var unit = parseInt(document.getElementById("share-custom-unit").value, 10);
+                return Math.round(n * unit);
+            }
+
+            function sharePathLabel(path) {
+                return !path || path === "." ? rootDirName + " (everything)" : path;
+            }
+
+            function setShareTarget(container) {
+                container.querySelectorAll(".share-target-kind").forEach(function (el) {
+                    el.textContent = shareIsDir ? "Folder" : "File";
+                });
+                container.querySelectorAll(".share-target-path").forEach(function (el) {
+                    el.textContent = sharePathLabel(sharePath);
+                });
+            }
+
+            function openShareDialog() {
+                if (RV.mode !== "owner") return;
+                sharePath = currentFilePath || currentPath || ".";
+                shareIsDir = !currentFilePath;
+                var overlay = document.getElementById("share-overlay");
+                setShareTarget(overlay);
+                document.getElementById("share-form").hidden = false;
+                document.getElementById("share-result").hidden = true;
+                showModalError("share-error", "");
+                document.getElementById("share-expiry").value = "86400";
+                updateShareExpiry();
+                regenerateSharePassword();
+                var btn = document.getElementById("share-create-btn");
+                btn.disabled = false;
+                btn.textContent = "Create link";
+                overlay.classList.add("open");
+                document.getElementById("share-password").focus();
+            }
+
+            function closeShareDialog() {
+                document.getElementById("share-overlay").classList.remove("open");
+            }
+
+            function showModalError(id, msg) {
+                var el = document.getElementById(id);
+                el.textContent = msg || "";
+                el.hidden = !msg;
+            }
+
+            async function responseError(res) {
+                var text = (await res.text().catch(function () { return ""; })).trim();
+                return new Error(text || res.status + " " + res.statusText);
+            }
+
+            async function createShare() {
+                var expiresIn = shareExpirySeconds();
+                if (expiresIn === null) {
+                    showModalError("share-error", "Enter a custom expiry greater than zero.");
+                    return;
+                }
+                var password = document.getElementById("share-password").value;
+                var btn = document.getElementById("share-create-btn");
+                btn.disabled = true;
+                btn.textContent = "Creating…";
+                showModalError("share-error", "");
+                try {
+                    var res = await rvFetch(RV.base + "/api/shares", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ path: sharePath, password: password, expiresIn: expiresIn }),
+                    });
+                    if (!res.ok) throw await responseError(res);
+                    var share = await res.json();
+                    document.getElementById("share-result-url").value = location.origin + share.url;
+                    document.getElementById("share-result-password").value = password;
+                    document.getElementById("share-result-password-block").hidden = !password;
+                    var note = share.expiresAt
+                        ? "Expires " + formatRelativeTime(share.expiresAt) + "."
+                        : "Never expires.";
+                    note += password
+                        ? " Copy the password now: it can't be shown again."
+                        : " Anyone with the link can view.";
+                    document.getElementById("share-result-note").textContent = note;
+                    setShareTarget(document.getElementById("share-result"));
+                    document.getElementById("share-form").hidden = true;
+                    document.getElementById("share-result").hidden = false;
+                    document.getElementById("share-result-url").focus();
+                } catch (err) {
+                    showModalError("share-error", err.message || String(err));
+                } finally {
+                    btn.disabled = false;
+                    btn.textContent = "Create link";
+                }
+            }
+
+            async function copyText(text) {
+                try {
+                    await navigator.clipboard.writeText(text);
+                    return true;
+                } catch (e) {
+                    // The Clipboard API needs a secure context; fall back to execCommand.
+                    var ta = document.createElement("textarea");
+                    ta.value = text;
+                    ta.style.position = "fixed";
+                    ta.style.opacity = "0";
+                    document.body.appendChild(ta);
+                    ta.select();
+                    var ok = false;
+                    try {
+                        ok = document.execCommand("copy");
+                    } catch (e2) {}
+                    ta.remove();
+                    return ok;
+                }
+            }
+
+            async function copyWithFeedback(text, btn) {
+                var ok = await copyText(text);
+                var label = btn.dataset.label || btn.textContent;
+                btn.dataset.label = label;
+                btn.textContent = ok ? "Copied" : "Copy failed";
+                clearTimeout(btn._copyTimer);
+                btn._copyTimer = setTimeout(function () {
+                    btn.textContent = label;
+                }, 1500);
+            }
+
+            function copyField(id, btn) {
+                copyWithFeedback(document.getElementById(id).value, btn);
+            }
+
+            // "in 3 days" / "5 minutes ago"
+            function formatRelativeTime(iso) {
+                var t = Date.parse(iso);
+                if (isNaN(t)) return String(iso);
+                var diff = t - Date.now();
+                var abs = Math.abs(diff);
+                var units = [
+                    ["year", 365 * 86400000],
+                    ["month", 30 * 86400000],
+                    ["day", 86400000],
+                    ["hour", 3600000],
+                    ["minute", 60000],
+                ];
+                var str = "less than a minute";
+                for (var i = 0; i < units.length; i++) {
+                    if (abs >= units[i][1]) {
+                        var n = Math.round(abs / units[i][1]);
+                        str = n + " " + units[i][0] + (n === 1 ? "" : "s");
+                        break;
+                    }
+                }
+                return diff >= 0 ? "in " + str : str + " ago";
+            }
+
+            function openSharesPanel() {
+                if (RV.mode !== "owner") return;
+                document.getElementById("shares-overlay").classList.add("open");
+                loadShares();
+            }
+
+            function closeSharesPanel() {
+                document.getElementById("shares-overlay").classList.remove("open");
+            }
+
+            async function loadShares() {
+                var list = document.getElementById("shares-list");
+                showModalError("shares-error", "");
+                var result = await apiFetch(RV.base + "/api/shares");
+                if (!result.ok) {
+                    list.innerHTML = "";
+                    showModalError(
+                        "shares-error",
+                        result.isNetworkError ? "Network error" : (result.error || "").trim() || "Error " + result.status,
+                    );
+                    return;
+                }
+                var shares = (result.data && result.data.shares) || [];
+                if (!shares.length) {
+                    list.innerHTML = '<div class="shares-empty">No shared links yet.</div>';
+                    return;
+                }
+                list.innerHTML = "";
+                shares.forEach(function (sh) {
+                    var row = document.createElement("div");
+                    row.className = "share-row" + (sh.expired ? " expired" : "");
+                    row.dataset.id = sh.id;
+                    var expiry = sh.expired
+                        ? "expired"
+                        : sh.expiresAt
+                          ? "expires " + formatRelativeTime(sh.expiresAt)
+                          : "never expires";
+                    row.innerHTML =
+                        '<div class="share-row-main">' +
+                        '<div class="share-row-path">' + (sh.isDir ? "Folder " : "File ") +
+                        "<code>" + esc(sharePathLabel(sh.path)) + "</code></div>" +
+                        '<div class="share-row-meta">' +
+                        (sh.hasPassword ? "Password" : "No password") +
+                        ' · <span class="share-row-expiry">' + esc(expiry) + "</span>" +
+                        (sh.createdAt ? " · created " + esc(formatRelativeTime(sh.createdAt)) : "") +
+                        "</div></div>" +
+                        '<div class="share-row-actions">' +
+                        '<button type="button" class="rv-btn share-copy-btn">Copy link</button>' +
+                        '<button type="button" class="rv-btn rv-btn-danger share-revoke-btn">Revoke</button>' +
+                        "</div>";
+                    row.querySelector(".share-copy-btn").onclick = function () {
+                        copyWithFeedback(location.origin + sh.url, this);
+                    };
+                    row.querySelector(".share-revoke-btn").onclick = function () {
+                        revokeShare(sh, this);
+                    };
+                    list.appendChild(row);
+                });
+            }
+
+            async function revokeShare(sh, btn) {
+                if (!confirm("Revoke the link to " + sharePathLabel(sh.path) + "? It stops working immediately.")) return;
+                btn.disabled = true;
+                try {
+                    var res = await rvFetch(RV.base + "/api/shares?id=" + encodeURIComponent(sh.id), {
+                        method: "DELETE",
+                    });
+                    if (!res.ok) throw await responseError(res);
+                } catch (err) {
+                    showModalError("shares-error", err.message || String(err));
+                    btn.disabled = false;
+                    return;
+                }
+                loadShares();
+            }
+
             /* ── Keyboard shortcut ────────────────────────────────────── */
             document.addEventListener("keydown", function (e) {
+                var openModal = document.querySelector(".rv-modal-overlay.open");
+                if (openModal) {
+                    if (e.key === "Escape") {
+                        e.preventDefault();
+                        openModal.classList.remove("open");
+                    }
+                    return;
+                }
                 // Cmd/Ctrl+\: toggle sidebar (works everywhere, even in inputs)
                 if (
                     e.key === "\\" &&
@@ -4845,7 +5572,8 @@
                 }
                 if (
                     e.target.tagName === "INPUT" ||
-                    e.target.tagName === "TEXTAREA"
+                    e.target.tagName === "TEXTAREA" ||
+                    e.target.tagName === "SELECT"
                 )
                     return;
                 if (e.key === "t" && !e.ctrlKey && !e.metaKey && !e.altKey) {
@@ -4937,11 +5665,11 @@
             // Path-based raw URL: relative URLs inside a served HTML file
             // resolve against the file's own folder.
             function rawURLFor(path) {
-                return "/_raw/" + encodePath(path);
+                return RV.base + "/_raw/" + encodePath(path);
             }
 
             function pushURL(path) {
-                var url = path ? "/" + encodePath(path) : "/";
+                var url = path ? pageURL(path) : RV.base + "/";
                 if (location.pathname !== url) {
                     history.pushState(null, "", url);
                 }
@@ -4953,7 +5681,12 @@
             }
 
             function navigateFromURL(skipPush) {
-                var raw = location.pathname.replace(/^\//, "");
+                var pathname = location.pathname;
+                if (RV.base && pathname.indexOf(RV.base) === 0) {
+                    pathname = pathname.slice(RV.base.length);
+                }
+                var raw = pathname.replace(/^\//, "");
+                if (!raw && RV.file) raw = encodePath(RV.file);
                 if (!raw) return false;
                 var path = decodeURIComponent(raw).replace(/\/$/, "");
                 if (isFilePath(path)) {
