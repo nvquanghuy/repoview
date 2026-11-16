@@ -840,3 +840,45 @@ test.describe("PWA (Add to Home Screen)", () => {
     await expect(page.locator("#content-area")).toContainText("Hello");
   });
 });
+
+test.describe("Desktop sidebar toggle", () => {
+  test("menu button collapses and expands the sidebar", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.goto("/");
+    const sidebar = page.locator("#sidebar");
+    await expect(page.locator("#menu-toggle")).toBeVisible();
+    await page.locator("#menu-toggle").click();
+    await expect(sidebar).toHaveClass(/collapsed/);
+    await expect.poll(() => sidebar.evaluate((el) => el.getBoundingClientRect().width)).toBe(0);
+    await page.locator("#menu-toggle").click();
+    await expect(sidebar).not.toHaveClass(/collapsed/);
+    await expect.poll(() => sidebar.evaluate((el) => el.getBoundingClientRect().width)).toBeGreaterThan(100);
+  });
+
+  test("Cmd/Ctrl+Backslash toggles, works in inputs, and persists", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.goto("/");
+    const sidebar = page.locator("#sidebar");
+    await page.keyboard.press("Meta+Backslash");
+    await expect(sidebar).toHaveClass(/collapsed/);
+    await page.reload();
+    await expect(sidebar).toHaveClass(/collapsed/);
+    // Works while typing in the search input
+    await page.keyboard.press("t");
+    await expect(page.locator("#search-input")).toBeFocused();
+    await page.keyboard.press("Control+Backslash");
+    await expect(sidebar).not.toHaveClass(/collapsed/);
+    await page.reload();
+    await expect(sidebar).not.toHaveClass(/collapsed/);
+  });
+
+  test("shortcut opens the drawer on narrow screens", async ({ page }) => {
+    await page.setViewportSize({ width: 600, height: 800 });
+    await page.goto("/");
+    await expect(page.locator("#tree-container .tree-item").first()).toBeAttached();
+    await expect(page.locator(".dir-listing-row").first()).toBeAttached();
+    await page.keyboard.press("Control+Backslash");
+    await expect(page.locator("#sidebar")).toHaveClass(/open/);
+    await expect(page.locator("#sidebar")).not.toHaveClass(/collapsed/);
+  });
+});

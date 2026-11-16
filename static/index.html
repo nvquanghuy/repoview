@@ -152,6 +152,22 @@
             #resize-handle.active {
                 background: var(--rv-resize-handle);
             }
+            /* Desktop: collapsible sidebar (toggle with ☰ or Cmd/Ctrl+\) */
+            @media (min-width: 769px) {
+                #sidebar.animating {
+                    transition:
+                        width 0.15s ease,
+                        min-width 0.15s ease;
+                }
+                #sidebar.collapsed {
+                    width: 0 !important;
+                    min-width: 0;
+                    border-right: none;
+                }
+                #sidebar.collapsed #resize-handle {
+                    display: none;
+                }
+            }
 
             #main {
                 flex: 1;
@@ -1657,7 +1673,9 @@
 
             /* ── Mobile Menu Toggle ───────────────────────────────────── */
             #menu-toggle {
-                display: none;
+                display: flex;
+                align-items: center;
+                justify-content: center;
                 background: none;
                 border: none;
                 padding: 8px;
@@ -1861,7 +1879,7 @@
             <div id="sidebar-overlay" onclick="closeSidebar()"></div>
             <div id="main">
                 <div id="breadcrumb-bar">
-                    <button id="menu-toggle" onclick="toggleSidebar()" title="Toggle sidebar">
+                    <button id="menu-toggle" onclick="toggleSidebar()" title="Toggle sidebar (⌘\)">
                         <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
                             <path d="M1 2.75A.75.75 0 0 1 1.75 2h12.5a.75.75 0 0 1 0 1.5H1.75A.75.75 0 0 1 1 2.75Zm0 5A.75.75 0 0 1 1.75 7h12.5a.75.75 0 0 1 0 1.5H1.75A.75.75 0 0 1 1 7.75ZM1.75 12h12.5a.75.75 0 0 1 0 1.5H1.75a.75.75 0 0 1 0-1.5Z"/>
                         </svg>
@@ -3556,8 +3574,41 @@
                 });
             }
 
-            /* ── Mobile Sidebar ───────────────────────────────────────── */
+            /* ── Sidebar toggle ───────────────────────────────────────── */
+            function isMobileLayout() {
+                return window.matchMedia("(max-width: 768px)").matches;
+            }
+
             function toggleSidebar() {
+                if (isMobileLayout()) {
+                    toggleMobileSidebar();
+                } else {
+                    toggleDesktopSidebar();
+                }
+            }
+
+            function toggleDesktopSidebar() {
+                var sidebar = document.getElementById("sidebar");
+                sidebar.classList.add("animating");
+                clearTimeout(toggleDesktopSidebar.timer);
+                toggleDesktopSidebar.timer = setTimeout(function () {
+                    sidebar.classList.remove("animating");
+                }, 200);
+                var collapsed = sidebar.classList.toggle("collapsed");
+                try {
+                    localStorage.setItem("sidebarCollapsed", collapsed ? "1" : "0");
+                } catch (e) {}
+            }
+
+            (function restoreSidebarState() {
+                try {
+                    if (localStorage.getItem("sidebarCollapsed") === "1") {
+                        document.getElementById("sidebar").classList.add("collapsed");
+                    }
+                } catch (e) {}
+            })();
+
+            function toggleMobileSidebar() {
                 var sidebar = document.getElementById("sidebar");
                 var overlay = document.getElementById("sidebar-overlay");
                 var isOpen = sidebar.classList.toggle("open");
@@ -4696,6 +4747,17 @@
 
             /* ── Keyboard shortcut ────────────────────────────────────── */
             document.addEventListener("keydown", function (e) {
+                // Cmd/Ctrl+\: toggle sidebar (works everywhere, even in inputs)
+                if (
+                    e.key === "\\" &&
+                    (e.metaKey || e.ctrlKey) &&
+                    !e.altKey &&
+                    !e.shiftKey
+                ) {
+                    e.preventDefault();
+                    toggleSidebar();
+                    return;
+                }
                 if (
                     e.target.tagName === "INPUT" ||
                     e.target.tagName === "TEXTAREA"
