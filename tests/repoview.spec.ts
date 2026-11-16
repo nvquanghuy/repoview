@@ -965,7 +965,7 @@ test.describe("Rendering safety", () => {
       }),
     );
     await page.goto("/huge.log");
-    await expect(page.locator("#content-area")).toContainText("Too large to preview");
+    await expect(page.locator("#content-area")).toContainText("Text file too large to preview");
     await expect(page.locator("#content-area .binary-download")).toHaveAttribute("href", "/_raw/huge.log");
   });
 
