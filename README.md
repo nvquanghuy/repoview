@@ -96,7 +96,7 @@ The update command downloads the latest release from GitHub, shows release notes
 
 ### Using on your phone (Add to Home Screen)
 
-RepoView can be installed as a home-screen web app (PWA), so a server on another machine becomes a notes viewer on your phone. Nothing is synced or stored on the device. RepoView has no authentication, so keep it on a private network. [Tailscale](https://tailscale.com) works well:
+RepoView can be installed as a home-screen web app (PWA), so a server on another machine becomes a notes viewer on your phone. Nothing is synced or stored on the device. Without a password RepoView has no authentication, so either keep it on a private network or turn on [password login](#public-access-and-sharing). [Tailscale](https://tailscale.com) works well:
 
 ```bash
 # on the server (e.g. a VPS syncing your notes from Dropbox)
@@ -104,6 +104,24 @@ repoview --host "$(tailscale ip -4)" --no-browser ~/Dropbox/notes
 ```
 
 On the iPhone (with Tailscale connected), open `http://<tailscale-ip>:7777` in Safari, then tap **Share → Add to Home Screen**. It launches full-screen with its own icon, named after the folder.
+
+### Public access and sharing
+
+To put RepoView on the internet, set an owner password and put it behind an HTTPS proxy such as [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/):
+
+```bash
+REPOVIEW_PASSWORD='a long passphrase' repoview --no-browser ~/notes
+cloudflared tunnel --url http://localhost:7777   # or a named tunnel with your hostname
+```
+
+- You sign in at `/login`; the session lasts 30 days. Use `REPOVIEW_PASSWORD_HASH` with a bcrypt hash instead of a plaintext password if you prefer (`htpasswd -nbBC 12 "" 'pw' | cut -d: -f2`). Changing the password signs every session out.
+- **Share** (on any file or folder, including the root) creates a link like `/s/quarterly-report-k3J9xQ…` with an optional password (a random one is suggested) and an expiry (1 hour to 30 days, a custom number of hours/days, or never). Copy the password when you create the share; it's stored hashed and can't be shown again.
+- People with the link see the normal viewer, limited to the shared file or folder: tree, search, backlinks, raw files and live reload all stay inside it, and dotfiles (`.env`, `.git/`) and symlinks pointing outside are hidden. "Open in editor" and share management are owner-only.
+- **Manage shares** lists your links and revokes them; revoking or expiry cuts off access immediately.
+- Five wrong passwords from one IP lock that IP out of that login (owner, or a given share) for 15 minutes.
+- Behind a proxy on the same machine, RepoView trusts `Cf-Connecting-IP`/`X-Forwarded-For` and `X-Forwarded-Proto` for rate limiting and `Secure` cookies. It ignores those headers from remote clients, so don't put a proxy on another machine in front of it.
+
+State lives in `~/.config/repoview/` (`$REPOVIEW_CONFIG_DIR` overrides it): `secret` (the session signing key) and `shares/<id>.json` (one file per served folder). Several RepoView instances can run at once: each serves on its own port and keeps its own shares and cookies, and instances serving the same folder share its links safely.
 
 ## API
 
@@ -116,6 +134,11 @@ On the iPhone (with Tailscale connected), open `http://<tailscale-ip>:7777` in S
 | `GET /api/manifest.webmanifest` | Web app manifest (enables "Add to Home Screen") |
 | `GET /api/backlinks?path=` | Markdown notes linking to `path`, most recently modified first, with up to 3 linking lines each. Counts wiki links (in Obsidian vaults) and relative/root-relative markdown links; ignores code blocks |
 | `WS /ws` | WebSocket for file change notifications |
+| `GET/POST /login`, `POST /logout` | Owner sign-in and sign-out (when a password is set) |
+| `GET /api/shares` | Owner: list share links |
+| `POST /api/shares` | Owner: create a share, JSON `{"path", "password", "expiresIn"}` (`expiresIn` in seconds, 0 = never) |
+| `DELETE /api/shares?id=` | Owner: revoke a share |
+| `/s/<slug>-<id>/…` | A share: password prompt, then the viewer and `api/*`/`ws` limited to the shared item |
 
 ## Development
 
@@ -145,6 +168,10 @@ This updates `CHANGELOG.md`, commits, tags, and pushes. GitHub Actions builds th
 
 ```
 main.go              # Server, API handlers, WebSocket hub, file watchers
+scope.go             # Per-request path scope (owner root or shared item)
+auth.go              # Login/sharing core: tokens, credentials, rate limiter, share ids
+gate.go, pages.go    # Routing, sessions, shares API, login and share-password pages
+sharestore.go        # Share and secret persistence
 static/index.html    # Single-page frontend (embedded at build time)
 static/index_test.html # Frontend test harness
 main_test.go         # Backend unit and integration tests
