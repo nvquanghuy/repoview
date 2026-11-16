@@ -931,3 +931,42 @@ test.describe("Desktop sidebar toggle", () => {
     await expect(page.locator("#sidebar")).not.toHaveClass(/collapsed/);
   });
 });
+
+test.describe("Rendering safety", () => {
+  // Serve a crafted markdown file without touching the fixtures.
+  async function serveMarkdown(page, html: string) {
+    await page.route("**/api/file?path=evil.md", (route) =>
+      route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({ name: "evil.md", path: "evil.md", isMarkdown: true, content: html, rawContent: "" }),
+      }),
+    );
+  }
+
+  test("mermaid source is never re-inserted as HTML on theme change", async ({ page }) => {
+    await serveMarkdown(
+      page,
+      '<pre><code class="language-mermaid">graph TD\n  A--&gt;B\n%% &lt;img src=x onerror="window.__pwned=1"&gt;</code></pre>',
+    );
+    await page.goto("/evil.md");
+    await expect(page.locator("#content-area .mermaid")).toHaveCount(1);
+    await page.locator("#theme-toggle").click();
+    await page.emulateMedia({ colorScheme: "dark" });
+    await page.waitForTimeout(500);
+    expect(await page.evaluate(() => (window as any).__pwned)).toBeUndefined();
+    await expect(page.locator("#content-area .mermaid img")).toHaveCount(0);
+  });
+
+  test("script URLs are stripped from rendered links", async ({ page }) => {
+    await serveMarkdown(
+      page,
+      '<p><a id="a1" href="javascript:window.__pwned=1">a</a> <a id="a2" href="java&#9;script:window.__pwned=2">b</a> ' +
+        '<a id="a3" href="VBScript:x">c</a> <a id="a4" href="data:text/html,x">d</a> <a id="ok" href="https://example.com/">ok</a></p>',
+    );
+    await page.goto("/evil.md");
+    await expect(page.locator("#content-area #ok")).toHaveAttribute("href", "https://example.com/");
+    for (const id of ["a1", "a2", "a3", "a4"]) {
+      await expect(page.locator(`#content-area #${id}`)).not.toHaveAttribute("href", /.*/);
+    }
+  });
+});

@@ -2117,10 +2117,14 @@
                 if (meta) meta.setAttribute('content', theme === 'dark' ? '#1e1e2e' : '#ffffff');
             }
         </script>
-        <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+        <!-- Pinned with SRI: third-party code runs with the viewer's session. -->
+        <script src="https://cdn.jsdelivr.net/npm/mermaid@11.17.2/dist/mermaid.min.js"
+                integrity="sha384-EOXBFmc3gx5mb+vn0vPvvGqACToJD24hhacX5Yx+8NUUQrHIle/Qi5Bg9o3zKwW2"
+                crossorigin="anonymous"></script>
         <script>
             mermaid.initialize({
                 startOnLoad: false,
+                securityLevel: 'strict',
                 theme: document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'default'
             });
         </script>
@@ -2363,6 +2367,7 @@
             function updateMermaidTheme(theme) {
                 mermaid.initialize({
                     startOnLoad: false,
+                    securityLevel: 'strict',
                     theme: theme === 'dark' ? 'dark' : 'default'
                 });
                 var diagrams = document.querySelectorAll('.mermaid[data-processed="true"]');
@@ -2370,7 +2375,8 @@
                     var original = el.getAttribute('data-original');
                     if (original) {
                         el.removeAttribute('data-processed');
-                        el.innerHTML = original;
+                        // textContent: the source is untrusted text, never markup.
+                        el.textContent = original;
                     }
                 });
                 if (diagrams.length > 0) {
@@ -2937,7 +2943,7 @@
                                     container.querySelector(".markdown-body");
                                 if (mdBody) {
                                     addHeadingAnchors(mdBody);
-                                    rewriteMarkdownImages(mdBody, readme.path);
+                                    prepareMarkdown(mdBody, readme.path);
                                 }
                                 bindAnchorLinks(container);
                             }
@@ -3000,6 +3006,30 @@
             }
 
             /* ── File loading ─────────────────────────────────────────── */
+            // A link URL that would run script when followed. URL parsing
+            // normalises case, whitespace and control characters the way the
+            // browser does, so obfuscations like "java\tscript:" are caught.
+            function isScriptURL(href) {
+                try {
+                    var protocol = new URL(href, location.href).protocol;
+                    return protocol === "javascript:" || protocol === "vbscript:" || protocol === "data:";
+                } catch (e) {
+                    return true;
+                }
+            }
+
+            function stripScriptLinks(container) {
+                container.querySelectorAll("a[href]").forEach(function (a) {
+                    if (isScriptURL(a.getAttribute("href"))) a.removeAttribute("href");
+                });
+            }
+
+            // Post-process server-rendered markdown before it is shown.
+            function prepareMarkdown(container, filePath) {
+                stripScriptLinks(container);
+                rewriteMarkdownImages(container, filePath);
+            }
+
             function rewriteMarkdownImages(container, filePath) {
                 // In a share the shared item is the visitor's root, so
                 // root-relative links ("/foo.md") resolve under RV.base.
@@ -3498,6 +3528,8 @@
                     mammothPromise = new Promise(function (resolve, reject) {
                         var s = document.createElement("script");
                         s.src = "https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js";
+                        s.integrity = "sha384-/cXAMbzovUIKbBERjPmR3SnPTh8siWr5lsvFYj1Uq4XP0yaJUZJmsh0YXyGv5P0y";
+                        s.crossOrigin = "anonymous";
                         s.onload = function () { resolve(window.mammoth); };
                         s.onerror = function () {
                             mammothPromise = null;
@@ -3527,7 +3559,7 @@
                     tmp.innerHTML = result.value;
                     tmp.querySelectorAll("a[href]").forEach(function (a) {
                         var href = a.getAttribute("href").trim();
-                        if (/^(javascript|data|vbscript):/i.test(href)) a.removeAttribute("href");
+                        if (isScriptURL(href)) a.removeAttribute("href");
                         else if (!href.startsWith("#")) { a.target = "_blank"; a.rel = "noopener noreferrer"; }
                     });
                     var body = area.querySelector(".word-doc");
@@ -3798,7 +3830,7 @@
                             var mdBody = area.querySelector(".markdown-body");
                             if (mdBody) {
                                 addHeadingAnchors(mdBody);
-                                rewriteMarkdownImages(mdBody, path);
+                                prepareMarkdown(mdBody, path);
                                 resolveWikiLinks(mdBody, path);
                                 wrapCollapsibleSections(mdBody, currentFilePath);
                                 loadBacklinks(path, area);

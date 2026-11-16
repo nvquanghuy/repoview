@@ -161,7 +161,7 @@ func (s *server) handler() http.Handler {
 	registerPWARoutes(app, rootName)
 	app.HandleFunc("/", index)
 	if !s.authEnabled() {
-		return s.withRootScope(app)
+		return localHeaders(s.withRootScope(app))
 	}
 	app.Handle("/api/shares", requireSameOrigin(http.HandlerFunc(s.handleShares)))
 
@@ -196,6 +196,16 @@ func securityHeaders(next http.Handler) http.Handler {
 		h.Set("Referrer-Policy", "same-origin")
 		h.Set("X-Frame-Options", "SAMEORIGIN")
 		h.Set("X-Robots-Tag", "noindex, nofollow")
+		next.ServeHTTP(w, r)
+	})
+}
+
+// localHeaders: the minimum that still matters without a password, e.g. on
+// a LAN (--host 0.0.0.0): no framing by other sites, no MIME sniffing.
+func localHeaders(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("X-Frame-Options", "SAMEORIGIN")
 		next.ServeHTTP(w, r)
 	})
 }

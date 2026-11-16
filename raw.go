@@ -27,9 +27,19 @@ func scriptableType(contentType string) bool {
 // a sandbox, so a script-bearing file never runs with this origin's cookies,
 // whatever it is named. Other types are left alone: PDF viewers refuse to
 // render inside a sandbox.
+//
+// A top-level navigation (Sec-Fetch-Dest: document) gets a sandbox without
+// scripts: shown full-page on our domain, a planted page could otherwise
+// draw a convincing fake login form. The in-app preview iframe keeps
+// scripts, still in an opaque origin.
 type sandboxWriter struct {
 	http.ResponseWriter
 	wroteHeader bool
+	topLevel    bool
+}
+
+func newSandboxWriter(w http.ResponseWriter, r *http.Request) *sandboxWriter {
+	return &sandboxWriter{ResponseWriter: w, topLevel: r.Header.Get("Sec-Fetch-Dest") == "document"}
 }
 
 func (w *sandboxWriter) WriteHeader(code int) {
@@ -38,7 +48,11 @@ func (w *sandboxWriter) WriteHeader(code int) {
 		h := w.Header()
 		h.Set("X-Content-Type-Options", "nosniff")
 		if scriptableType(h.Get("Content-Type")) {
-			h.Set("Content-Security-Policy", "sandbox allow-scripts")
+			if w.topLevel {
+				h.Set("Content-Security-Policy", "sandbox")
+			} else {
+				h.Set("Content-Security-Policy", "sandbox allow-scripts")
+			}
 		}
 	}
 	w.ResponseWriter.WriteHeader(code)

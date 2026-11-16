@@ -1,11 +1,11 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"html"
 	"html/template"
 	"net/http"
+	"strings"
 )
 
 // renderIndex fills the placeholders in the embedded index.html. Values are
@@ -21,10 +21,13 @@ func renderIndex(raw []byte, rootName string, cfg pageConfig) []byte {
 	}
 	jsCfg, _ := json.Marshal(map[string]any{"base": cfg.Base, "mode": cfg.Mode, "file": file})
 	jsName, _ := json.Marshal(rootName)
-	out := bytes.ReplaceAll(raw, []byte("__RV_CONFIG_JS__"), jsCfg)
-	out = bytes.ReplaceAll(out, []byte("__ROOT_DIR_NAME_JS__"), jsName)
-	out = bytes.ReplaceAll(out, []byte("__ROOT_DIR_NAME__"), []byte(html.EscapeString(rootName)))
-	return out
+	// One pass: inserted values are never rescanned, so a name containing a
+	// placeholder can't splice more values into the page.
+	return []byte(strings.NewReplacer(
+		"__RV_CONFIG_JS__", string(jsCfg),
+		"__ROOT_DIR_NAME_JS__", string(jsName),
+		"__ROOT_DIR_NAME__", html.EscapeString(rootName),
+	).Replace(string(raw)))
 }
 
 // pageData drives the small server-rendered pages (login, share password

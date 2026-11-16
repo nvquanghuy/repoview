@@ -530,6 +530,7 @@ func renderMarkdown(w io.Writer, data []byte) {
 	md := goldmark.New(
 		goldmark.WithExtensions(
 			extension.GFM,
+			safeAutoLinks{},
 		),
 		goldmark.WithParserOptions(
 			parser.WithAutoHeadingID(),
@@ -703,7 +704,7 @@ func serveRawFile(w http.ResponseWriter, r *http.Request, rel string) {
 	// ServeContent, not ServeFile: ServeFile redirects ".../index.html" to
 	// the directory, which would break previews of index.html files. The
 	// sandboxWriter sandboxes anything whose final type can run script.
-	http.ServeContent(&sandboxWriter{ResponseWriter: w}, r, info.Name(), info.ModTime(), f)
+	http.ServeContent(newSandboxWriter(w, r), r, info.Name(), info.ModTime(), f)
 }
 
 // realPathInRoot resolves symlinks in p and checks the result is still inside
