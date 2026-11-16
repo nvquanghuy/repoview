@@ -514,7 +514,7 @@ func TestShareVisit_PasswordFlowAndScope(t *testing.T) {
 	if r.code != http.StatusOK || !strings.Contains(r.body, `name="password"`) || strings.Contains(r.body, "nested.md") {
 		t.Fatalf("prompt: %d", r.code)
 	}
-	if r.header.Get("X-Robots-Tag") == "" || r.header.Get("Referrer-Policy") != "no-referrer" {
+	if r.header.Get("X-Robots-Tag") == "" || r.header.Get("Referrer-Policy") != "same-origin" {
 		t.Errorf("share pages must not be indexed or leak the link via Referer: %v", r.header)
 	}
 	if r := e.get(bob, sh.URL+"/api/tree"); r.code != http.StatusUnauthorized {

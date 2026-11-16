@@ -171,7 +171,10 @@ func securityHeaders(next http.Handler) http.Handler {
 		h := w.Header()
 		h.Set("Cache-Control", "no-store")
 		h.Set("X-Content-Type-Options", "nosniff")
-		h.Set("Referrer-Policy", "no-referrer")
+		// same-origin (not no-referrer): share URLs never leak to other sites,
+		// while our own form POSTs keep a real Origin header (no-referrer makes
+		// browsers send "Origin: null", which sameOrigin rightly refuses).
+		h.Set("Referrer-Policy", "same-origin")
 		h.Set("X-Frame-Options", "SAMEORIGIN")
 		h.Set("X-Robots-Tag", "noindex, nofollow")
 		next.ServeHTTP(w, r)
