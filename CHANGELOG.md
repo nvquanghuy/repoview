@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+
+## [v0.24.0] - 2026-11-16
+
 - [added] Share dialog: a one-click link for password shares (the password rides after `#k=` in the link, which browsers never send to the server, and is removed from the address bar once used), plus a "Copy link + password" button that copies both in one message
 
 
