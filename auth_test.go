@@ -192,6 +192,29 @@ func TestClientIP(t *testing.T) {
 	}
 }
 
+func TestClientIP_IgnoresXForwardedFor(t *testing.T) {
+	r := httptest.NewRequest("GET", "/", nil)
+	r.RemoteAddr = "127.0.0.1:5555"
+	r.Header.Set("X-Forwarded-For", "203.0.113.77")
+	if got := clientIP(r); got != "127.0.0.1" {
+		t.Fatalf("X-Forwarded-For must not be trusted (any local proxy could pass it through): %q", got)
+	}
+}
+
+func TestRateKey(t *testing.T) {
+	for in, want := range map[string]string{
+		"203.0.113.9":          "203.0.113.9",
+		"2001:db8:1:2:3:4:5:6": "2001:db8:1:2::/64",
+		"2001:db8:1:2:ffff::1": "2001:db8:1:2::/64",
+		"::ffff:203.0.113.9":   "203.0.113.9",
+		"not-an-ip":            "not-an-ip",
+	} {
+		if got := rateKey(in); got != want {
+			t.Errorf("rateKey(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
 func TestIsHTTPS(t *testing.T) {
 	r := httptest.NewRequest("GET", "/", nil)
 	r.RemoteAddr = "127.0.0.1:1"

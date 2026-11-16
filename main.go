@@ -887,6 +887,17 @@ func (h *hub) broadcast(msg []byte) {
 	}
 }
 
+// sweep disconnects clients whose share was revoked or expired.
+func (h *hub) sweep() {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	for c := range h.clients {
+		if c.alive != nil && !c.alive() {
+			c.conn.Close() // readPump then unregisters
+		}
+	}
+}
+
 // notifyFile sends a change notification for a path relative to rootDir.
 func (h *hub) notifyFile(relPath string) {
 	h.notifyAbs(filepath.Join(rootDir, filepath.FromSlash(relPath)))

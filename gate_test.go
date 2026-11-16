@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/cookiejar"
@@ -13,6 +14,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/gorilla/websocket"
 )
 
 // ── harness ─────────────────────────────────────────────────
@@ -369,6 +372,54 @@ func TestRaw_SniffedHTMLIsSandboxed(t *testing.T) {
 	os.WriteFile(filepath.Join(e.root, "doc.pdf"), []byte("%PDF-1.4\n"), 0o644)
 	if r := e.get(c, "/api/raw?path=doc.pdf"); r.header.Get("Content-Security-Policy") != "" {
 		t.Errorf("pdf got CSP %q", r.header.Get("Content-Security-Policy"))
+	}
+}
+
+// An attacker rotating client IPs still hits a per-target ceiling.
+func TestOwnerLogin_RotatingIPsHitTargetLimit(t *testing.T) {
+	e := newAuthEnv(t)
+	guess := func(i int, pw string) int {
+		return e.do(e.client(), "POST", "/login", strings.NewReader("password="+url.QueryEscape(pw)), map[string]string{
+			"Content-Type":     "application/x-www-form-urlencoded",
+			"Cf-Connecting-IP": fmt.Sprintf("198.51.%d.%d", i/250, i%250),
+		}).code
+	}
+	for i := 0; i < loginTargetMax; i++ {
+		if code := guess(i, "nope"); code != http.StatusUnauthorized {
+			t.Fatalf("guess %d: %d", i, code)
+		}
+	}
+	if code := guess(loginTargetMax, ownerPW); code != http.StatusTooManyRequests {
+		t.Fatalf("over the target ceiling: %d", code)
+	}
+	e.advance(loginLockout)
+	if code := guess(loginTargetMax+1, ownerPW); code != http.StatusSeeOther {
+		t.Fatalf("after the window: %d", code)
+	}
+}
+
+func TestShareWebsocket_ClosedAfterRevoke(t *testing.T) {
+	e := newAuthEnv(t)
+	owner := e.client()
+	e.login(owner)
+	sh := e.createShare(owner, "subdir", "", 0)
+
+	wsURL := "ws" + strings.TrimPrefix(e.srv.URL, "http") + sh.URL + "/ws"
+	conn, _, err := websocket.DefaultDialer.Dial(wsURL, http.Header{"Origin": {e.srv.URL}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	if _, _, err := websocket.DefaultDialer.Dial(wsURL, http.Header{"Origin": {"https://evil.example"}}); err == nil {
+		t.Fatal("cross-origin websocket accepted")
+	}
+
+	e.do(owner, "DELETE", "/api/shares?id="+sh.ID, nil, map[string]string{"Origin": e.srv.URL})
+	e.advance(shareCheckTTL)
+	e.app.hub.sweep()
+	conn.SetReadDeadline(time.Now().Add(2 * time.Second))
+	if _, _, err := conn.ReadMessage(); err == nil {
+		t.Fatal("websocket of a revoked share must be closed")
 	}
 }
 

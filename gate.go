@@ -20,6 +20,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/fsnotify/fsnotify"
@@ -28,6 +29,10 @@ import (
 const (
 	maxShareExpiry   = 10 * 365 * 24 * time.Hour
 	maxPasswordBytes = 72 // bcrypt's limit
+	// shareCheckTTL: how long a share's validity is cached for websockets,
+	// which otherwise re-read the store on every filesystem event.
+	shareCheckTTL = 2 * time.Second
+	sweepInterval = 30 * time.Second
 )
 
 type serverConfig struct {
@@ -42,8 +47,13 @@ type serverConfig struct {
 type server struct {
 	serverConfig
 	inst    string
-	limiter *limiter
-	index   []byte // raw embedded index.html
+	limiter *limiter      // per client and login target
+	targets *limiter      // per login target, all clients together
+	checks  chan struct{} // semaphore for concurrent bcrypt checks
+
+	validMu sync.Mutex
+	valid   map[string]validity // share id -> cached shareStillValid result
+	index   []byte              // raw embedded index.html
 	hub     *hub
 	api     *http.ServeMux // read-only API, shared by owner and share visitors
 	watcher *fsnotify.Watcher
@@ -104,6 +114,9 @@ func newServer(cfg serverConfig) *server {
 		serverConfig: cfg,
 		inst:         instanceID(cfg.root),
 		limiter:      newLimiter(loginMaxFailures, loginLockout),
+		targets:      newLimiter(loginTargetMax, loginLockout),
+		checks:       make(chan struct{}, maxConcurrentChecks),
+		valid:        map[string]validity{},
 		index:        index,
 		hub:          newHub(),
 		api:          apiHandler(),
@@ -116,10 +129,16 @@ func (s *server) serveWS(w http.ResponseWriter, r *http.Request, alive func() bo
 	handleWSScoped(w, r, s.hub, s.watcher, alive)
 }
 
-// watch starts delivering filesystem change events to websocket clients.
+// watch starts delivering filesystem change events to websocket clients and
+// periodically disconnects clients whose share was revoked or expired.
 func (s *server) watch(w *fsnotify.Watcher) {
 	s.watcher = w
 	go watchLoop(w, s.hub)
+	go func() {
+		for range time.Tick(sweepInterval) {
+			s.hub.sweep()
+		}
+	}()
 }
 
 // ── Routing ─────────────────────────────────────────────────
@@ -274,21 +293,35 @@ func clearCookie(w http.ResponseWriter, r *http.Request, name, cookiePath string
 		HttpOnly: true, Secure: isHTTPS(r), SameSite: http.SameSiteLaxMode})
 }
 
-// checkPassword runs a rate-limited password check and writes the failure
-// response itself; it returns true only on success.
-func (s *server) checkPassword(w http.ResponseWriter, r *http.Request, key string, check func(string) bool, page pageData) bool {
-	if wait, ok := s.limiter.attempt(key, s.now()); !ok {
+// checkPassword runs a rate-limited password check for one login target
+// ("owner" or "share|<id>") and writes the failure response itself; it
+// returns true only on success.
+func (s *server) checkPassword(w http.ResponseWriter, r *http.Request, target string, check func(string) bool, page pageData) bool {
+	now := s.now()
+	wait, ok := s.limiter.attempt(target+"|"+rateKey(clientIP(r)), now)
+	if ok {
+		wait, ok = s.targets.attempt(target, now)
+	}
+	if !ok {
 		w.Header().Set("Retry-After", strconv.Itoa(int(math.Ceil(wait.Seconds()))))
 		page.Error = fmt.Sprintf("Too many attempts. Try again in %d minutes.", int(math.Ceil(wait.Minutes())))
 		renderPage(w, http.StatusTooManyRequests, page)
 		return false
 	}
-	if !check(r.PostFormValue("password")) {
+	select {
+	case s.checks <- struct{}{}:
+	case <-r.Context().Done():
+		return false
+	}
+	good := check(r.PostFormValue("password"))
+	<-s.checks
+	if !good {
 		page.Error = "Incorrect password."
 		renderPage(w, http.StatusUnauthorized, page)
 		return false
 	}
-	s.limiter.succeed(key)
+	s.limiter.succeed(target + "|" + rateKey(clientIP(r)))
+	s.targets.succeed(target)
 	return true
 }
 
@@ -296,7 +329,7 @@ func (s *server) checkPassword(w http.ResponseWriter, r *http.Request, key strin
 
 func (s *server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	next := safeNext(r.FormValue("next"))
-	page := pageData{Title: "Sign in", Heading: "Sign in to " + filepath.Base(s.root), Action: "/login", Next: next, Button: "Sign in"}
+	page := pageData{Title: "Sign in", Heading: "Sign in to RepoView", Action: "/login", Next: next, Button: "Sign in"}
 	switch r.Method {
 	case http.MethodGet, http.MethodHead:
 		if s.ownerSession(r) {
@@ -309,7 +342,7 @@ func (s *server) handleLogin(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "cross-site request refused", http.StatusForbidden)
 			return
 		}
-		if !s.checkPassword(w, r, "owner|"+clientIP(r), s.owner.check, page) {
+		if !s.checkPassword(w, r, "owner", s.owner.check, page) {
 			return
 		}
 		s.setSession(w, r, ownerCookieName(s.inst), "/", claims{
@@ -421,9 +454,27 @@ func (s *server) lookupShare(w http.ResponseWriter, ref string) (Share, bool) {
 	return sh, true
 }
 
+type validity struct {
+	ok bool
+	at time.Time
+}
+
+// shareStillValid reports whether a share exists and is active, caching the
+// answer briefly (revocation takes effect within shareCheckTTL).
 func (s *server) shareStillValid(id string) bool {
+	now := s.now()
+	s.validMu.Lock()
+	if v, ok := s.valid[id]; ok && now.Sub(v.at) < shareCheckTTL {
+		s.validMu.Unlock()
+		return v.ok
+	}
+	s.validMu.Unlock()
 	sh, found, err := s.shares.get(id)
-	return err == nil && found && sh.active(s.now())
+	ok := err == nil && found && sh.active(now)
+	s.validMu.Lock()
+	s.valid[id] = validity{ok: ok, at: now}
+	s.validMu.Unlock()
+	return ok
 }
 
 func (s *server) shareLogin(w http.ResponseWriter, r *http.Request, sh Share, base, name string) {
@@ -431,7 +482,7 @@ func (s *server) shareLogin(w http.ResponseWriter, r *http.Request, sh Share, ba
 		http.Error(w, "cross-site request refused", http.StatusForbidden)
 		return
 	}
-	if !s.checkPassword(w, r, "share|"+sh.ID+"|"+clientIP(r), sh.checkPassword, sharePromptPage(base, name)) {
+	if !s.checkPassword(w, r, "share|"+sh.ID, sh.checkPassword, sharePromptPage(base, name)) {
 		return
 	}
 	s.setSession(w, r, shareCookieName(sh.ID), "/s/", claims{

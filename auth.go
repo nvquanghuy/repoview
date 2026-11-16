@@ -31,6 +31,11 @@ const (
 	loginMaxFailures  = 5
 	loginLockout      = 15 * time.Minute
 	limiterMaxEntries = 10_000
+	// loginTargetMax caps attempts against one login (the owner's, or one
+	// share's) from all clients together, so rotating IPs doesn't help.
+	loginTargetMax = 50
+	// maxConcurrentChecks bounds CPU spent on bcrypt by unauthenticated users.
+	maxConcurrentChecks = 4
 )
 
 // ── Session tokens ──────────────────────────────────────────
@@ -213,14 +218,13 @@ func fromLocalProxy(r *http.Request) bool {
 	return ip != nil && ip.IsLoopback()
 }
 
+// clientIP is the visitor's address: Cloudflare's Cf-Connecting-IP when the
+// request comes through a local tunnel, else the TCP peer. X-Forwarded-For is
+// deliberately ignored: other local proxies pass client-supplied values on.
 func clientIP(r *http.Request) string {
 	if fromLocalProxy(r) {
 		if ip := strings.TrimSpace(r.Header.Get("Cf-Connecting-IP")); ip != "" {
 			return ip
-		}
-		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-			first, _, _ := strings.Cut(xff, ",")
-			return strings.TrimSpace(first)
 		}
 	}
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
@@ -228,6 +232,19 @@ func clientIP(r *http.Request) string {
 		return r.RemoteAddr
 	}
 	return host
+}
+
+// rateKey groups addresses one client is likely to control: an IPv6 /64
+// counts as a single client, since anyone holding one can rotate through it.
+func rateKey(ip string) string {
+	parsed := net.ParseIP(ip)
+	if parsed == nil {
+		return ip
+	}
+	if v4 := parsed.To4(); v4 != nil {
+		return v4.String()
+	}
+	return (&net.IPNet{IP: parsed.Mask(net.CIDRMask(64, 128)), Mask: net.CIDRMask(64, 128)}).String()
 }
 
 func isHTTPS(r *http.Request) bool {
