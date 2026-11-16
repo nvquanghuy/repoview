@@ -1671,6 +1671,28 @@
                 border: none;
             }
 
+            /* ── Word Viewer ─────────────────────────────────────────── */
+            .word-doc table {
+                border-collapse: collapse;
+            }
+            .word-doc td,
+            .word-doc th {
+                border: 1px solid var(--rv-border);
+                padding: 6px 13px;
+            }
+            .word-doc td > p,
+            .word-doc th > p {
+                margin: 0;
+            }
+            .word-doc img {
+                max-width: 100%;
+                height: auto;
+            }
+            .word-doc-status {
+                color: var(--rv-text-secondary);
+                padding: 24px 0;
+            }
+
             /* ── Mobile Menu Toggle ───────────────────────────────────── */
             #menu-toggle {
                 display: flex;
@@ -2036,6 +2058,7 @@
                 fileJson: '<svg width="16" height="16" viewBox="0 0 16 16"><path fill="white" stroke="#cbcb41" stroke-width="0.75" d="M2 2.5A1.5 1.5 0 0 1 3.5 1h7l3.5 3.5V13.5A1.5 1.5 0 0 1 12.5 15h-9A1.5 1.5 0 0 1 2 13.5Z"/><path fill="#cbcb41" d="M10.5 1v3h3Z"/><rect x="1.75" y="6.5" width="12.5" height="4.5" fill="#cbcb41"/><text x="8" y="10.2" font-family="sans-serif" font-size="3.8" font-weight="bold" fill="white" text-anchor="middle">JSON</text><line x1="3.5" y1="12.5" x2="12.5" y2="12.5" stroke="#cbcb41" stroke-width="0.75" stroke-linecap="round"/><line x1="3.5" y1="13.8" x2="9" y2="13.8" stroke="#cbcb41" stroke-width="0.75" stroke-linecap="round"/></svg>',
                 fileYaml: '<svg width="16" height="16" viewBox="0 0 16 16"><path fill="white" stroke="#cb171e" stroke-width="0.75" d="M2 2.5A1.5 1.5 0 0 1 3.5 1h7l3.5 3.5V13.5A1.5 1.5 0 0 1 12.5 15h-9A1.5 1.5 0 0 1 2 13.5Z"/><path fill="#cb171e" d="M10.5 1v3h3Z"/><rect x="1.75" y="6.5" width="12.5" height="4.5" fill="#cb171e"/><text x="8" y="10.2" font-family="sans-serif" font-size="3.8" font-weight="bold" fill="white" text-anchor="middle">YML</text><line x1="3.5" y1="12.5" x2="12.5" y2="12.5" stroke="#cb171e" stroke-width="0.75" stroke-linecap="round"/><line x1="3.5" y1="13.8" x2="9" y2="13.8" stroke="#cb171e" stroke-width="0.75" stroke-linecap="round"/></svg>',
                 fileHtml: '<svg width="16" height="16" viewBox="0 0 16 16"><path fill="white" stroke="#e34c26" stroke-width="0.75" d="M2 2.5A1.5 1.5 0 0 1 3.5 1h7l3.5 3.5V13.5A1.5 1.5 0 0 1 12.5 15h-9A1.5 1.5 0 0 1 2 13.5Z"/><path fill="#e34c26" d="M10.5 1v3h3Z"/><rect x="1.75" y="6.5" width="12.5" height="4.5" fill="#e34c26"/><text x="8" y="10.2" font-family="sans-serif" font-size="3.8" font-weight="bold" fill="white" text-anchor="middle">HTML</text><line x1="3.5" y1="12.5" x2="12.5" y2="12.5" stroke="#e34c26" stroke-width="0.75" stroke-linecap="round"/><line x1="3.5" y1="13.8" x2="9" y2="13.8" stroke="#e34c26" stroke-width="0.75" stroke-linecap="round"/></svg>',
+                fileWord: '<svg width="16" height="16" viewBox="0 0 16 16"><path fill="white" stroke="#2b579a" stroke-width="0.75" d="M2 2.5A1.5 1.5 0 0 1 3.5 1h7l3.5 3.5V13.5A1.5 1.5 0 0 1 12.5 15h-9A1.5 1.5 0 0 1 2 13.5Z"/><path fill="#2b579a" d="M10.5 1v3h3Z"/><rect x="1.75" y="6.5" width="12.5" height="4.5" fill="#2b579a"/><text x="8" y="10.2" font-family="sans-serif" font-size="3.8" font-weight="bold" fill="white" text-anchor="middle">DOC</text><line x1="3.5" y1="12.5" x2="12.5" y2="12.5" stroke="#2b579a" stroke-width="0.75" stroke-linecap="round"/><line x1="3.5" y1="13.8" x2="9" y2="13.8" stroke="#2b579a" stroke-width="0.75" stroke-linecap="round"/></svg>',
                 caret: '<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M6.22 3.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042L9.94 8 6.22 4.28a.75.75 0 0 1 0-1.06Z"/></svg>',
                 collapseToggle: '<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M4.427 7.427l3.396 3.396a.25.25 0 00.354 0l3.396-3.396A.25.25 0 0011.396 7H4.604a.25.25 0 00-.177.427z"/></svg>',
             };
@@ -2044,6 +2067,7 @@
                 const ext = name.split('.').pop().toLowerCase();
                 if (ext === 'md' || ext === 'mdx' || ext === 'markdown') return SVG.fileMarkdown;
                 if (ext === 'pdf') return SVG.filePdf;
+                if (ext === 'docx') return SVG.fileWord;
                 if (ext === 'json') return SVG.fileJson;
                 if (ext === 'yml' || ext === 'yaml') return SVG.fileYaml;
                 if (ext === 'html' || ext === 'htm') return SVG.fileHtml;
@@ -3073,6 +3097,55 @@
                 area.innerHTML = '<div class="pdf-viewer"><embed src="' + escAttr(rawURL) + '" type="application/pdf"></div>';
             }
 
+            // ── Word Viewer (.docx, rendered client-side with mammoth.js) ──
+            var mammothPromise = null;
+            function loadMammoth() {
+                if (window.mammoth) return Promise.resolve(window.mammoth);
+                if (!mammothPromise) {
+                    mammothPromise = new Promise(function (resolve, reject) {
+                        var s = document.createElement("script");
+                        s.src = "https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js";
+                        s.onload = function () { resolve(window.mammoth); };
+                        s.onerror = function () {
+                            mammothPromise = null;
+                            reject(new Error("could not load the Word renderer (mammoth.js)"));
+                        };
+                        document.head.appendChild(s);
+                    });
+                }
+                return mammothPromise;
+            }
+
+            async function renderWord(path, data) {
+                var area = document.getElementById("content-area");
+                var rawURL = "/api/raw?path=" + encodeURIComponent(path);
+                var downloadHTML = '<a class="binary-download" href="' + escAttr(rawURL) + '" download="' + escAttr(data.name) + '">Download</a>';
+                area.innerHTML = '<div class="markdown-body word-doc"><div class="word-doc-status">Loading document…</div></div>';
+                try {
+                    var [resp, mammoth] = await Promise.all([
+                        fetch(rawURL),
+                        loadMammoth(),
+                    ]);
+                    if (!resp.ok) throw new Error((await resp.text()).trim() || resp.statusText);
+                    var buf = await resp.arrayBuffer();
+                    var result = await mammoth.convertToHtml({ arrayBuffer: buf });
+                    if (currentFilePath !== path) return;
+                    var tmp = document.createElement("div");
+                    tmp.innerHTML = result.value;
+                    tmp.querySelectorAll("a[href]").forEach(function (a) {
+                        var href = a.getAttribute("href").trim();
+                        if (/^(javascript|data|vbscript):/i.test(href)) a.removeAttribute("href");
+                        else if (!href.startsWith("#")) { a.target = "_blank"; a.rel = "noopener noreferrer"; }
+                    });
+                    var body = area.querySelector(".word-doc");
+                    body.innerHTML = tmp.innerHTML || '<p class="word-doc-status">This document is empty.</p>';
+                } catch (err) {
+                    if (currentFilePath !== path) return;
+                    area.innerHTML = '<div class="binary-info"><p>Cannot render this document: ' +
+                        esc(err.message || String(err)) + "</p>" + downloadHTML + "</div>";
+                }
+            }
+
             async function loadFile(path, skipPush) {
                 closeSidebar();
                 // Unwatch old file
@@ -3140,6 +3213,18 @@
                     refreshTree();
                     var filename = path.split("/").pop();
                     document.title = filename + " - RepoView";
+                    return;
+                }
+
+                // Handle Word documents
+                if (data.isWord) {
+                    if (getViewParam()) setViewParam(null);
+                    var sizeStr = formatFileSize(data.size);
+                    showFileHeaderBar(null, "<span>" + esc(sizeStr) + '</span><span class="sep">·</span><span>Word</span>');
+                    wsWatch(path);
+                    refreshTree();
+                    document.title = path.split("/").pop() + " - RepoView";
+                    await renderWord(path, data);
                     return;
                 }
 

@@ -282,6 +282,7 @@ type FileResponse struct {
 	IsPDF      bool   `json:"isPDF,omitempty"`
 	IsBinary   bool   `json:"isBinary,omitempty"`
 	IsJSONL    bool   `json:"isJSONL,omitempty"`
+	IsWord     bool   `json:"isWord,omitempty"`
 	MimeType   string `json:"mimeType,omitempty"`
 	Size       int64  `json:"size,omitempty"`
 }
@@ -326,6 +327,20 @@ func handleFile(w http.ResponseWriter, r *http.Request) {
 			Path:     reqPath,
 			IsPDF:    true,
 			MimeType: "application/pdf",
+			Size:     info.Size(),
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(resp)
+		return
+	}
+
+	// Detect Word (.docx) documents; the frontend renders them from /api/raw.
+	if ext == ".docx" {
+		resp := FileResponse{
+			Name:     filepath.Base(filePath),
+			Path:     reqPath,
+			IsWord:   true,
+			MimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 			Size:     info.Size(),
 		}
 		w.Header().Set("Content-Type", "application/json")

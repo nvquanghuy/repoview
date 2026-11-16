@@ -186,6 +186,23 @@ test.describe("File viewing", () => {
   });
 });
 
+test.describe("Word documents", () => {
+  test("docx files get the DOC file icon", async ({ page }) => {
+    await page.goto("/");
+    const row = page.locator("#tree-container .tree-item", { hasText: "sample.docx" }).first();
+    await expect(row.locator(".icon text")).toHaveText("DOC");
+  });
+
+  test(".docx — rendered as HTML with headings, formatting, lists and tables", async ({ page }) => {
+    await page.goto("/sample.docx");
+    const doc = page.locator("#content-area .word-doc");
+    await expect(doc.locator("h1", { hasText: "Quarterly Report" })).toBeVisible();
+    await expect(doc.locator("strong", { hasText: "bold" })).toBeVisible();
+    await expect(doc.locator("li", { hasText: "Second item" })).toBeVisible();
+    await expect(doc.locator("table td", { hasText: "Revenue" })).toBeVisible();
+  });
+});
+
 test.describe("Pretty-printed files", () => {
   test("JSON — pretty-printed and syntax-highlighted", async ({ page }) => {
     await page.goto("/");
