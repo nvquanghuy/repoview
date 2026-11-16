@@ -20,6 +20,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/alecthomas/chroma/v2"
 	chromahtml "github.com/alecthomas/chroma/v2/formatters/html"
@@ -157,7 +158,7 @@ func main() {
 		_ = browser.OpenURL(url)
 	}
 
-	log.Fatal(http.ListenAndServe(addr, app.handler()))
+	log.Fatal(newHTTPServer(addr, app.handler()).ListenAndServe())
 }
 
 // rawPrefix is the path-based route for raw file bytes: /_raw/<relative/path>.
@@ -1256,3 +1257,15 @@ func readJSONLPage(filePath string, page, pageSize int) ([]string, []string, err
 // maxRenderSize: larger files are not read or rendered by /api/file (a 20 MB
 // source file took ~3.5 GB to highlight); the frontend offers a download.
 const maxRenderSize = 2 << 20
+
+// newHTTPServer bounds slow or oversized requests. No write timeout: raw
+// downloads and websockets are long-lived by design.
+func newHTTPServer(addr string, h http.Handler) *http.Server {
+	return &http.Server{
+		Addr:              addr,
+		Handler:           h,
+		ReadHeaderTimeout: 10 * time.Second,
+		IdleTimeout:       2 * time.Minute,
+		MaxHeaderBytes:    64 << 10,
+	}
+}

@@ -90,6 +90,11 @@ func handleSearch(w http.ResponseWriter, r *http.Request) {
 		limit = min(l, searchMaxLimit)
 	}
 
+	if !acquireHeavy(w, r) {
+		return
+	}
+	defer releaseHeavy()
+
 	resp := SearchResponse{Query: q, Terms: parseSearchQuery(q), Results: []SearchResult{}}
 	if utf8.RuneCountInString(strings.Join(resp.Terms, "")) >= searchMinQueryRunes {
 		results := searchFilesIn(r.Context(), scopeOf(r), resp.Terms)
@@ -271,3 +276,21 @@ feed:
 	wg.Wait()
 	return out
 }
+
+// heavySlots bounds concurrent whole-tree scans (search, backlinks), which
+// read up to every file; each already fans out across CPUs.
+var heavySlots = make(chan struct{}, 4)
+
+// acquireHeavy waits for a slot; if the client goes away first it answers
+// 503 and returns false.
+func acquireHeavy(w http.ResponseWriter, r *http.Request) bool {
+	select {
+	case heavySlots <- struct{}{}:
+		return true
+	case <-r.Context().Done():
+		http.Error(w, "busy, try again", http.StatusServiceUnavailable)
+		return false
+	}
+}
+
+func releaseHeavy() { <-heavySlots }

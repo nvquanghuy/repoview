@@ -42,10 +42,12 @@ type pageData struct {
 	Button  string
 }
 
-func sharePromptPage(base, name string) pageData {
+// sharePromptPage doesn't name the shared item: that's for people who know
+// the password.
+func sharePromptPage(base string) pageData {
 	return pageData{
-		Title:   name,
-		Heading: name,
+		Title:   "Protected link",
+		Heading: "Protected link",
 		Message: "This link is password protected.",
 		Action:  base + "/login",
 		Button:  "View",

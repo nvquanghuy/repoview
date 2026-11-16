@@ -41,9 +41,13 @@ const (
 // ── Session tokens ──────────────────────────────────────────
 
 const (
-	kindOwner = "owner"
-	kindShare = "share"
+	kindOwner  = "owner"
+	kindShare  = "share"
+	kindDevice = "device" // "this browser signed in as owner before"; not a session
 )
+
+// deviceMaxAge: how long a browser stays recognised after an owner login.
+const deviceMaxAge = 365 * 24 * time.Hour
 
 // claims is what a session cookie asserts. Inst binds it to one served root
 // so several repoview instances on one host (sharing a secret) can't accept
@@ -295,8 +299,9 @@ func instanceID(root string) string {
 	return hex.EncodeToString(sum[:])[:16]
 }
 
-func ownerCookieName(inst string) string { return "rv_owner_" + inst }
-func shareCookieName(id string) string   { return "rv_share_" + id }
+func ownerCookieName(inst string) string  { return "rv_owner_" + inst }
+func shareCookieName(id string) string    { return "rv_share_" + id }
+func deviceCookieName(inst string) string { return "rv_device_" + inst }
 
 // ── Shares ──────────────────────────────────────────────────
 

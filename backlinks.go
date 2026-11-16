@@ -220,6 +220,11 @@ func handleBacklinks(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !acquireHeavy(w, r) {
+		return
+	}
+	defer releaseHeavy()
+
 	files := sc.files()
 	resolver := newWikiResolver(files)
 	wikiLinks := isObsidianVault

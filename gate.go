@@ -17,6 +17,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -47,9 +48,10 @@ type serverConfig struct {
 type server struct {
 	serverConfig
 	inst    string
-	limiter *limiter      // per client and login target
-	targets *limiter      // per login target, all clients together
-	checks  chan struct{} // semaphore for concurrent bcrypt checks
+	limMu   sync.Mutex
+	clients map[string]*limiter // per login target: attempts per client
+	targets *limiter            // per login target, all clients together
+	checks  chan struct{}       // semaphore for concurrent bcrypt checks
 
 	validMu sync.Mutex
 	valid   map[string]validity // share id -> cached shareStillValid result
@@ -113,7 +115,7 @@ func newServer(cfg serverConfig) *server {
 	return &server{
 		serverConfig: cfg,
 		inst:         instanceID(cfg.root),
-		limiter:      newLimiter(loginMaxFailures, loginLockout),
+		clients:      map[string]*limiter{},
 		targets:      newLimiter(loginTargetMax, loginLockout),
 		checks:       make(chan struct{}, maxConcurrentChecks),
 		valid:        map[string]validity{},
@@ -303,14 +305,43 @@ func clearCookie(w http.ResponseWriter, r *http.Request, name, cookiePath string
 		HttpOnly: true, Secure: isHTTPS(r), SameSite: http.SameSiteLaxMode})
 }
 
+// clientLimiter returns the per-client limiter of one login target. Each
+// target has its own, so flooding one login (filling its table) can't
+// affect another. Targets are the owner login and existing shares only.
+func (s *server) clientLimiter(target string) *limiter {
+	s.limMu.Lock()
+	defer s.limMu.Unlock()
+	l, ok := s.clients[target]
+	if !ok {
+		l = newLimiter(loginMaxFailures, loginLockout)
+		s.clients[target] = l
+	}
+	return l
+}
+
+// parseSmallForm reads a login form of at most 4 KB.
+func parseSmallForm(w http.ResponseWriter, r *http.Request) bool {
+	r.Body = http.MaxBytesReader(w, r.Body, 4<<10)
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "request too large", http.StatusRequestEntityTooLarge)
+		return false
+	}
+	return true
+}
+
 // checkPassword runs a rate-limited password check for one login target
 // ("owner" or "share|<id>") and writes the failure response itself; it
-// returns true only on success.
-func (s *server) checkPassword(w http.ResponseWriter, r *http.Request, target string, check func(string) bool, page pageData) bool {
+// returns true only on success. knownDevice skips the per-target ceiling (but
+// not the per-client limit), so an attack on the login can't lock the owner
+// out of browsers they've used before. The form must already be parsed.
+func (s *server) checkPassword(w http.ResponseWriter, r *http.Request, target string, knownDevice bool, check func(string) bool, page pageData) bool {
 	now := s.now()
-	wait, ok := s.limiter.attempt(target+"|"+rateKey(clientIP(r)), now)
-	if ok {
+	wait, ok := time.Duration(0), true
+	if !knownDevice {
 		wait, ok = s.targets.attempt(target, now)
+	}
+	if ok {
+		wait, ok = s.clientLimiter(target).attempt(rateKey(clientIP(r)), now)
 	}
 	if !ok {
 		w.Header().Set("Retry-After", strconv.Itoa(int(math.Ceil(wait.Seconds()))))
@@ -330,33 +361,51 @@ func (s *server) checkPassword(w http.ResponseWriter, r *http.Request, target st
 		renderPage(w, http.StatusUnauthorized, page)
 		return false
 	}
-	s.limiter.succeed(target + "|" + rateKey(clientIP(r)))
-	s.targets.succeed(target)
+	s.clientLimiter(target).succeed(rateKey(clientIP(r)))
+	if !knownDevice {
+		s.targets.succeed(target)
+	}
 	return true
+}
+
+// knownDevice: this browser has signed in as owner before.
+func (s *server) knownDevice(r *http.Request) bool {
+	c, ok := s.sessionClaims(r, deviceCookieName(s.inst))
+	return ok && c.Kind == kindDevice
 }
 
 // ── Owner login ─────────────────────────────────────────────
 
 func (s *server) handleLogin(w http.ResponseWriter, r *http.Request) {
-	next := safeNext(r.FormValue("next"))
-	page := pageData{Title: "Sign in", Heading: "Sign in to RepoView", Action: "/login", Next: next, Button: "Sign in"}
+	page := pageData{Title: "Sign in", Heading: "Sign in to RepoView", Action: "/login", Button: "Sign in"}
 	switch r.Method {
 	case http.MethodGet, http.MethodHead:
+		next := safeNext(r.URL.Query().Get("next"))
+		page.Next = next
 		if s.ownerSession(r) {
 			http.Redirect(w, r, next, http.StatusSeeOther)
 			return
 		}
 		renderPage(w, http.StatusOK, page)
 	case http.MethodPost:
+		// Origin first, then a bounded body: nothing is read for refused requests.
 		if !sameOrigin(r) {
 			http.Error(w, "cross-site request refused", http.StatusForbidden)
 			return
 		}
-		if !s.checkPassword(w, r, "owner", s.owner.check, page) {
+		if !parseSmallForm(w, r) {
+			return
+		}
+		next := safeNext(r.PostFormValue("next"))
+		page.Next = next
+		if !s.checkPassword(w, r, "owner", s.knownDevice(r), s.owner.check, page) {
 			return
 		}
 		s.setSession(w, r, ownerCookieName(s.inst), "/", claims{
 			Kind: kindOwner, Inst: s.inst, FP: s.owner.fp, Exp: s.now().Add(sessionMaxAge).Unix(),
+		})
+		s.setSession(w, r, deviceCookieName(s.inst), "/login", claims{
+			Kind: kindDevice, Inst: s.inst, Exp: s.now().Add(deviceMaxAge).Unix(),
 		})
 		http.Redirect(w, r, next, http.StatusSeeOther)
 	default:
@@ -401,7 +450,7 @@ func (s *server) handleShareArea(w http.ResponseWriter, r *http.Request) {
 		name = filepath.Base(s.root)
 	}
 	if sub == "login" && r.Method == http.MethodPost {
-		s.shareLogin(w, r, sh, base, name)
+		s.shareLogin(w, r, sh, base)
 		return
 	}
 	if !(sh.PasswordHash == "" || s.ownerSession(r) || s.shareSession(r, sh)) {
@@ -409,7 +458,7 @@ func (s *server) handleShareArea(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "password required", http.StatusUnauthorized)
 			return
 		}
-		renderPage(w, http.StatusOK, sharePromptPage(base, name))
+		renderPage(w, http.StatusOK, sharePromptPage(base))
 		return
 	}
 
@@ -436,6 +485,12 @@ func (s *server) handleShareArea(w http.ResponseWriter, r *http.Request) {
 	case sub == "ws":
 		s.serveWS(w, r2, func() bool { return s.shareStillValid(sh.ID) })
 	case isAPIPath("/" + sub):
+		// Unclean paths would make the inner mux redirect to a URL without
+		// the share prefix; refuse them instead.
+		if path.Clean("/"+sub) != "/"+sub {
+			http.NotFound(w, r)
+			return
+		}
 		r2.URL.Path = "/" + sub
 		r2.URL.RawPath = ""
 		s.apiOr(index).ServeHTTP(w, r2)
@@ -490,12 +545,15 @@ func (s *server) shareStillValid(id string) bool {
 	return ok
 }
 
-func (s *server) shareLogin(w http.ResponseWriter, r *http.Request, sh Share, base, name string) {
+func (s *server) shareLogin(w http.ResponseWriter, r *http.Request, sh Share, base string) {
 	if !sameOrigin(r) {
 		http.Error(w, "cross-site request refused", http.StatusForbidden)
 		return
 	}
-	if !s.checkPassword(w, r, "share|"+sh.ID, sh.checkPassword, sharePromptPage(base, name)) {
+	if !parseSmallForm(w, r) {
+		return
+	}
+	if !s.checkPassword(w, r, "share|"+sh.ID, false, sh.checkPassword, sharePromptPage(base)) {
 		return
 	}
 	s.setSession(w, r, shareCookieName(sh.ID), "/s/", claims{

@@ -175,6 +175,13 @@ func loadOrCreateSecret(dir string) ([]byte, error) {
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return nil, err
 	}
+	// MkdirAll leaves an existing directory's mode alone (the updater may
+	// have created it 0755); keep other users out of share names.
+	if !isWindows() {
+		if err := os.Chmod(dir, 0o700); err != nil {
+			return nil, err
+		}
+	}
 	name := filepath.Join(dir, "secret")
 	for attempt := 0; attempt < 3; attempt++ {
 		data, err := os.ReadFile(name)
