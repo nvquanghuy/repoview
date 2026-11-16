@@ -124,6 +124,8 @@ cloudflared tunnel --url http://localhost:7777   # or a named tunnel with your h
 
 State lives in `~/.config/repoview/` (`$REPOVIEW_CONFIG_DIR` overrides it): `secret` (the session signing key) and `shares/<id>.json` (one file per served folder). Several RepoView instances can run at once: each serves on its own port and keeps its own shares and cookies, and instances serving the same folder share its links safely.
 
+Known limitation: in Obsidian vaults, raw HTML in notes is rendered as-is, so don't publicly serve a vault that holds notes from untrusted sources. The design, security model and rationale are in [docs/design/public-access-and-sharing.md](docs/design/public-access-and-sharing.md).
+
 ## API
 
 | Endpoint | Description |
