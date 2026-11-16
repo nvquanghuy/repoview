@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+
+## [v0.22.0] - 2026-11-16
+
 - [added] Word documents (`.docx`) render in the browser (headings, formatting, lists, tables, images) using mammoth.js, loaded from a CDN only when you open one; they also get their own file icon. Legacy `.doc` files are not supported yet
 
 
