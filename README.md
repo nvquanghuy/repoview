@@ -118,13 +118,13 @@ cloudflared tunnel --url http://localhost:7777   # or a named tunnel with your h
 - **Share** (on any file or folder, including the root) creates a link like `/s/quarterly-report-k3J9xQ…` with an optional password (a random one is suggested) and an expiry (1 hour to 30 days, a custom number of hours/days, or never). Copy the password when you create the share; it's stored hashed and can't be shown again.
 - People with the link see the normal viewer, limited to the shared file or folder: tree, search, backlinks, raw files and live reload all stay inside it, and dotfiles (`.env`, `.git/`) and symlinks pointing outside are hidden. "Open in editor" and share management are owner-only.
 - The shared-links button in the header lists your links and revokes them; revoking or expiry cuts off access immediately.
-- Five password attempts from one IP (an IPv6 /64 counts as one) without a success lock that IP out of that login (owner, or a given share) for 15 minutes. Each login also accepts at most 50 attempts per 15 minutes from all IPs together, so someone hammering your login from many addresses can briefly lock you out of signing in. Existing sessions keep working.
+- Five password attempts from one IP (an IPv6 /64 counts as one) without a success lock that IP out of that login (owner, or a given share) for 15 minutes. Each login also accepts at most 50 attempts per 15 minutes from all IPs together. Browsers you have signed in with before are exempt from that cap, so an attack can only block sign-ins from new browsers; existing sessions keep working.
 - Signing out clears the cookie on that device. To end every session (e.g. a lost laptop), change the password.
 - RepoView trusts `Cf-Connecting-IP` and `X-Forwarded-Proto` only from a proxy on the same machine (cloudflared), and ignores `X-Forwarded-For`. Don't put a proxy on another machine in front of it.
 
 State lives in `~/.config/repoview/` (`$REPOVIEW_CONFIG_DIR` overrides it): `secret` (the session signing key) and `shares/<id>.json` (one file per served folder). Several RepoView instances can run at once: each serves on its own port and keeps its own shares and cookies, and instances serving the same folder share its links safely.
 
-Known limitation: in Obsidian vaults, raw HTML in notes is rendered as-is, so don't publicly serve a vault that holds notes from untrusted sources. The design, security model and rationale are in [docs/design/public-access-and-sharing.md](docs/design/public-access-and-sharing.md).
+Known limitation: in Obsidian vaults, raw HTML in notes is rendered as-is, so don't publicly serve a vault that holds notes from untrusted sources. The design, security model and a deployment checklist are in [docs/design/public-access-and-sharing.md](docs/design/public-access-and-sharing.md); read the checklist before going public.
 
 ## API
 

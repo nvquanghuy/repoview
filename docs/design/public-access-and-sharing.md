@@ -133,8 +133,8 @@ one key. Files are `0600`, directories `0700`.
 
 Threats considered: anonymous internet users, share visitors trying to
 reach beyond their share, malicious web pages the owner visits (CSRF,
-cross-site websockets), and untrusted files inside the served folder (a
-cloned repo, downloaded docs).
+cross-site websockets), untrusted files inside the served folder (a cloned
+repo, downloaded docs, a synced `.git` directory), and resource exhaustion.
 
 | Control | Detail and rationale |
 |---------|----------------------|
@@ -142,18 +142,27 @@ cloned repo, downloaded docs).
 | CSRF | State-changing requests (`POST /login`, `/logout`, share login, `/api/shares`, `/api/open`) require `Origin` matching `Host` (or `Sec-Fetch-Site: same-origin/none`); `Origin: null` is refused because sandboxed previews send it. |
 | Referrer-Policy `same-origin` | Share URLs never leak to other sites via `Referer`. Not `no-referrer`: that makes Chromium send `Origin: null` on our own form posts, which the CSRF check refuses. |
 | Websocket Origin check | Browsers attach cookies to cross-site websocket handshakes. |
-| Raw content sandbox | `/_raw/` and `/api/raw` add `Content-Security-Policy: sandbox allow-scripts` to any response whose **final** type can run script (HTML, SVG, any XML/XSL), including files sniffed as HTML. A script-bearing file in the folder therefore never runs with the owner's cookies (otherwise it could create a passwordless share of everything). PDFs are left unsandboxed because viewers refuse to render in a sandbox. SVG previews in the SPA use `<img>`, never inline markup. |
+| Raw content sandbox | `/_raw/` and `/api/raw` add a CSP sandbox to any response whose **final** type can run script (HTML, SVG, any XML/XSL), including files sniffed as HTML. In the preview iframe it is `sandbox allow-scripts` (opaque origin); opened as a top-level page (`Sec-Fetch-Dest: document`) it is plain `sandbox`, so a planted page can't draw a fake login form on our domain. A script-bearing file therefore never runs with the owner's cookies (otherwise it could create a passwordless share of everything). PDFs are left unsandboxed because viewers refuse to render in a sandbox. |
+| Untrusted content in the SPA | SVG previews use `<img>`, never inline markup. Mermaid sources are re-rendered from text (`textContent`), never `innerHTML`; `securityLevel: 'strict'`. goldmark autolinks with `javascript:`/`vbscript:`/`data:` URLs lose their link (`markdown_safety.go`; goldmark only filters `[text](url)` links), and the SPA strips such URLs from every rendered markdown and `.docx` link as a second layer, using `URL` parsing so `java\tscript:` is caught. Index placeholders are filled in one pass so names can't splice values into the injected config. Third-party scripts (mermaid, mammoth) are pinned to exact versions with SRI. |
+| Symlinked share roots | The shared item must resolve (after symlinks) inside the served root, at creation and on every visit, so a shared folder later replaced by a symlink (a pull, a sync) exposes nothing. |
+| No repository-configured commands | Share visitors never cause `git` to run (their file lists come from a walk). The owner's `git ls-files` runs with `core.fsmonitor=false`, `core.untrackedCache=false` and no system config, so a planted `.git/config` can't execute commands. |
+| Resource limits | `/api/file` renders at most 2 MB (larger: metadata and a download; a 20 MB source file took ~3.5 GB to highlight). At most 4 concurrent search/backlinks scans. Websockets: 4 KB messages, only existing paths watched, ≤256 watches per client, ≤256 connections. Login forms ≤4 KB, read only after the origin check. HTTP server: 10 s header timeout, 2 min idle timeout, 64 KB headers. |
 | Caching | `Cache-Control: no-store` on everything except icons, so Cloudflare never caches private pages (it caches by file extension, and SPA URLs end in `.md`, `.pdf`, …). |
-| Rate limiting | Attempts are reserved *before* the bcrypt check (parallel guesses can't race past). Limits: 5 per client (IPv6 grouped by /64) per login, 50 per login across all clients, both per 15 min; at most 4 concurrent bcrypt checks. Locked-out keys survive a flood of new keys. The per-login cap means someone hammering the owner login can block new owner sign-ins for 15 minutes; existing sessions keep working. |
+| Rate limiting | Attempts are reserved *before* the bcrypt check (parallel guesses can't race past). Limits: 50 per login target (the owner login, or one share) across all clients, then 5 per client (IPv6 grouped by /64), both per 15 min; at most 4 concurrent bcrypt checks. Each target has its own per-client table, so flooding the owner login can't block share logins. Locked-out keys survive a flood of new keys. |
+| Known devices | A successful owner login also sets `rv_device_<instance>` (Path `/login`, 1 year; a signed "this browser signed in before", not a session). It skips the per-login ceiling, so someone hammering the owner login can block sign-ins only from browsers you haven't used before; existing sessions keep working either way. |
 | Proxy headers | `Cf-Connecting-IP` and `X-Forwarded-Proto` are trusted only from a loopback peer (cloudflared on the same machine). `X-Forwarded-For` is ignored: other local proxies pass client values through. |
 | Redirects | `next` must be a single-slash local path without backslashes or control characters (`/\t/evil.com` would become `//evil.com`). |
 | Other headers | `nosniff`, `X-Frame-Options: SAMEORIGIN`, `X-Robots-Tag: noindex`. |
 | Env scrubbing | The password variables are removed from the environment at startup so editors launched via `/api/open` don't inherit them. |
 | Revoked shares' websockets | Closed by a sweep every 30 s and on the next file event; validity cached 2 s. |
+| Share prompt | Shows "Protected link", not the shared item's name. |
+| Dependencies | Built with Go ≥ 1.26.11 (the `go` line in `go.mod`, which the release workflow uses) and goldmark ≥ 1.7.17; `govulncheck ./...` reports nothing. Re-run it before releases. |
 
-An independent review probed path tricks (encoded `..`, backslashes,
-symlinks, dotfiles, `/api/../`), session confusion and the items above;
-the findings it confirmed are fixed and covered by tests.
+Two rounds of independent review (white-box backend and frontend, and a
+black-box pentest of a running instance behind a simulated tunnel) probed
+path tricks (encoded `..`, backslashes, symlinks, dotfiles, `/api/../`,
+81 paths × 6 methods), session confusion, XSS sinks and the items above.
+Every confirmed finding is fixed and has a regression test.
 
 ## Known limitations / future work
 
@@ -166,9 +175,35 @@ the findings it confirmed are fixed and covered by tests.
 - No server-side session revocation (logout is per device; password change
   ends all owner sessions).
 - Rate-limit state is per process and resets on restart.
+- A narrow TOCTOU window remains between path checks and opening a file;
+  exploiting it needs someone who can write into the served folder at that
+  moment. (`os.Root` would close it.)
+- Updates (`repoview update`) trust GitHub over TLS; there's no signature
+  check.
 - Only one proxy setup is supported for client IPs: cloudflared on the same
   machine.
 - Share passwords can't be changed; revoke and re-share.
+
+## Deploying on the internet: checklist
+
+1. Run RepoView as your normal (unprivileged) user, bound to the default
+   `127.0.0.1`, with cloudflared on the same machine.
+2. Use a long random passphrase (e.g. 5+ random words). Prefer
+   `REPOVIEW_PASSWORD_HASH` in a `0600` environment file (systemd
+   `EnvironmentFile=`) over a plaintext variable in shell history.
+3. Don't add Cloudflare cache rules that override origin headers ("Cache
+   Everything" with an Edge TTL): RepoView marks every private response
+   `no-store`, and such rules ignore that.
+4. After the first login through the public hostname, check the
+   `rv_owner_…` cookie is `Secure` (cloudflared should pass
+   `X-Forwarded-Proto: https`).
+5. Optional defense in depth: put a Cloudflare Access policy (your email)
+   on everything except `/s/*` and `/api/icons/*`, so the owner area needs
+   SSO before RepoView's own password, while share links stay public.
+6. Don't serve folders that contain Obsidian notes, `.git` directories or
+   HTML from sources you don't trust (see Known limitations).
+7. Rebuild/update when Go or goldmark security releases land
+   (`govulncheck ./...`).
 
 ## Tests
 
@@ -183,5 +218,13 @@ the findings it confirmed are fixed and covered by tests.
   (`newAuthEnv`): gate, login, CSRF, rate limits, expiry, other-instance
   cookies, password change, shares API, every share-visit path, `/_raw/`.
 - `raw_test.go`: which content types are sandboxed.
+- `render_security_test.go`: autolink script URLs, single-pass placeholders,
+  top-level raw sandbox, local-mode headers.
+- `hardening_test.go`, `hardening2_test.go`: symlinked share roots, git
+  fsmonitor, large files, websocket limits, known devices, per-target
+  limiters, bounded login bodies, share prompt, server timeouts, heavy-scan
+  concurrency.
+- `tests/repoview.spec.ts` "Rendering safety": mermaid theme switch, script
+  URLs in links, too-large files.
 - `tests/sharing.spec.ts` (Playwright, project `auth`, port 3124): login,
   folder/file shares in a fresh browser context, revoke, logout.
