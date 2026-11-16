@@ -3,7 +3,7 @@
 ## [Unreleased]
 
 - [added] Password login for running RepoView on the internet: set `REPOVIEW_PASSWORD` (or `REPOVIEW_PASSWORD_HASH`) and sign in at `/login`. Sessions last 30 days, and repeated wrong passwords lock that IP out for 15 minutes
-- [added] Share links: share any file or folder as `/s/<name>-<id>` with an optional password and an expiry. Visitors see the viewer limited to that item, and **Manage shares** lists and revokes links
+- [added] Share links: share any file or folder as `/s/<name>-<id>` with an optional password and an expiry. Visitors see the viewer limited to that item, and the shared-links button in the header lists and revokes them
 - [security] Raw HTML/SVG files are served sandboxed, and the live-reload websocket only accepts connections from RepoView's own pages
 
 ## [v0.22.1] - 2026-11-16
