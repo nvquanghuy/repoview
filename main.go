@@ -238,17 +238,7 @@ func prepareIndexHTML(raw []byte, rootName string) []byte {
 
 // safePath resolves a request path within rootDir and rejects traversal.
 func safePath(reqPath string) (string, error) {
-	cleaned := filepath.Clean(reqPath)
-	full := filepath.Join(rootDir, cleaned)
-	abs, err := filepath.Abs(full)
-	if err != nil {
-		return "", err
-	}
-	// Ensure path is exactly rootDir or inside rootDir (not a sibling with similar prefix)
-	if abs != rootDir && !strings.HasPrefix(abs, rootDir+string(os.PathSeparator)) {
-		return "", fmt.Errorf("path outside root")
-	}
-	return abs, nil
+	return scope{root: rootDir}.resolve(reqPath)
 }
 
 // handleTree returns immediate children of a directory as JSON.
@@ -258,7 +248,8 @@ func handleTree(w http.ResponseWriter, r *http.Request) {
 		reqPath = "."
 	}
 
-	dirPath, err := safePath(reqPath)
+	sc := scopeOf(r)
+	dirPath, err := sc.resolve(reqPath)
 	if err != nil {
 		http.Error(w, "invalid path", http.StatusBadRequest)
 		return
@@ -273,8 +264,11 @@ func handleTree(w http.ResponseWriter, r *http.Request) {
 	result := make([]TreeEntry, 0, len(entries))
 	for _, e := range entries {
 		name := e.Name()
-		relPath, _ := filepath.Rel(rootDir, filepath.Join(dirPath, name))
+		relPath, _ := filepath.Rel(sc.root, filepath.Join(dirPath, name))
 		relPath = filepath.ToSlash(relPath)
+		if (sc.restricted || sc.only != "") && !sc.visible(relPath) {
+			continue
+		}
 		ext := ""
 		if !e.IsDir() {
 			ext = strings.TrimPrefix(filepath.Ext(name), ".")
@@ -337,7 +331,7 @@ func handleFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	filePath, err := safePath(reqPath)
+	filePath, err := scopeOf(r).resolve(reqPath)
 	if err != nil {
 		http.Error(w, "invalid path", http.StatusBadRequest)
 		return
@@ -723,9 +717,9 @@ func handleRawPath(w http.ResponseWriter, r *http.Request) {
 	serveRawFile(w, r, rel)
 }
 
-// serveRawFile serves the file at rel (relative to rootDir). Traversal is
-// rejected with 400; missing files, directories and symlinks resolving
-// outside the root are 404.
+// serveRawFile serves the file at rel, relative to the request's scope.
+// Traversal is rejected with 400; missing files, directories and symlinks
+// resolving outside the scope root are 404.
 func serveRawFile(w http.ResponseWriter, r *http.Request, rel string) {
 	for _, seg := range strings.Split(filepath.ToSlash(rel), "/") {
 		if seg == ".." {
@@ -733,12 +727,13 @@ func serveRawFile(w http.ResponseWriter, r *http.Request, rel string) {
 			return
 		}
 	}
-	filePath, err := safePath(rel)
+	sc := scopeOf(r)
+	filePath, err := sc.resolve(rel)
 	if err != nil {
 		http.Error(w, "invalid path", http.StatusBadRequest)
 		return
 	}
-	real, err := realPathInRoot(filePath)
+	real, err := realPathInRoot(sc.root, filePath)
 	if err != nil {
 		http.Error(w, "file not found", http.StatusNotFound)
 		return
@@ -762,12 +757,12 @@ func serveRawFile(w http.ResponseWriter, r *http.Request, rel string) {
 
 // realPathInRoot resolves symlinks in p and checks the result is still inside
 // the (symlink-resolved) root directory.
-func realPathInRoot(p string) (string, error) {
+func realPathInRoot(rootPath, p string) (string, error) {
 	real, err := filepath.EvalSymlinks(p)
 	if err != nil {
 		return "", err
 	}
-	root, err := filepath.EvalSymlinks(rootDir)
+	root, err := filepath.EvalSymlinks(rootPath)
 	if err != nil {
 		return "", err
 	}
@@ -779,48 +774,17 @@ func realPathInRoot(p string) (string, error) {
 
 // handleFiles returns a flat list of all file paths for fuzzy search.
 func handleFiles(w http.ResponseWriter, r *http.Request) {
+	files := scopeOf(r).files()
+	if files == nil {
+		files = []string{}
+	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(listFiles())
+	json.NewEncoder(w).Encode(files)
 }
 
 // listFiles returns all file paths under rootDir (slash-separated, relative).
-// It uses `git ls-files` when rootDir is a git repo, otherwise walks the tree
-// skipping dotfiles and dot-directories (e.g. .git, .obsidian).
 func listFiles() []string {
-	var files []string
-
-	// Try git ls-files first. -z gives raw NUL-separated paths; without it git
-	// C-quotes non-ASCII names (e.g. "T\341\273\255.md") and they can't be opened.
-	cmd := exec.Command("git", "-C", rootDir, "ls-files", "-z")
-	out, err := cmd.Output()
-	if err == nil && len(out) > 0 {
-		for _, name := range strings.Split(string(out), "\x00") {
-			if name != "" {
-				files = append(files, name)
-			}
-		}
-		return files
-	}
-
-	// Walk the directory tree.
-	filepath.WalkDir(rootDir, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return nil
-		}
-		name := d.Name()
-		if strings.HasPrefix(name, ".") && path != rootDir {
-			if d.IsDir() {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		if !d.IsDir() {
-			rel, _ := filepath.Rel(rootDir, path)
-			files = append(files, filepath.ToSlash(rel))
-		}
-		return nil
-	})
-	return files
+	return listFilesIn(rootDir)
 }
 
 // EditorInfo is returned by the /api/editors endpoint.
@@ -1114,7 +1078,7 @@ func handleJSONL(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	filePath, err := safePath(reqPath)
+	filePath, err := scopeOf(r).resolve(reqPath)
 	if err != nil {
 		http.Error(w, "invalid path", http.StatusBadRequest)
 		return

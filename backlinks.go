@@ -202,17 +202,25 @@ func findBacklinks(source string, data []byte, target string, resolver *wikiReso
 // handleBacklinks lists markdown notes that link to ?path=, most recently
 // modified first.
 func handleBacklinks(w http.ResponseWriter, r *http.Request) {
-	target := strings.TrimPrefix(path.Clean("/"+r.URL.Query().Get("path")), "/")
+	raw := r.URL.Query().Get("path")
+	target := strings.TrimPrefix(path.Clean("/"+raw), "/")
 	if target == "" {
 		http.Error(w, "path is required", http.StatusBadRequest)
 		return
 	}
-	if _, err := safePath(target); err != nil {
+	sc := scopeOf(r)
+	// The owner's traversal attempts are normalised into the root; inside a
+	// share they are refused outright.
+	check := target
+	if sc.restricted {
+		check = raw
+	}
+	if _, err := sc.resolve(check); err != nil {
 		http.Error(w, "invalid path", http.StatusBadRequest)
 		return
 	}
 
-	files := listFiles()
+	files := sc.files()
 	resolver := newWikiResolver(files)
 	wikiLinks := isObsidianVault
 
@@ -224,7 +232,7 @@ func handleBacklinks(w http.ResponseWriter, r *http.Request) {
 	}
 
 	backlinks := parallelMap(r.Context(), sources, func(src string) (Backlink, bool) {
-		abs := filepath.Join(rootDir, filepath.FromSlash(src))
+		abs := filepath.Join(sc.root, filepath.FromSlash(src))
 		info, err := os.Stat(abs)
 		if err != nil || !info.Mode().IsRegular() || info.Size() > searchMaxFileSize {
 			return Backlink{}, false
