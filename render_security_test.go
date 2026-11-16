@@ -64,7 +64,7 @@ func TestRaw_TopLevelDocumentsGetNoScripts(t *testing.T) {
 		t.Errorf("top-level document: CSP %q, want plain sandbox", csp)
 	}
 	for _, dest := range []string{"iframe", ""} {
-		if csp := get(dest); csp != "sandbox allow-scripts" {
+		if csp := get(dest); csp != "sandbox allow-scripts; connect-src 'none'" {
 			t.Errorf("dest %q: CSP %q", dest, csp)
 		}
 	}

@@ -3780,8 +3780,11 @@
                     return;
                 }
                 if (data.isHTML) {
-                    var rawSrc = rawURLFor(path);
-                    var previewEl = '<iframe class="html-preview" sandbox="allow-scripts" src="' + rawSrc + '"></iframe>';
+                    // previewURL carries a token when login is on: the sandboxed
+                    // frame can't send cookies, so relative assets authenticate
+                    // through the URL instead.
+                    var rawSrc = data.previewURL || rawURLFor(path);
+                    var previewEl = '<iframe class="html-preview" sandbox="allow-scripts" src="' + escAttr(rawSrc) + '"></iframe>';
                     var codeHTML = '<div class="source-code">' + data.rawContent + "</div>";
                     var wantCode = getViewParam() === "code";
 

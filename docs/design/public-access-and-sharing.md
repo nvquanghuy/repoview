@@ -118,6 +118,28 @@ id, credential fingerprint, expiry.
 - Logout clears the cookie on that device only (stateless tokens); ending all
   sessions = changing the password.
 
+### HTML previews (capability URLs)
+
+HTML files preview in an iframe with `sandbox="allow-scripts"` (and a CSP
+sandbox), which gives the page an opaque origin. Browsers then treat its
+requests as cross-site and don't send `SameSite=Lax` cookies, so relative
+images and stylesheets inside the page would get 401 for the owner and in
+password shares. Instead, when login is on, `/api/file` returns a
+`previewURL` such as `/_preview/<token>/site/index.html` (or
+`/s/<ref>/_preview/<token>/…`), and relative URLs in the page resolve under
+the same token, so they need no cookies (`preview.go`).
+
+- The token is a signed `preview` claim bound to the instance and to the
+  owner's or the share's credential fingerprint, valid 12 hours. Changing
+  the owner password, revoking the share or its expiry kills it; it is never
+  accepted as a session, nor on another share or the owner area.
+- It grants read access to the same scope the viewer already had, through
+  the raw file route only.
+- Scriptable responses carry `connect-src 'none'`, so a malicious page's
+  scripts can't use the token in their own URL to read other files.
+- Without a password there are no cookies to lose, so the preview loads from
+  `/_raw/` directly.
+
 ### Share storage and concurrency
 
 `shares/<instanceID(root)>.json` holds `{root, shares[]}`; the root is checked
@@ -218,6 +240,8 @@ Every confirmed finding is fixed and has a regression test.
   (`newAuthEnv`): gate, login, CSRF, rate limits, expiry, other-instance
   cookies, password change, shares API, every share-visit path, `/_raw/`.
 - `raw_test.go`: which content types are sandboxed.
+- `preview_test.go`: preview URLs for the owner and shares, relative assets
+  without cookies, token scoping, password change, revocation, expiry.
 - `render_security_test.go`: autolink script URLs, single-pass placeholders,
   top-level raw sandbox, local-mode headers.
 - `hardening_test.go`, `hardening2_test.go`: symlinked share roots, git

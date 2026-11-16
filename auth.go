@@ -41,9 +41,10 @@ const (
 // ── Session tokens ──────────────────────────────────────────
 
 const (
-	kindOwner  = "owner"
-	kindShare  = "share"
-	kindDevice = "device" // "this browser signed in as owner before"; not a session
+	kindOwner   = "owner"
+	kindShare   = "share"
+	kindDevice  = "device"  // "this browser signed in as owner before"; not a session
+	kindPreview = "preview" // capability for one scope's HTML previews; see preview.go
 )
 
 // deviceMaxAge: how long a browser stays recognised after an owner login.
