@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+
+## [v0.21.0] - 2026-11-16
+
 - [added] Collapse the sidebar on desktop with the ☰ button or Cmd/Ctrl+\; the state is remembered across reloads
 
 ## [v0.20.1] - 2026-11-15
