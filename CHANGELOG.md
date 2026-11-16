@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+
+## [v0.23.1] - 2026-11-16
+
 - [fixed] With password login on, HTML previews load their relative images and stylesheets again, for the owner and in password-protected shares (the sandboxed preview can't send the login cookie, so it now loads from a short-lived signed URL)
 
 
