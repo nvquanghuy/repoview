@@ -87,6 +87,29 @@ visitors may use it, and resolve paths with `scopeOf(r).resolve(...)`, never
 
 The owner's session also unlocks shares (preview without the password).
 
+### One-click links and invites
+
+Sending a link and a password as two things is friction, so the Share dialog
+offers two shortcuts for password shares (the password exists in plaintext
+only in that dialog, so both are offered only right after creating a share):
+
+- **One-click link:** `/s/<ref>#k=<url-encoded password>`. Browsers never
+  send the fragment to the server, so the key stays out of Cloudflare and
+  server logs, link-preview bots (they see the prompt) and `Referer`. The
+  prompt page's inline script removes the fragment with
+  `history.replaceState` and then submits the key through the normal form,
+  so it gets the same rate limit, CSRF check and cookie as a typed password.
+  The script is left out of pages that report an error, so a wrong key shows
+  "Incorrect password." once instead of looping. The SPA strips `#k=` too, for
+  visitors who are already unlocked.
+- **Copy link + password:** one clipboard message (item, link, password) for
+  when you'd rather the password travel separately or with the link.
+
+Trade-off: a one-click link is a bearer link, like a share without a
+password, minus the log and preview leaks. Anyone it's forwarded to gets in.
+Send link and password over different channels when that matters. The
+browser's own history may still record the URL as it was typed or clicked.
+
 ### Scopes
 
 | | owner | folder share | file share |
@@ -240,6 +263,10 @@ Every confirmed finding is fixed and has a regression test.
   (`newAuthEnv`): gate, login, CSRF, rate limits, expiry, other-instance
   cookies, password change, shares API, every share-visit path, `/_raw/`.
 - `raw_test.go`: which content types are sandboxed.
+- `hardening2_test.go` `TestSharePrompt_ReadsKeyFromFragment`: only the share
+  prompt (and not its error page or the owner login) auto-submits `#k=`.
+- `tests/sharing.spec.ts`: one-click link (unlock, key stripped from the URL,
+  wrong key falls back to the prompt), copy link + password.
 - `preview_test.go`: preview URLs for the owner and shares, relative assets
   without cookies, token scoping, password change, revocation, expiry.
 - `render_security_test.go`: autolink script URLs, single-pass placeholders,

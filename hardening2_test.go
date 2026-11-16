@@ -113,6 +113,27 @@ func TestSharePrompt_DoesNotRevealName(t *testing.T) {
 	}
 }
 
+// One-click links carry the share password after "#k=". Only the share
+// prompt reads it (browsers never send the fragment to the server).
+func TestSharePrompt_ReadsKeyFromFragment(t *testing.T) {
+	e := newAuthEnv(t)
+	owner := e.client()
+	e.login(owner)
+	sh := e.createShare(owner, "subdir", "pw", 0)
+	prompt := e.get(e.client(), sh.URL+"/")
+	if !strings.Contains(prompt.body, `id="rv-key-unlock"`) {
+		t.Fatalf("share prompt lacks the one-click unlock script: %s", prompt.body)
+	}
+	wrong := e.postForm(e.client(), sh.URL+"/login", url.Values{"password": {"nope"}})
+	if wrong.code != http.StatusUnauthorized || strings.Contains(wrong.body, `id="rv-key-unlock"`) {
+		t.Fatalf("the incorrect-password page must not auto-submit again (code %d)", wrong.code)
+	}
+	login := e.get(e.client(), "/login")
+	if strings.Contains(login.body, `id="rv-key-unlock"`) {
+		t.Fatal("owner login page must not read keys from the fragment")
+	}
+}
+
 func TestShareArea_UncleanPathsAre404NotRedirects(t *testing.T) {
 	e := newAuthEnv(t)
 	owner := e.client()

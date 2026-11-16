@@ -40,17 +40,21 @@ type pageData struct {
 	Action  string // form target; empty = no form
 	Next    string
 	Button  string
+	// KeyUnlock: submit the password from a one-click link's "#k=" fragment.
+	// Never on a page that reports an error, so a bad key can't loop.
+	KeyUnlock bool
 }
 
 // sharePromptPage doesn't name the shared item: that's for people who know
 // the password.
 func sharePromptPage(base string) pageData {
 	return pageData{
-		Title:   "Protected link",
-		Heading: "Protected link",
-		Message: "This link is password protected.",
-		Action:  base + "/login",
-		Button:  "View",
+		Title:     "Protected link",
+		Heading:   "Protected link",
+		Message:   "This link is password protected.",
+		Action:    base + "/login",
+		Button:    "View",
+		KeyUnlock: true,
 	}
 }
 
@@ -97,12 +101,29 @@ var pageTmpl = template.Must(template.New("page").Parse(`<!doctype html>
   {{if .Message}}<p>{{.Message}}</p>{{end}}
   {{if .Error}}<p class="error" role="alert">{{.Error}}</p>{{end}}
   {{if .Action}}
-  <form method="post" action="{{.Action}}">
+  <form id="rv-form" method="post" action="{{.Action}}">
     {{if .Next}}<input type="hidden" name="next" value="{{.Next}}">{{end}}
     <label for="password">Password</label>
     <input type="password" id="password" name="password" autocomplete="current-password" autofocus required>
     <button type="submit">{{.Button}}</button>
   </form>
+  {{if and .KeyUnlock (not .Error)}}
+  <script id="rv-key-unlock">
+  // One-click link: /s/<ref>#k=<password>. Browsers never send the fragment,
+  // so the key stays out of server, proxy and link-preview logs. Drop it from
+  // the address bar (and history) first, then submit it like a typed password.
+  (function () {
+    var m = /^#k=(.+)$/.exec(location.hash);
+    if (!m) return;
+    history.replaceState(null, "", location.pathname + location.search);
+    var key;
+    try { key = decodeURIComponent(m[1]); } catch (e) { return; }
+    var f = document.getElementById("rv-form");
+    f.elements.password.value = key;
+    f.submit();
+  })();
+  </script>
+  {{end}}
   {{end}}
 </main>
 </body>

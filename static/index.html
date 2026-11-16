@@ -2000,6 +2000,24 @@
             .rv-hint.rv-warn {
                 color: var(--rv-warning-text);
             }
+            .share-or {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                margin: 16px 0 4px;
+                color: var(--rv-text-secondary);
+                font-size: 12px;
+            }
+            .share-or::before,
+            .share-or::after {
+                content: "";
+                flex: 1;
+                border-top: 1px solid var(--rv-border);
+            }
+            .share-invite-btn {
+                margin-top: 8px;
+                width: 100%;
+            }
             .rv-error {
                 margin-top: 12px;
                 padding: 8px 12px;
@@ -2285,6 +2303,15 @@
                 </form>
                 <div id="share-result" class="rv-modal-body" hidden>
                     <div class="share-target"><span class="share-target-kind"></span> <code class="share-target-path"></code></div>
+                    <div id="share-result-oneclick-block">
+                        <label class="rv-field-label" for="share-result-oneclick">One-click link</label>
+                        <div class="rv-input-row">
+                            <input id="share-result-oneclick" type="text" readonly onfocus="this.select()" />
+                            <button type="button" class="rv-btn rv-btn-primary" onclick="copyField('share-result-oneclick', this)">Copy</button>
+                        </div>
+                        <div class="rv-hint" id="share-result-oneclick-hint">Opens without typing the password. Anyone with this link can view, so send it only to the people you mean.</div>
+                        <div class="share-or">or send the link and password separately</div>
+                    </div>
                     <label class="rv-field-label" for="share-result-url">Link</label>
                     <div class="rv-input-row">
                         <input id="share-result-url" type="text" readonly onfocus="this.select()" />
@@ -2296,6 +2323,7 @@
                             <input id="share-result-password" type="text" readonly onfocus="this.select()" />
                             <button type="button" class="rv-btn" onclick="copyField('share-result-password', this)">Copy</button>
                         </div>
+                        <button type="button" class="rv-btn share-invite-btn" id="share-result-invite-btn" onclick="copyShareInvite(this)">Copy link + password</button>
                     </div>
                     <div class="rv-hint" id="share-result-note"></div>
                     <div class="rv-modal-actions">
@@ -2408,6 +2436,11 @@
             RV.mode = RV.mode || "local";
             RV.file = RV.file || null;
             document.documentElement.classList.add("rv-mode-" + RV.mode);
+            // A one-click share link (#k=<password>) opened by someone already
+            // unlocked: don't leave the key in the address bar or history.
+            if (/^#k=/.test(location.hash)) {
+                history.replaceState(history.state, "", location.pathname + location.search);
+            }
             if (RV.file) document.documentElement.classList.add("rv-file-share");
 
             // Page URL for a path relative to the served root.
@@ -5397,6 +5430,11 @@
                     document.getElementById("share-result-url").value = location.origin + share.url;
                     document.getElementById("share-result-password").value = password;
                     document.getElementById("share-result-password-block").hidden = !password;
+                    document.getElementById("share-result-oneclick-block").hidden = !password;
+                    // The key rides in the fragment, which browsers never send to the server.
+                    document.getElementById("share-result-oneclick").value = password
+                        ? location.origin + share.url + "#k=" + encodeURIComponent(password)
+                        : "";
                     var note = share.expiresAt
                         ? "Expires " + formatRelativeTime(share.expiresAt) + "."
                         : "Never expires.";
@@ -5407,7 +5445,7 @@
                     setShareTarget(document.getElementById("share-result"));
                     document.getElementById("share-form").hidden = true;
                     document.getElementById("share-result").hidden = false;
-                    document.getElementById("share-result-url").focus();
+                    document.getElementById(password ? "share-result-oneclick" : "share-result-url").focus();
                 } catch (err) {
                     showModalError("share-error", err.message || String(err));
                 } finally {
@@ -5446,6 +5484,15 @@
                 btn._copyTimer = setTimeout(function () {
                     btn.textContent = label;
                 }, 1500);
+            }
+
+            // One message with everything a viewer needs.
+            function copyShareInvite(btn) {
+                var text =
+                    (shareIsDir ? "Folder: " : "File: ") + sharePathLabel(sharePath) + "\n" +
+                    "Link: " + document.getElementById("share-result-url").value + "\n" +
+                    "Password: " + document.getElementById("share-result-password").value;
+                copyWithFeedback(text, btn);
             }
 
             function copyField(id, btn) {
