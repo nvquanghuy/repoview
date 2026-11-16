@@ -209,3 +209,30 @@ test.describe("Sharing", () => {
     await ctx.close();
   });
 });
+
+// Sandboxed HTML previews can't send cookies; their relative assets must
+// still load for the owner and in password-protected shares.
+test.describe("HTML previews with relative assets", () => {
+  async function previewImageWidth(page: Page) {
+    const img = page.frameLocator("iframe.html-preview").locator("#rel-img");
+    await expect(img).toBeAttached();
+    await expect.poll(() => img.evaluate((el: HTMLImageElement) => el.naturalWidth)).toBeGreaterThan(0);
+  }
+
+  test("load for the owner", async ({ page }) => {
+    await login(page, "/site/index.html");
+    await page.goto("/site/index.html");
+    await previewImageWidth(page);
+  });
+
+  test("load in a password-protected folder share", async ({ page, browser }) => {
+    await login(page, "/site/");
+    const url = await createShare(page, { password: "preview-pw" });
+    const { ctx, page: visitor } = await freshPage(browser);
+    await visitor.goto(url + "/");
+    await submitPassword(visitor, "preview-pw");
+    await visitor.goto(url + "/index.html");
+    await previewImageWidth(visitor);
+    await ctx.close();
+  });
+});

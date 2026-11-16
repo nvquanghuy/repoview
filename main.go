@@ -256,6 +256,7 @@ type FileResponse struct {
 	IsSVG      bool   `json:"isSVG,omitempty"`
 	RawSVG     string `json:"rawSVG,omitempty"`
 	IsHTML     bool   `json:"isHTML,omitempty"`
+	PreviewURL string `json:"previewURL,omitempty"` // HTML: where the sandboxed preview loads from
 	IsPDF      bool   `json:"isPDF,omitempty"`
 	IsBinary   bool   `json:"isBinary,omitempty"`
 	IsJSONL    bool   `json:"isJSONL,omitempty"`
@@ -412,6 +413,14 @@ func handleFile(w http.ResponseWriter, r *http.Request) {
 
 	if isSVG {
 		resp.RawSVG = string(data)
+	}
+
+	if isHTML {
+		// Path relative to the scope, so relative URLs inside the page
+		// resolve within it.
+		if rel, err := filepath.Rel(scopeOf(r).root, filePath); err == nil {
+			resp.PreviewURL = previewURLFor(r, filepath.ToSlash(rel))
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")

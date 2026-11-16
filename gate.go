@@ -171,9 +171,18 @@ func (s *server) handler() http.Handler {
 	public.HandleFunc("/login", s.handleLogin)
 	public.HandleFunc("/logout", s.handleLogout)
 	public.HandleFunc("/s/", s.handleShareArea)
+	public.HandleFunc(previewPrefix, s.handleOwnerPreview)
 	public.Handle(pwaIconPrefix, app) // icons are harmless and fetched without cookies
-	public.Handle("/", s.requireOwner(s.withRootScope(app)))
+	public.Handle("/", s.requireOwner(s.withRootScope(s.withOwnerPreview(app))))
 	return securityHeaders(public)
+}
+
+// withOwnerPreview lets owner requests mint HTML preview URLs.
+func (s *server) withOwnerPreview(next http.Handler) http.Handler {
+	mint := s.previewMinter("", "", s.owner.fp)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		next.ServeHTTP(w, r.WithContext(withPreview(r.Context(), mint)))
+	})
 }
 
 // withRootScope gives owner requests the whole served root as their scope.
@@ -453,6 +462,19 @@ func (s *server) handleShareArea(w http.ResponseWriter, r *http.Request) {
 		s.shareLogin(w, r, sh, base)
 		return
 	}
+	// Preview capability URLs authenticate by their token, not cookies
+	// (sandboxed previews can't send cookies); see preview.go.
+	if rest, ok := strings.CutPrefix(sub, strings.TrimPrefix(previewPrefix, "/")); ok {
+		tok, rel, ok := splitPreview(rest)
+		if !ok || !s.checkPreviewToken(tok, sh.ID, sh.fingerprint()) {
+			http.Error(w, "preview link expired; reload the page", http.StatusUnauthorized)
+			return
+		}
+		if sc, ok := s.sharedScope(w, sh); ok {
+			servePreview(w, r, sc, rel)
+		}
+		return
+	}
 	if !(sh.PasswordHash == "" || s.ownerSession(r) || s.shareSession(r, sh)) {
 		if isAPIPath("/" + sub) {
 			http.Error(w, "password required", http.StatusUnauthorized)
@@ -462,16 +484,8 @@ func (s *server) handleShareArea(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sc := sh.scopeIn(s.root)
-	target := sc.root
-	if sc.only != "" {
-		target = filepath.Join(sc.root, sc.only)
-	}
-	// The shared item must still exist and, after following symlinks, lie
-	// inside the served root: a shared folder later replaced by a symlink
-	// (a pull, a sync) must not expose what it points to.
-	if _, err := realPathInRoot(s.root, target); err != nil {
-		renderPage(w, http.StatusNotFound, messagePage("Not found", "The shared item no longer exists."))
+	sc, ok := s.sharedScope(w, sh)
+	if !ok {
 		return
 	}
 
@@ -480,7 +494,7 @@ func (s *server) handleShareArea(w http.ResponseWriter, r *http.Request) {
 		cfg.File = sc.only
 	}
 	index := s.serveIndex(name, cfg)
-	r2 := r.Clone(withScope(r.Context(), sc))
+	r2 := r.Clone(withPreview(withScope(r.Context(), sc), s.previewMinter(base, sh.ID, sh.fingerprint())))
 	switch {
 	case sub == "ws":
 		s.serveWS(w, r2, func() bool { return s.shareStillValid(sh.ID) })
@@ -497,6 +511,23 @@ func (s *server) handleShareArea(w http.ResponseWriter, r *http.Request) {
 	default:
 		index(w, r2)
 	}
+}
+
+// sharedScope is what a share's visitors may see. The shared item must still
+// exist and, after following symlinks, lie inside the served root: a shared
+// folder later replaced by a symlink (a pull, a sync) must not expose what
+// it points to. Writes a 404 otherwise.
+func (s *server) sharedScope(w http.ResponseWriter, sh Share) (scope, bool) {
+	sc := sh.scopeIn(s.root)
+	target := sc.root
+	if sc.only != "" {
+		target = filepath.Join(sc.root, sc.only)
+	}
+	if _, err := realPathInRoot(s.root, target); err != nil {
+		renderPage(w, http.StatusNotFound, messagePage("Not found", "The shared item no longer exists."))
+		return scope{}, false
+	}
+	return sc, true
 }
 
 // lookupShare resolves a ref to an active share, writing a 404 otherwise.

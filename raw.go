@@ -51,7 +51,9 @@ func (w *sandboxWriter) WriteHeader(code int) {
 			if w.topLevel {
 				h.Set("Content-Security-Policy", "sandbox")
 			} else {
-				h.Set("Content-Security-Policy", "sandbox allow-scripts")
+				// connect-src 'none': a page's scripts can't read other files
+				// (e.g. with a preview URL's token) or send what they read.
+				h.Set("Content-Security-Policy", "sandbox allow-scripts; connect-src 'none'")
 			}
 		}
 	}
