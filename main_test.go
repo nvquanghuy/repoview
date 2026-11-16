@@ -786,22 +786,7 @@ func TestNotifyFile_NoMatchingWatch(t *testing.T) {
 // newTestServer creates a test server with the same routing as production.
 func newTestServer(t *testing.T) *httptest.Server {
 	t.Helper()
-	mux := http.NewServeMux()
-	mux.HandleFunc("/api/tree", handleTree)
-	mux.HandleFunc("/api/file", handleFile)
-	mux.HandleFunc("/api/raw", handleRaw)
-	mux.HandleFunc("/api/files", handleFiles)
-	mux.HandleFunc("/api/search", handleSearch)
-	mux.HandleFunc("/api/backlinks", handleBacklinks)
-	sub, _ := fs.Sub(staticFiles, "static")
-	rawHTML, _ := fs.ReadFile(sub, "index.html")
-	indexHTML := prepareIndexHTML(rawHTML, filepath.Base(rootDir))
-	registerPWARoutes(mux, filepath.Base(rootDir))
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		w.Write(indexHTML)
-	})
-	return httptest.NewServer(mux)
+	return httptest.NewServer(newMux(filepath.Base(rootDir), nil))
 }
 
 func TestStaticFileServed(t *testing.T) {
@@ -1237,7 +1222,6 @@ func TestSPARoute_EncodedPaths(t *testing.T) {
 		}
 	}
 }
-
 
 // ── Editor endpoints tests ─────────────────────────────────────
 
@@ -1801,5 +1785,225 @@ func TestHandleFile_JSONL(t *testing.T) {
 
 	if resp.Size == 0 {
 		t.Error("expected size to be non-zero")
+	}
+}
+
+// ── Path-based raw route (/_raw/<path>) ──────────────────────
+
+// noRedirectClient returns a client that reports redirects instead of following them.
+func noRedirectClient() *http.Client {
+	return &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error {
+		return http.ErrUseLastResponse
+	}}
+}
+
+func getRaw(t *testing.T, u string) (*http.Response, string) {
+	t.Helper()
+	resp, err := noRedirectClient().Get(u)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	return resp, string(body)
+}
+
+func TestRawPath_HTMLRelativeImage(t *testing.T) {
+	setRoot(t, "testdata")
+	srv := newTestServer(t)
+	defer srv.Close()
+
+	// index.html must be served as-is, not redirected to the folder.
+	resp, body := getRaw(t, srv.URL+"/_raw/site/index.html")
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("index.html: expected 200, got %d", resp.StatusCode)
+	}
+	if ct := resp.Header.Get("Content-Type"); !strings.HasPrefix(ct, "text/html") {
+		t.Errorf("index.html: expected text/html, got %s", ct)
+	}
+	if !strings.Contains(body, `src="img/dot.png"`) {
+		t.Errorf("index.html body should be served unmodified")
+	}
+
+	// The browser resolves img/dot.png against /_raw/site/index.html.
+	base, _ := url.Parse(srv.URL + "/_raw/site/index.html")
+	imgURL := base.ResolveReference(&url.URL{Path: "img/dot.png"})
+	if imgURL.Path != "/_raw/site/img/dot.png" {
+		t.Fatalf("unexpected resolved path %s", imgURL.Path)
+	}
+	resp, _ = getRaw(t, imgURL.String())
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("image: expected 200, got %d", resp.StatusCode)
+	}
+	if ct := resp.Header.Get("Content-Type"); ct != "image/png" {
+		t.Errorf("image: expected image/png, got %s", ct)
+	}
+}
+
+func TestRawPath_NestedAssetAndEncoding(t *testing.T) {
+	setRoot(t, "testdata")
+	srv := newTestServer(t)
+	defer srv.Close()
+
+	resp, body := getRaw(t, srv.URL+"/_raw/site/css/style.css")
+	if resp.StatusCode != http.StatusOK || !strings.HasPrefix(resp.Header.Get("Content-Type"), "text/css") {
+		t.Fatalf("css: got %d %s", resp.StatusCode, resp.Header.Get("Content-Type"))
+	}
+	if !strings.Contains(body, "color") {
+		t.Errorf("css body unexpected: %q", body)
+	}
+
+	resp, _ = getRaw(t, srv.URL+"/_raw/subdir/nested.md")
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("nested.md: expected 200, got %d", resp.StatusCode)
+	}
+
+	resp, _ = getRaw(t, srv.URL+"/_raw/file%20with%20spaces.txt")
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("encoded name: expected 200, got %d", resp.StatusCode)
+	}
+}
+
+func TestRawPath_NotFoundAndDirectories(t *testing.T) {
+	setRoot(t, "testdata")
+	srv := newTestServer(t)
+	defer srv.Close()
+
+	for _, p := range []string{"/_raw/", "/_raw/subdir", "/_raw/subdir/", "/_raw/nope.png", "/_raw/site/img/missing.png"} {
+		resp, _ := getRaw(t, srv.URL+p)
+		if resp.StatusCode != http.StatusNotFound {
+			t.Errorf("%s: expected 404, got %d", p, resp.StatusCode)
+		}
+	}
+}
+
+func TestRawPath_TraversalRejected(t *testing.T) {
+	setRoot(t, "testdata")
+
+	// Direct handler calls (bypassing ServeMux path cleaning).
+	for _, p := range []string{
+		"/_raw/../main.go",
+		"/_raw/subdir/../../main.go",
+		"/_raw/%2e%2e/main.go",
+		"/_raw/..%2fmain.go",
+	} {
+		req := httptest.NewRequest("GET", p, nil)
+		w := httptest.NewRecorder()
+		handleRawPath(w, req)
+		if w.Code != http.StatusBadRequest && w.Code != http.StatusNotFound {
+			t.Errorf("%s: expected 400/404, got %d", p, w.Code)
+		}
+		if strings.Contains(w.Body.String(), "package main") {
+			t.Errorf("%s: leaked file outside root", p)
+		}
+	}
+
+	// Absolute path stays inside root (joined under rootDir) → 404.
+	req := httptest.NewRequest("GET", "/x", nil)
+	req.URL.Path = "/_raw//etc/passwd"
+	w := httptest.NewRecorder()
+	handleRawPath(w, req)
+	if w.Code == http.StatusOK {
+		t.Errorf("absolute path: expected rejection, got 200")
+	}
+
+	// Through the server: the mux redirects or rejects, never serves the file.
+	srv := newTestServer(t)
+	defer srv.Close()
+	for _, p := range []string{"/_raw/../main.go", "/_raw/%2e%2e/main.go", "/_raw/subdir/%2e%2e/%2e%2e/main.go"} {
+		req, _ := http.NewRequest("GET", srv.URL+p, nil)
+		req.URL.Opaque = p // send the path verbatim, without client-side cleaning
+		resp, err := noRedirectClient().Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		body, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if resp.StatusCode == http.StatusOK && strings.Contains(string(body), "package main") {
+			t.Errorf("%s: served file outside root", p)
+		}
+	}
+}
+
+func TestRawPath_SymlinkEscapingRoot(t *testing.T) {
+	outside := t.TempDir()
+	os.WriteFile(filepath.Join(outside, "secret.txt"), []byte("secret"), 0o644)
+	root := t.TempDir()
+	os.WriteFile(filepath.Join(root, "ok.txt"), []byte("ok"), 0o644)
+	if err := os.Symlink(filepath.Join(outside, "secret.txt"), filepath.Join(root, "leak.txt")); err != nil {
+		t.Skip("symlinks not supported:", err)
+	}
+	os.Symlink(outside, filepath.Join(root, "leakdir"))
+	os.Symlink(filepath.Join(root, "ok.txt"), filepath.Join(root, "inside.txt"))
+	setRoot(t, root)
+
+	for _, tc := range []struct {
+		url  string
+		want int
+	}{
+		{"/_raw/leak.txt", http.StatusNotFound},
+		{"/_raw/leakdir/secret.txt", http.StatusNotFound},
+		{"/api/raw?path=leak.txt", http.StatusNotFound},
+		{"/_raw/inside.txt", http.StatusOK},
+	} {
+		req := httptest.NewRequest("GET", tc.url, nil)
+		w := httptest.NewRecorder()
+		if strings.HasPrefix(tc.url, "/api/raw") {
+			handleRaw(w, req)
+		} else {
+			handleRawPath(w, req)
+		}
+		if w.Code != tc.want {
+			t.Errorf("%s: expected %d, got %d", tc.url, tc.want, w.Code)
+		}
+	}
+}
+
+func TestLegacyAPIRawStillWorks(t *testing.T) {
+	setRoot(t, "testdata")
+	srv := newTestServer(t)
+	defer srv.Close()
+
+	resp, _ := getRaw(t, srv.URL+"/api/raw?path=site/img/dot.png")
+	if resp.StatusCode != http.StatusOK || resp.Header.Get("Content-Type") != "image/png" {
+		t.Errorf("expected 200 image/png, got %d %s", resp.StatusCode, resp.Header.Get("Content-Type"))
+	}
+	// index.html via the legacy route is served, not redirected.
+	resp, _ = getRaw(t, srv.URL+"/api/raw?path=site/index.html")
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("legacy index.html: expected 200, got %d", resp.StatusCode)
+	}
+}
+
+func TestUnknownAPIPathIs404(t *testing.T) {
+	setRoot(t, "testdata")
+	srv := newTestServer(t)
+	defer srv.Close()
+
+	for _, p := range []string{"/api/foo", "/api/img/a.png", "/api/"} {
+		resp, _ := getRaw(t, srv.URL+p)
+		if resp.StatusCode != http.StatusNotFound {
+			t.Errorf("%s: expected 404, got %d", p, resp.StatusCode)
+		}
+	}
+}
+
+func TestAPIFolderInRepoStillServesSPA(t *testing.T) {
+	root := t.TempDir()
+	os.MkdirAll(filepath.Join(root, "api"), 0o755)
+	os.WriteFile(filepath.Join(root, "api", "handlers.go"), []byte("package api"), 0o644)
+	setRoot(t, root)
+	srv := newTestServer(t)
+	defer srv.Close()
+
+	for _, p := range []string{"/api/handlers.go", "/api/"} {
+		resp, _ := getRaw(t, srv.URL+p)
+		if resp.StatusCode != http.StatusOK || !strings.HasPrefix(resp.Header.Get("Content-Type"), "text/html") {
+			t.Errorf("%s: expected SPA 200 text/html, got %d %s", p, resp.StatusCode, resp.Header.Get("Content-Type"))
+		}
+	}
+	resp, _ := getRaw(t, srv.URL+"/api/missing.go")
+	if resp.StatusCode != http.StatusNotFound {
+		t.Errorf("missing file under api/: expected 404, got %d", resp.StatusCode)
 	}
 }

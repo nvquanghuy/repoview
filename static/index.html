@@ -2644,7 +2644,7 @@
                         }
                         resolved = stack.join("/");
                     }
-                    img.setAttribute("src", "/api/raw?path=" + encodeURIComponent(resolved));
+                    img.setAttribute("src", rawURLFor(resolved));
                 });
             }
 
@@ -2738,7 +2738,7 @@
                     var target = img.dataset.wikiTarget;
                     var resolved = resolveWikiTarget(target, currentDir);
                     if (resolved) {
-                        img.src = '/api/raw?path=' + encodeURIComponent(resolved);
+                        img.src = rawURLFor(resolved);
                         img.classList.add('wiki-image-valid');
                     } else {
                         img.classList.add('wiki-image-broken');
@@ -3093,7 +3093,7 @@
             // ── PDF Viewer ─────────────────────────────────────────────
             function renderPDF(path, data) {
                 var area = document.getElementById("content-area");
-                var rawURL = "/api/raw?path=" + encodeURIComponent(path);
+                var rawURL = rawURLFor(path);
                 area.innerHTML = '<div class="pdf-viewer"><embed src="' + escAttr(rawURL) + '" type="application/pdf"></div>';
             }
 
@@ -3118,7 +3118,7 @@
 
             async function renderWord(path, data) {
                 var area = document.getElementById("content-area");
-                var rawURL = "/api/raw?path=" + encodeURIComponent(path);
+                var rawURL = rawURLFor(path);
                 var downloadHTML = '<a class="binary-download" href="' + escAttr(rawURL) + '" download="' + escAttr(data.name) + '">Download</a>';
                 area.innerHTML = '<div class="markdown-body word-doc"><div class="word-doc-status">Loading document…</div></div>';
                 try {
@@ -3238,7 +3238,7 @@
                 if (data.isBinary) {
                     // Strip ?view param for binary files
                     if (getViewParam()) setViewParam(null);
-                    var rawURL = "/api/raw?path=" + encodeURIComponent(path);
+                    var rawURL = rawURLFor(path);
                     var sizeStr = formatFileSize(data.size);
                     var mime = data.mimeType || "application/octet-stream";
                     var html = "";
@@ -3341,7 +3341,7 @@
                     return;
                 }
                 if (data.isHTML) {
-                    var rawSrc = "/api/raw?path=" + encodeURIComponent(path);
+                    var rawSrc = rawURLFor(path);
                     var previewEl = '<iframe class="html-preview" sandbox="allow-scripts" src="' + rawSrc + '"></iframe>';
                     var codeHTML = '<div class="source-code">' + data.rawContent + "</div>";
                     var wantCode = getViewParam() === "code";
@@ -4932,6 +4932,12 @@
             /* ── URL routing ──────────────────────────────────────────── */
             function encodePath(path) {
                 return path.split("/").map(encodeURIComponent).join("/");
+            }
+
+            // Path-based raw URL: relative URLs inside a served HTML file
+            // resolve against the file's own folder.
+            function rawURLFor(path) {
+                return "/_raw/" + encodePath(path);
             }
 
             function pushURL(path) {
