@@ -418,7 +418,10 @@ func (s *server) handleShareArea(w http.ResponseWriter, r *http.Request) {
 	if sc.only != "" {
 		target = filepath.Join(sc.root, sc.only)
 	}
-	if _, err := os.Stat(target); err != nil {
+	// The shared item must still exist and, after following symlinks, lie
+	// inside the served root: a shared folder later replaced by a symlink
+	// (a pull, a sync) must not expose what it points to.
+	if _, err := realPathInRoot(s.root, target); err != nil {
 		renderPage(w, http.StatusNotFound, messagePage("Not found", "The shared item no longer exists."))
 		return
 	}
@@ -549,6 +552,9 @@ func validateShareRequest(req createShareRequest, root string) (string, bool, ti
 	info, err := os.Stat(abs)
 	if err != nil {
 		return "", false, 0, errors.New("no such file or folder")
+	}
+	if _, err := realPathInRoot(root, abs); err != nil {
+		return "", false, 0, errors.New("can't share a link that points outside the served folder")
 	}
 	return rel, info.IsDir(), time.Duration(req.ExpiresIn) * time.Second, nil
 }

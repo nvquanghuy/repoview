@@ -119,10 +119,12 @@ func (s scope) files() []string {
 		}
 		return nil
 	}
-	all := listFilesIn(s.root)
 	if !s.restricted {
-		return all
+		return listFilesIn(s.root)
 	}
+	// Share visitors never make us run git: a repository's own config can
+	// make git execute commands (core.fsmonitor), and a walk is enough here.
+	all := walkFiles(s.root)
 	out := all[:0]
 	for _, f := range all {
 		if s.visible(f) {
@@ -132,23 +134,43 @@ func (s scope) files() []string {
 	return out
 }
 
+// listFilesIn lists files under root, preferring `git ls-files` (fast and
+// respects .gitignore) and falling back to a walk.
 func listFilesIn(root string) []string {
-	var files []string
-
-	// Try git ls-files first. -z gives raw NUL-separated paths; without it git
-	// C-quotes non-ASCII names (e.g. "T\341\273\255.md") and they can't be opened.
-	// In a sub-directory of a repo it lists only that directory, relative to it.
-	cmd := exec.Command("git", "-C", root, "ls-files", "-z")
-	out, err := cmd.Output()
-	if err == nil && len(out) > 0 {
-		for _, name := range strings.Split(string(out), "\x00") {
-			if name != "" {
-				files = append(files, name)
-			}
-		}
+	if files := gitFiles(root); len(files) > 0 {
 		return files
 	}
+	return walkFiles(root)
+}
 
+// gitFiles runs `git ls-files` with the repository's command-running
+// settings neutralised: a planted .git/config could otherwise make git
+// execute arbitrary commands (core.fsmonitor). Command-line -c settings take
+// precedence over the repository's config. -z gives raw NUL-separated paths;
+// without it git C-quotes non-ASCII names (e.g. "T\341\273\255.md"). In a
+// sub-directory of a repo it lists only that directory, relative to it.
+func gitFiles(root string) []string {
+	cmd := exec.Command("git",
+		"-c", "core.fsmonitor=false",
+		"-c", "core.untrackedCache=false",
+		"-C", root, "ls-files", "-z")
+	cmd.Env = append(os.Environ(), "GIT_CONFIG_NOSYSTEM=1", "GIT_TERMINAL_PROMPT=0")
+	out, err := cmd.Output()
+	if err != nil {
+		return nil
+	}
+	var files []string
+	for _, name := range strings.Split(string(out), "\x00") {
+		if name != "" {
+			files = append(files, name)
+		}
+	}
+	return files
+}
+
+// walkFiles lists files under root, skipping dotfiles and dot-directories.
+func walkFiles(root string) []string {
+	var files []string
 	filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return nil

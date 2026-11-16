@@ -3660,6 +3660,20 @@
                     return;
                 }
 
+                if (data.isTooLarge) {
+                    // The server doesn't render files over 2 MB; offer the raw file.
+                    if (getViewParam()) setViewParam(null);
+                    var largeURL = rawURLFor(path);
+                    area.innerHTML =
+                        '<div class="binary-info"><div class="binary-filename">' + esc(data.name) + "</div>" +
+                        '<div class="binary-meta"><span>' + esc(formatFileSize(data.size)) + "</span></div>" +
+                        "<p>Too large to preview (over 2 MB)</p>" +
+                        '<a class="binary-download" href="' + escAttr(largeURL) + '" download="' + escAttr(data.name) + '">Download</a></div>';
+                    showFileHeaderBar(null, "<span>" + esc(formatFileSize(data.size)) + "</span>");
+                    wsWatch(path);
+                    document.title = path.split("/").pop() + " - RepoView";
+                    return;
+                }
                 if (data.isBinary) {
                     // Strip ?view param for binary files
                     if (getViewParam()) setViewParam(null);

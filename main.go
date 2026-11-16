@@ -259,6 +259,7 @@ type FileResponse struct {
 	IsBinary   bool   `json:"isBinary,omitempty"`
 	IsJSONL    bool   `json:"isJSONL,omitempty"`
 	IsWord     bool   `json:"isWord,omitempty"`
+	IsTooLarge bool   `json:"isTooLarge,omitempty"`
 	MimeType   string `json:"mimeType,omitempty"`
 	Size       int64  `json:"size,omitempty"`
 }
@@ -332,6 +333,18 @@ func handleFile(w http.ResponseWriter, r *http.Request) {
 			IsJSONL:  true,
 			MimeType: "application/x-ndjson",
 			Size:     info.Size(),
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(resp)
+		return
+	}
+
+	if info.Size() > maxRenderSize {
+		resp := FileResponse{
+			Name:       filepath.Base(filePath),
+			Path:       reqPath,
+			IsTooLarge: true,
+			Size:       info.Size(),
 		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(resp)
@@ -864,6 +877,25 @@ func (h *hub) run() {
 	// Hub doesn't need a goroutine loop; broadcast is called directly.
 }
 
+func (h *hub) count() int {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return len(h.clients)
+}
+
+// maxWatched is the largest watch list of any client (for tests).
+func (h *hub) maxWatched() int {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	n := 0
+	for c := range h.clients {
+		c.mu.Lock()
+		n = max(n, len(c.watched))
+		c.mu.Unlock()
+	}
+	return n
+}
+
 func (h *hub) register(c *wsClient) {
 	h.mu.Lock()
 	h.clients[c] = true
@@ -968,9 +1000,20 @@ func handleWS(w http.ResponseWriter, r *http.Request, h *hub, watcher *fsnotify.
 	handleWSScoped(w, r, h, watcher, nil)
 }
 
+// Websocket limits: clients only send small watch/unwatch messages.
+const (
+	maxWSClients        = 256
+	maxWatchesPerClient = 256
+	maxWSMessage        = 4096
+)
+
 // handleWSScoped upgrades the connection; the client may only watch paths
 // inside the request's scope.
 func handleWSScoped(w http.ResponseWriter, r *http.Request, h *hub, watcher *fsnotify.Watcher, alive func() bool) {
+	if h.count() >= maxWSClients {
+		http.Error(w, "too many live-reload connections", http.StatusServiceUnavailable)
+		return
+	}
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		return
@@ -995,6 +1038,7 @@ func (c *wsClient) readPump(watcher *fsnotify.Watcher) {
 		c.hub.unregister(c)
 		c.conn.Close()
 	}()
+	c.conn.SetReadLimit(maxWSMessage)
 	for {
 		_, msg, err := c.conn.ReadMessage()
 		if err != nil {
@@ -1016,6 +1060,10 @@ func (c *wsClient) readPump(watcher *fsnotify.Watcher) {
 		c.mu.Lock()
 		switch req.Action {
 		case "watch":
+			// Only existing paths, and a bounded number of them.
+			if _, err := os.Stat(absPath); err != nil || (!c.watched[req.Path] && len(c.watched) >= maxWatchesPerClient) {
+				break
+			}
 			c.watched[req.Path] = true
 			if watcher != nil {
 				_ = watcher.Add(absPath)
@@ -1204,3 +1252,7 @@ func readJSONLPage(filePath string, page, pageSize int) ([]string, []string, err
 
 	return records, parseErrors, nil
 }
+
+// maxRenderSize: larger files are not read or rendered by /api/file (a 20 MB
+// source file took ~3.5 GB to highlight); the frontend offers a download.
+const maxRenderSize = 2 << 20

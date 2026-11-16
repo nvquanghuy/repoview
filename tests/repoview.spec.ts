@@ -957,6 +957,18 @@ test.describe("Rendering safety", () => {
     await expect(page.locator("#content-area .mermaid img")).toHaveCount(0);
   });
 
+  test("files too large to render offer a download", async ({ page }) => {
+    await page.route("**/api/file?path=huge.log", (route) =>
+      route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({ name: "huge.log", path: "huge.log", isTooLarge: true, size: 50 << 20 }),
+      }),
+    );
+    await page.goto("/huge.log");
+    await expect(page.locator("#content-area")).toContainText("Too large to preview");
+    await expect(page.locator("#content-area .binary-download")).toHaveAttribute("href", "/_raw/huge.log");
+  });
+
   test("script URLs are stripped from rendered links", async ({ page }) => {
     await serveMarkdown(
       page,
