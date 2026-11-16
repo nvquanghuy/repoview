@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+
+## [v0.24.1] - 2026-11-16
+
 - [fixed] Images, video and audio over 2 MB preview again instead of showing "Too large to preview"; the 2 MB limit now applies only to text files, which the server renders
 
 
