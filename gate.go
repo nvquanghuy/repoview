@@ -277,15 +277,13 @@ func clearCookie(w http.ResponseWriter, r *http.Request, name, cookiePath string
 // checkPassword runs a rate-limited password check and writes the failure
 // response itself; it returns true only on success.
 func (s *server) checkPassword(w http.ResponseWriter, r *http.Request, key string, check func(string) bool, page pageData) bool {
-	now := s.now()
-	if wait, blocked := s.limiter.blocked(key, now); blocked {
+	if wait, ok := s.limiter.attempt(key, s.now()); !ok {
 		w.Header().Set("Retry-After", strconv.Itoa(int(math.Ceil(wait.Seconds()))))
 		page.Error = fmt.Sprintf("Too many attempts. Try again in %d minutes.", int(math.Ceil(wait.Minutes())))
 		renderPage(w, http.StatusTooManyRequests, page)
 		return false
 	}
 	if !check(r.PostFormValue("password")) {
-		s.limiter.fail(key, now)
 		page.Error = "Incorrect password."
 		renderPage(w, http.StatusUnauthorized, page)
 		return false

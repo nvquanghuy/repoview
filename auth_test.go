@@ -2,8 +2,10 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -91,50 +93,80 @@ func TestLimiter(t *testing.T) {
 	l := newLimiter(5, 15*time.Minute)
 	now := time.Unix(1_700_000_000, 0)
 
-	for i := 0; i < 4; i++ {
-		l.fail("k", now)
+	for i := 0; i < 5; i++ {
+		if _, ok := l.attempt("k", now); !ok {
+			t.Fatalf("attempt %d refused", i+1)
+		}
 	}
-	if _, blocked := l.blocked("k", now); blocked {
-		t.Fatal("4 failures must not block")
+	wait, ok := l.attempt("k", now.Add(time.Minute))
+	if ok || wait != 14*time.Minute {
+		t.Fatalf("6th attempt: ok=%v wait=%v", ok, wait)
 	}
-	l.fail("k", now)
-	wait, blocked := l.blocked("k", now.Add(time.Minute))
-	if !blocked || wait != 14*time.Minute {
-		t.Fatalf("after 5 failures: blocked=%v wait=%v", blocked, wait)
-	}
-	if _, blocked := l.blocked("other", now); blocked {
+	if _, ok := l.attempt("other", now); !ok {
 		t.Fatal("keys must be independent")
 	}
-	if _, blocked := l.blocked("k", now.Add(15*time.Minute)); blocked {
+	if _, ok := l.attempt("k", now.Add(15*time.Minute)); !ok {
 		t.Fatal("lockout must expire")
 	}
 
-	// Failures spread out beyond the window don't accumulate.
+	// Attempts spread out beyond the window don't accumulate.
 	l2 := newLimiter(5, 15*time.Minute)
 	for i := 0; i < 10; i++ {
-		l2.fail("k", now.Add(time.Duration(i)*16*time.Minute))
-	}
-	if _, blocked := l2.blocked("k", now.Add(10*16*time.Minute)); blocked {
-		t.Fatal("old failures must age out")
+		if _, ok := l2.attempt("k", now.Add(time.Duration(i)*16*time.Minute)); !ok {
+			t.Fatalf("spread attempt %d refused", i)
+		}
 	}
 
 	// Success clears the counter.
 	l3 := newLimiter(5, 15*time.Minute)
 	for i := 0; i < 4; i++ {
-		l3.fail("k", now)
+		l3.attempt("k", now)
 	}
 	l3.succeed("k")
-	l3.fail("k", now)
-	if _, blocked := l3.blocked("k", now); blocked {
-		t.Fatal("success must reset failures")
+	for i := 0; i < 5; i++ {
+		if _, ok := l3.attempt("k", now); !ok {
+			t.Fatal("success must reset the counter")
+		}
 	}
 }
 
-func TestLimiter_BoundedMemory(t *testing.T) {
+// The attempt is reserved before the (slow) password check, so a burst of
+// parallel guesses can't all slip past the limit.
+func TestLimiter_ConcurrentAttemptsCapped(t *testing.T) {
 	l := newLimiter(5, time.Minute)
 	now := time.Unix(1_700_000_000, 0)
-	for i := 0; i < 20_000; i++ {
-		l.fail(strings.Repeat("x", i%50)+string(rune(i)), now.Add(time.Duration(i)*time.Second))
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	allowed := 0
+	for i := 0; i < 100; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if _, ok := l.attempt("k", now); ok {
+				mu.Lock()
+				allowed++
+				mu.Unlock()
+			}
+		}()
+	}
+	wg.Wait()
+	if allowed != 5 {
+		t.Fatalf("%d attempts allowed, want 5", allowed)
+	}
+}
+
+// Flooding the limiter with fresh keys must not release locked-out keys.
+func TestLimiter_FloodKeepsLockouts(t *testing.T) {
+	l := newLimiter(5, time.Hour)
+	now := time.Unix(1_700_000_000, 0)
+	for i := 0; i < 5; i++ {
+		l.attempt("victim", now)
+	}
+	for i := 0; i < limiterMaxEntries*2; i++ {
+		l.attempt(fmt.Sprintf("flood-%d", i), now)
+	}
+	if _, ok := l.attempt("victim", now); ok {
+		t.Fatal("flood released the lockout")
 	}
 	if n := len(l.entries); n > limiterMaxEntries {
 		t.Fatalf("limiter grew to %d entries", n)
@@ -212,6 +244,11 @@ func TestSafeNext(t *testing.T) {
 		"https://evil.com": "/",
 		"javascript:x":     "/",
 		"/s/abc/":          "/s/abc/",
+		"/\t/evil.com":     "/",
+		"/\r\n/evil.com":   "/",
+		"/%09/evil.com":    "/%09/evil.com", // still encoded: a harmless local path
+		"/a\x7f":           "/",
+		"/caf\u00e9.md":    "/caf\u00e9.md",
 	} {
 		if got := safeNext(in); got != want {
 			t.Errorf("safeNext(%q) = %q, want %q", in, got, want)

@@ -700,15 +700,10 @@ func serveRawFile(w http.ResponseWriter, r *http.Request, rel string) {
 		http.Error(w, "file not found", http.StatusNotFound)
 		return
 	}
-	// Documents that can run script are sandboxed even when opened directly,
-	// so they never run with this origin's cookies.
-	switch strings.ToLower(filepath.Ext(real)) {
-	case ".html", ".htm", ".xhtml", ".svg", ".xml":
-		w.Header().Set("Content-Security-Policy", "sandbox allow-scripts")
-	}
 	// ServeContent, not ServeFile: ServeFile redirects ".../index.html" to
-	// the directory, which would break previews of index.html files.
-	http.ServeContent(w, r, info.Name(), info.ModTime(), f)
+	// the directory, which would break previews of index.html files. The
+	// sandboxWriter sandboxes anything whose final type can run script.
+	http.ServeContent(&sandboxWriter{ResponseWriter: w}, r, info.Name(), info.ModTime(), f)
 }
 
 // realPathInRoot resolves symlinks in p and checks the result is still inside

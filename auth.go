@@ -128,9 +128,10 @@ func (o ownerCredential) check(pw string) bool {
 
 // ── Rate limiter ────────────────────────────────────────────
 
-// limiter locks a key out after max failures within the lockout window,
-// until the window since the last failure has passed. The clock is passed
-// in so behaviour is deterministic under test.
+// limiter allows max password attempts per key within a window that starts
+// at the key's first attempt; a success resets the key. Attempts are
+// reserved *before* the slow password check, so parallel guesses can't race
+// past the limit. The clock is passed in so behaviour is deterministic.
 type limiter struct {
 	mu      sync.Mutex
 	max     int
@@ -140,45 +141,36 @@ type limiter struct {
 
 type attempts struct {
 	count int
-	last  time.Time
+	start time.Time
 }
 
 func newLimiter(max int, window time.Duration) *limiter {
 	return &limiter{max: max, window: window, entries: map[string]*attempts{}}
 }
 
-// blocked reports whether key is locked out and for how much longer.
-func (l *limiter) blocked(key string, now time.Time) (time.Duration, bool) {
+// attempt reserves one try for key. When refused it returns how long until
+// the key may try again.
+func (l *limiter) attempt(key string, now time.Time) (time.Duration, bool) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	a, ok := l.entries[key]
-	if !ok {
-		return 0, false
-	}
-	until := a.last.Add(l.window)
-	if !now.Before(until) {
+	if ok && !now.Before(a.start.Add(l.window)) {
 		delete(l.entries, key)
-		return 0, false
+		ok = false
 	}
-	if a.count >= l.max {
-		return until.Sub(now), true
-	}
-	return 0, false
-}
-
-func (l *limiter) fail(key string, now time.Time) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	a, ok := l.entries[key]
-	if !ok || !now.Before(a.last.Add(l.window)) {
-		if len(l.entries) >= limiterMaxEntries {
-			l.prune(now)
+	if !ok {
+		if len(l.entries) >= limiterMaxEntries && !l.prune(now) {
+			// Full of live entries: refuse rather than forget lockouts.
+			return l.window, false
 		}
-		a = &attempts{}
+		a = &attempts{start: now}
 		l.entries[key] = a
 	}
+	if a.count >= l.max {
+		return a.start.Add(l.window).Sub(now), false
+	}
 	a.count++
-	a.last = now
+	return 0, true
 }
 
 func (l *limiter) succeed(key string) {
@@ -187,17 +179,24 @@ func (l *limiter) succeed(key string) {
 	l.mu.Unlock()
 }
 
-// prune drops stale entries; if an attacker floods fresh keys it drops
-// everything rather than grow without bound.
-func (l *limiter) prune(now time.Time) {
+// prune drops expired entries, then entries that aren't locked out. Locked
+// keys are never dropped, so a flood of fresh keys can't release them. It
+// reports whether there is now room.
+func (l *limiter) prune(now time.Time) bool {
 	for k, a := range l.entries {
-		if !now.Before(a.last.Add(l.window)) {
+		if !now.Before(a.start.Add(l.window)) {
 			delete(l.entries, k)
 		}
 	}
-	if len(l.entries) >= limiterMaxEntries {
-		l.entries = map[string]*attempts{}
+	for k, a := range l.entries {
+		if len(l.entries) < limiterMaxEntries*9/10 {
+			break
+		}
+		if a.count < l.max {
+			delete(l.entries, k)
+		}
 	}
+	return len(l.entries) < limiterMaxEntries
 }
 
 // ── Request facts ───────────────────────────────────────────
@@ -253,9 +252,20 @@ func sameOrigin(r *http.Request) bool {
 	return false
 }
 
-// safeNext keeps post-login redirects on this site.
+// safeNext keeps post-login redirects on this site: a single leading slash,
+// no backslashes and no control characters (browsers strip tabs and newlines,
+// which would turn "/\t/evil.com" into "//evil.com").
 func safeNext(next string) string {
-	if !strings.HasPrefix(next, "/") || strings.HasPrefix(next, "//") || strings.HasPrefix(next, "/\\") {
+	if !strings.HasPrefix(next, "/") || strings.HasPrefix(next, "//") {
+		return "/"
+	}
+	for _, r := range next {
+		if r < 0x20 || r == 0x7f || r == '\\' {
+			return "/"
+		}
+	}
+	u, err := url.Parse(next)
+	if err != nil || u.Scheme != "" || u.Host != "" || u.User != nil {
 		return "/"
 	}
 	return next

@@ -327,6 +327,51 @@ func TestOwnerLogin_RateLimited(t *testing.T) {
 	}
 }
 
+func TestOwnerLogin_ParallelGuessesCapped(t *testing.T) {
+	e := newAuthEnv(t)
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	checked := 0
+	for i := 0; i < 30; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			r := e.postForm(e.client(), "/login", url.Values{"password": {"guess"}})
+			if r.code == http.StatusUnauthorized {
+				mu.Lock()
+				checked++
+				mu.Unlock()
+			}
+		}()
+	}
+	wg.Wait()
+	if checked > loginMaxFailures {
+		t.Fatalf("%d passwords checked in parallel, limit is %d", checked, loginMaxFailures)
+	}
+}
+
+func TestRaw_SniffedHTMLIsSandboxed(t *testing.T) {
+	e := newAuthEnv(t)
+	c := e.client()
+	e.login(c)
+	page := "<!DOCTYPE html><html><script>alert(1)</script></html>"
+	for _, name := range []string{"page", "page.unknownext", "page.shtml", "page.xht", "page.xsl"} {
+		if err := os.WriteFile(filepath.Join(e.root, name), []byte(page), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		r := e.get(c, "/api/raw?path="+name)
+		ct := r.header.Get("Content-Type")
+		if !strings.Contains(r.header.Get("Content-Security-Policy"), "sandbox") {
+			t.Errorf("%s served as %q without sandbox", name, ct)
+		}
+	}
+	// Ordinary files keep working without the sandbox (PDF viewers refuse it).
+	os.WriteFile(filepath.Join(e.root, "doc.pdf"), []byte("%PDF-1.4\n"), 0o644)
+	if r := e.get(c, "/api/raw?path=doc.pdf"); r.header.Get("Content-Security-Policy") != "" {
+		t.Errorf("pdf got CSP %q", r.header.Get("Content-Security-Policy"))
+	}
+}
+
 func TestOwnerSession_ExpiresAfter30Days(t *testing.T) {
 	e := newAuthEnv(t)
 	c := e.client()
