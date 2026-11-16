@@ -342,6 +342,21 @@ func handleFile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if info.Size() > maxRenderSize {
+		// The cap guards server-side rendering of text. Binary files (images,
+		// video, audio) are shown by the browser from /api/raw, so sniff the
+		// head and let them through at any size.
+		if mime, ok := sniffBinary(filePath); ok {
+			resp := FileResponse{
+				Name:     filepath.Base(filePath),
+				Path:     reqPath,
+				IsBinary: true,
+				MimeType: mime,
+				Size:     info.Size(),
+			}
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(resp)
+			return
+		}
 		resp := FileResponse{
 			Name:       filepath.Base(filePath),
 			Path:       reqPath,
@@ -650,6 +665,23 @@ func prettyPrint(data []byte, ext string) []byte {
 }
 
 // isBinaryContent returns true if the data appears to be binary (non-text).
+// sniffBinary reads only the first 512 bytes of a file and reports whether it
+// is binary, with its detected MIME type.
+func sniffBinary(path string) (string, bool) {
+	f, err := os.Open(path)
+	if err != nil {
+		return "", false
+	}
+	defer f.Close()
+	head := make([]byte, 512)
+	n, _ := io.ReadFull(f, head)
+	head = head[:n]
+	if !isBinaryContent(head) {
+		return "", false
+	}
+	return http.DetectContentType(head), true
+}
+
 func isBinaryContent(data []byte) bool {
 	if len(data) == 0 {
 		return false

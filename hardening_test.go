@@ -130,6 +130,22 @@ func TestHandleFile_LargeFileReturnsMetadataOnly(t *testing.T) {
 	}
 }
 
+func TestHandleFile_LargeImagePreviewed(t *testing.T) {
+	dir := t.TempDir()
+	jpeg := append([]byte{0xFF, 0xD8, 0xFF, 0xE0, 0, 0x10, 'J', 'F', 'I', 'F', 0}, make([]byte, maxRenderSize+1)...)
+	os.WriteFile(filepath.Join(dir, "photo.jpeg"), jpeg, 0o644)
+	r := httptest.NewRequest("GET", "/api/file?path=photo.jpeg", nil).WithContext(withScope(context.Background(), scope{root: dir}))
+	w := httptest.NewRecorder()
+	handleFile(w, r)
+	var resp FileResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatal(err)
+	}
+	if resp.IsTooLarge || !resp.IsBinary || resp.MimeType != "image/jpeg" || resp.Size != int64(len(jpeg)) {
+		t.Fatalf("large image: tooLarge=%v binary=%v mime=%q size=%d", resp.IsTooLarge, resp.IsBinary, resp.MimeType, resp.Size)
+	}
+}
+
 // ── F4: websocket input is bounded ──────────────────────────
 
 func TestWebsocket_InputBounded(t *testing.T) {
