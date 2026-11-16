@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"html"
 	"io"
-	"io/fs"
 	"log"
 	"net"
 	"net/http"
@@ -125,20 +124,18 @@ func main() {
 		log.Println("Obsidian vault detected, enabling wiki links")
 	}
 
-	hub := newHub()
-	go hub.run()
+	cfg, err := serverConfigFromEnv(rootDir)
+	if err != nil {
+		log.Fatal(err)
+	}
+	app := newServer(cfg)
 
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer watcher.Close()
-
-	go watchLoop(watcher, hub)
-
-	mux := newMux(filepath.Base(rootDir), func(w http.ResponseWriter, r *http.Request) {
-		handleWS(w, r, hub, watcher)
-	})
+	app.watch(watcher)
 
 	// Find an available port (auto-increment if default port is taken)
 	actualPort := *port
@@ -148,13 +145,19 @@ func main() {
 
 	addr := fmt.Sprintf("%s:%d", *host, actualPort)
 	url := fmt.Sprintf("http://localhost:%d", actualPort)
-	fmt.Printf("RepoView v%s · %s\n→ http://%s\n\nPress Ctrl+C to stop\n", version, rootDir, addr)
+	fmt.Printf("RepoView v%s · %s\n→ http://%s\n", version, rootDir, addr)
+	if app.authEnabled() {
+		fmt.Println("Password login on; share links enabled")
+	} else if !isLoopbackHost(*host) {
+		fmt.Println("WARNING: listening beyond localhost without a password; set REPOVIEW_PASSWORD")
+	}
+	fmt.Print("\nPress Ctrl+C to stop\n")
 
 	if !*noBrowser {
 		_ = browser.OpenURL(url)
 	}
 
-	log.Fatal(http.ListenAndServe(addr, mux))
+	log.Fatal(http.ListenAndServe(addr, app.handler()))
 }
 
 // rawPrefix is the path-based route for raw file bytes: /_raw/<relative/path>.
@@ -163,56 +166,6 @@ func main() {
 // leading underscore keeps it from shadowing a real top-level "raw/" folder,
 // whose files are reachable at the SPA's clean URL /raw/<file>.
 const rawPrefix = "/_raw/"
-
-// newMux builds the HTTP routes. ws handles /ws; it may be nil (tests).
-func newMux(rootName string, ws http.HandlerFunc) *http.ServeMux {
-	mux := http.NewServeMux()
-	mux.HandleFunc("/api/tree", handleTree)
-	mux.HandleFunc("/api/file", handleFile)
-	mux.HandleFunc("/api/files", handleFiles)
-	mux.HandleFunc("/api/search", handleSearch)
-	mux.HandleFunc("/api/backlinks", handleBacklinks)
-	mux.HandleFunc("/api/raw", handleRaw)
-	mux.HandleFunc("/api/jsonl", handleJSONL)
-	mux.HandleFunc("/api/editors", handleEditors)
-	mux.HandleFunc("/api/open", handleOpen)
-	mux.HandleFunc(rawPrefix, handleRawPath)
-	if ws != nil {
-		mux.HandleFunc("/ws", ws)
-	}
-
-	// Serve index.html for all non-API paths (SPA catch-all).
-	staticSub, err := fs.Sub(staticFiles, "static")
-	if err != nil {
-		log.Fatal(err)
-	}
-	indexHTML, err := fs.ReadFile(staticSub, "index.html")
-	if err != nil {
-		log.Fatal(err)
-	}
-	indexHTML = prepareIndexHTML(indexHTML, rootName)
-	serveIndex := func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		w.Write(indexHTML)
-	}
-	registerPWARoutes(mux, rootName)
-
-	// Unknown /api/* paths are 404 so broken API or asset URLs fail visibly,
-	// unless the path is a real file or folder under an "api/" directory in
-	// the repo, whose clean SPA URL starts with /api/.
-	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
-		rel := strings.TrimPrefix(r.URL.Path, "/")
-		if p, err := safePath(rel); err == nil {
-			if _, err := os.Stat(p); err == nil {
-				serveIndex(w, r)
-				return
-			}
-		}
-		http.NotFound(w, r)
-	})
-	mux.HandleFunc("/", serveIndex)
-	return mux
-}
 
 // findAvailablePort tries to find an available port starting from startPort.
 // It tries up to maxAttempts ports, incrementing by 1 each time.
@@ -230,10 +183,7 @@ func findAvailablePort(host string, startPort, maxAttempts int) int {
 }
 
 func prepareIndexHTML(raw []byte, rootName string) []byte {
-	jsName, _ := json.Marshal(rootName)
-	out := bytes.ReplaceAll(raw, []byte("__ROOT_DIR_NAME_JS__"), jsName)
-	out = bytes.ReplaceAll(out, []byte("__ROOT_DIR_NAME__"), []byte(html.EscapeString(rootName)))
-	return out
+	return renderIndex(raw, rootName, pageConfig{Mode: "local"})
 }
 
 // safePath resolves a request path within rootDir and rejects traversal.
@@ -750,6 +700,12 @@ func serveRawFile(w http.ResponseWriter, r *http.Request, rel string) {
 		http.Error(w, "file not found", http.StatusNotFound)
 		return
 	}
+	// Documents that can run script are sandboxed even when opened directly,
+	// so they never run with this origin's cookies.
+	switch strings.ToLower(filepath.Ext(real)) {
+	case ".html", ".htm", ".xhtml", ".svg", ".xml":
+		w.Header().Set("Content-Security-Policy", "sandbox allow-scripts")
+	}
 	// ServeContent, not ServeFile: ServeFile redirects ".../index.html" to
 	// the directory, which would break previews of index.html files.
 	http.ServeContent(w, r, info.Name(), info.ModTime(), f)
@@ -893,6 +849,15 @@ type wsClient struct {
 	send    chan []byte
 	watched map[string]bool // paths this client wants watched
 	mu      sync.Mutex
+	scope   scope       // what this client may watch; zero value = whole root
+	alive   func() bool // nil, or false once the client's share is gone
+}
+
+func (c *wsClient) scopeOrRoot() scope {
+	if c.scope.root == "" {
+		return scope{root: rootDir}
+	}
+	return c.scope
 }
 
 func newHub() *hub {
@@ -927,13 +892,33 @@ func (h *hub) broadcast(msg []byte) {
 	}
 }
 
-// notifyFile sends a change notification to clients watching a given path
-// or any of its parent directories.
+// notifyFile sends a change notification for a path relative to rootDir.
 func (h *hub) notifyFile(relPath string) {
-	msg, _ := json.Marshal(map[string]string{"type": "change", "path": relPath})
+	h.notifyAbs(filepath.Join(rootDir, filepath.FromSlash(relPath)))
+}
+
+// notifyAbs sends a change notification to clients watching a path or any
+// of its parent directories. Each client gets the path relative to its own
+// scope; clients whose scope doesn't include it hear nothing. Clients whose
+// share was revoked or expired are disconnected.
+func (h *hub) notifyAbs(absPath string) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	for c := range h.clients {
+		if c.alive != nil && !c.alive() {
+			c.conn.Close() // readPump then unregisters
+			continue
+		}
+		sc := c.scopeOrRoot()
+		rel, err := filepath.Rel(sc.root, absPath)
+		if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+			continue
+		}
+		relPath := filepath.ToSlash(rel)
+		if (sc.restricted || sc.only != "") && relPath != "." && !sc.visible(relPath) {
+			continue
+		}
+		msg, _ := json.Marshal(map[string]string{"type": "change", "path": relPath})
 		c.mu.Lock()
 		// Check if client is watching the exact path or any parent directory
 		watching := c.watched[relPath]
@@ -966,11 +951,19 @@ func (h *hub) notifyFile(relPath string) {
 	}
 }
 
+// Browsers attach cookies to cross-site websocket handshakes, so only accept
+// connections from our own pages.
 var upgrader = websocket.Upgrader{
-	CheckOrigin: func(r *http.Request) bool { return true },
+	CheckOrigin: sameOrigin,
 }
 
 func handleWS(w http.ResponseWriter, r *http.Request, h *hub, watcher *fsnotify.Watcher) {
+	handleWSScoped(w, r, h, watcher, nil)
+}
+
+// handleWSScoped upgrades the connection; the client may only watch paths
+// inside the request's scope.
+func handleWSScoped(w http.ResponseWriter, r *http.Request, h *hub, watcher *fsnotify.Watcher, alive func() bool) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		return
@@ -981,6 +974,8 @@ func handleWS(w http.ResponseWriter, r *http.Request, h *hub, watcher *fsnotify.
 		hub:     h,
 		send:    make(chan []byte, 64),
 		watched: make(map[string]bool),
+		scope:   scopeOf(r),
+		alive:   alive,
 	}
 	h.register(client)
 
@@ -1006,7 +1001,7 @@ func (c *wsClient) readPump(watcher *fsnotify.Watcher) {
 			continue
 		}
 
-		absPath, err := safePath(req.Path)
+		absPath, err := c.scopeOrRoot().resolve(req.Path)
 		if err != nil {
 			continue
 		}
@@ -1015,7 +1010,9 @@ func (c *wsClient) readPump(watcher *fsnotify.Watcher) {
 		switch req.Action {
 		case "watch":
 			c.watched[req.Path] = true
-			_ = watcher.Add(absPath)
+			if watcher != nil {
+				_ = watcher.Add(absPath)
+			}
 		case "unwatch":
 			delete(c.watched, req.Path)
 			// Don't remove from fsnotify—other clients may watch it.
@@ -1041,11 +1038,7 @@ func watchLoop(watcher *fsnotify.Watcher, h *hub) {
 				return
 			}
 			if event.Op&(fsnotify.Write|fsnotify.Create|fsnotify.Remove|fsnotify.Rename) != 0 {
-				relPath, err := filepath.Rel(rootDir, event.Name)
-				if err != nil {
-					continue
-				}
-				h.notifyFile(filepath.ToSlash(relPath))
+				h.notifyAbs(event.Name)
 			}
 		case _, ok := <-watcher.Errors:
 			if !ok {

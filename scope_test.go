@@ -3,12 +3,12 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"strings"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"reflect"
 	"sort"
+	"strings"
 	"testing"
 )
 
@@ -67,8 +67,8 @@ func shareFixture(t *testing.T) (root string) {
 		t.Fatal(err)
 	}
 	for p, s := range map[string]string{
-		filepath.Join(shared, "a.md"): "# A",
-		filepath.Join(shared, ".env"): "SECRET=1",
+		filepath.Join(shared, "a.md"):    "# A",
+		filepath.Join(shared, ".env"):    "SECRET=1",
 		filepath.Join(root, "secret.md"): "top secret",
 	} {
 		if err := os.WriteFile(p, []byte(s), 0o644); err != nil {
@@ -223,6 +223,36 @@ func TestSearch_RestrictedScopeStaysInside(t *testing.T) {
 	handleSearch(w, r)
 	if body := w.Body.String(); contains(body, "top secret") || contains(body, ".env") {
 		t.Fatalf("search leaked content outside the share: %s", body)
+	}
+}
+
+// ── websocket notifications honour the client's scope ──────
+
+func TestHub_NotifyAbsRespectsClientScope(t *testing.T) {
+	root := shareFixture(t)
+	h := newHub()
+	shared := &wsClient{
+		hub: h, send: make(chan []byte, 8),
+		watched: map[string]bool{".": true},
+		scope:   scope{root: filepath.Join(root, "shared"), restricted: true},
+	}
+	h.register(shared)
+
+	h.notifyAbs(filepath.Join(root, "secret.md"))      // outside the share
+	h.notifyAbs(filepath.Join(root, "shared", ".env")) // hidden in shares
+	h.notifyAbs(filepath.Join(root, "shared", "a.md")) // visible
+	select {
+	case msg := <-shared.send:
+		if string(msg) != `{"path":"a.md","type":"change"}` {
+			t.Fatalf("got %s", msg)
+		}
+	default:
+		t.Fatal("expected a notification for a.md")
+	}
+	select {
+	case msg := <-shared.send:
+		t.Fatalf("unexpected extra notification %s", msg)
+	default:
 	}
 }
 

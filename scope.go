@@ -185,7 +185,7 @@ func scopeOf(r *http.Request) scope {
 
 // apiHandler serves the read-only API that both the owner and share
 // visitors use. Each handler reads the scope from the request context.
-func apiHandler() http.Handler {
+func apiHandler() *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/tree", handleTree)
 	mux.HandleFunc("/api/file", handleFile)
