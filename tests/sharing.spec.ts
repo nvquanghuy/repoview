@@ -185,6 +185,72 @@ test.describe("Sharing", () => {
     await expect(row.locator(".share-row-expiry")).toContainText("in 2 hours");
   });
 
+  test("one-click link opens a password share without typing", async ({ page, browser }) => {
+    await login(page, "/subdir/");
+    // Characters that need encoding survive the trip through the fragment.
+    const pw = "p@ss #1 &k=é/?";
+    const url = await createShare(page, { password: pw });
+    const oneClick = page.locator("#share-result-oneclick");
+    await expect(oneClick).toHaveValue(url + "#k=" + encodeURIComponent(pw));
+    await expect(page.locator("#share-result-oneclick-hint")).toContainText("Anyone with this link");
+
+    const { ctx, page: guest } = await freshPage(browser);
+    await guest.goto(await oneClick.inputValue());
+    await expect(guest.locator("#tree-container .tree-item").first()).toBeVisible();
+    await expect(guest.locator("input[name=password]")).toHaveCount(0);
+    // The key is gone from the address bar and from history.
+    expect(guest.url()).not.toContain("#");
+    expect(guest.url()).not.toContain("k=");
+    await guest.goBack().catch(() => {});
+    expect(guest.url()).not.toContain("k=");
+
+    // Already unlocked: opening the one-click link again strips the key too.
+    await guest.goto(await oneClick.inputValue());
+    await expect(guest.locator("#tree-container .tree-item").first()).toBeVisible();
+    expect(guest.url()).not.toContain("k=");
+    await ctx.close();
+
+    // The owner opening their own one-click link also gets a clean URL.
+    await page.goto(await oneClick.inputValue());
+    await expect(page.locator("#tree-container .tree-item").first()).toBeVisible();
+    expect(page.url()).not.toContain("k=");
+  });
+
+  test("one-click link with a wrong key falls back to the prompt", async ({ page, browser }) => {
+    await login(page, "/subdir/");
+    const url = await createShare(page, { password: "right-key-1" });
+    const { ctx, page: guest } = await freshPage(browser);
+    await guest.goto(url + "#k=wrong-key");
+    await expect(guest.getByText("Incorrect password.")).toBeVisible();
+    await expect(guest.locator("input[name=password]")).toBeVisible();
+    expect(guest.url()).not.toContain("wrong-key");
+    // No resubmit loop: the prompt stays put.
+    await guest.waitForTimeout(500);
+    await expect(guest.getByText("Incorrect password.")).toBeVisible();
+    await submitPassword(guest, "right-key-1");
+    await expect(guest.locator("#tree-container .tree-item").first()).toBeVisible();
+    await ctx.close();
+  });
+
+  test("no one-click link without a password", async ({ page }) => {
+    await login(page, "/hello.md");
+    await createShare(page, { password: "" });
+    await expect(page.locator("#share-result-oneclick-block")).toBeHidden();
+    await expect(page.locator("#share-result-invite-btn")).toBeHidden();
+  });
+
+  test("copy invite puts the link and password on the clipboard", async ({ page, context }) => {
+    await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+    await login(page, "/subdir/");
+    const url = await createShare(page, { password: "invite-pw-9" });
+    await page.locator("#share-result-invite-btn").click();
+    const text = await page.evaluate(() => navigator.clipboard.readText());
+    expect(text).toContain(url);
+    expect(text).toContain("invite-pw-9");
+    expect(text).not.toContain("#k=");
+    expect(text).toContain("subdir");
+  });
+
   test("revoking a share makes its link stop working", async ({ page, browser }) => {
     await login(page, "/data.csv");
     const url = await createShare(page, { password: "" });
