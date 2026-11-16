@@ -153,7 +153,7 @@ func TestHeavyEndpoints_ConcurrencyBounded(t *testing.T) {
 			<-heavySlots
 		}
 	}()
-	for _, u := range []string{"/api/search?q=hello", "/api/backlinks?path=hello.md"} {
+	for _, u := range []string{"/api/search?q=hello", "/api/backlinks?path=hello.md", "/api/jsonl?path=small.jsonl"} {
 		ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 		r := httptest.NewRequest("GET", u, nil).WithContext(ctx)
 		w := httptest.NewRecorder()

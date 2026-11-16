@@ -1139,6 +1139,12 @@ func handleJSONL(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Paging reads the file from the start each time; bound concurrent reads.
+	if !acquireHeavy(w, r) {
+		return
+	}
+	defer releaseHeavy()
+
 	// Count total lines first.
 	totalLines, err := countJSONLLines(filePath)
 	if err != nil {
