@@ -1,5 +1,19 @@
 import { test, expect } from "@playwright/test";
 
+test.describe("Local mode (no auth)", () => {
+  test("hides login and sharing controls", async ({ page }) => {
+    await page.goto("/");
+    await expect(page.locator("#tree-container .tree-item").first()).toBeVisible();
+    await expect(page.locator("#share-btn")).toBeHidden();
+    await expect(page.locator("#shares-btn")).toBeHidden();
+    await expect(page.locator("#logout-form")).toBeHidden();
+    // The theme toggle still sits right after the search button.
+    const search = await page.locator("#search-btn").boundingBox();
+    const theme = await page.locator("#theme-toggle").boundingBox();
+    expect(theme!.x - (search!.x + search!.width)).toBeLessThan(12);
+  });
+});
+
 test.describe("Sidebar tree", () => {
   test("root loads and contains known files", async ({ page }) => {
     await page.goto("/");
@@ -571,8 +585,10 @@ test.describe("Binary file handling", () => {
     await page.goto("/");
     await page.locator(".tree-item .label", { hasText: "icon.svg" }).click();
     const content = page.locator("#content-area");
-    // Preview mode: shows inline SVG element
-    await expect(content.locator(".svg-preview svg")).toBeVisible();
+    // Preview mode: rendered as an <img>, so scripts and event handlers
+    // inside the SVG never run with the viewer's session.
+    await expect(content.locator(".svg-preview img")).toBeVisible();
+    await expect(content.locator(".svg-preview svg")).toHaveCount(0);
     // Toggle should be visible
     await expect(page.locator(".view-toggle")).toBeVisible();
     await expect(page.locator(".view-toggle button", { hasText: "Preview" })).toBeVisible();
@@ -585,7 +601,7 @@ test.describe("Binary file handling", () => {
 
     // Switch back to preview
     await page.locator(".view-toggle button", { hasText: "Preview" }).click();
-    await expect(content.locator(".svg-preview svg")).toBeVisible();
+    await expect(content.locator(".svg-preview img")).toBeVisible();
     await expect(content.locator(".source-code")).not.toBeVisible();
   });
 
