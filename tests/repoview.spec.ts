@@ -563,7 +563,7 @@ test.describe("Binary file handling", () => {
     const content = page.locator("#content-area");
     await expect(content.locator(".binary-preview img")).toBeVisible();
     const src = await content.locator(".binary-preview img").getAttribute("src");
-    expect(src).toContain("/api/raw?path=pixel.png");
+    expect(src).toContain("/_raw/pixel.png");
     await expect(content.locator(".binary-download")).toBeVisible();
   });
 
@@ -609,6 +609,22 @@ test.describe("Binary file handling", () => {
     await expect(page.frameLocator("iframe.html-preview").locator("h1")).toHaveText("Hello from HTML");
   });
 
+  test("HTML preview loads its own relative image and stylesheet", async ({ page }) => {
+    await page.goto("/site/index.html");
+    const iframe = page.locator("#content-area iframe.html-preview");
+    await expect(iframe).toHaveAttribute("src", "/_raw/site/index.html");
+    const frame = page.frameLocator("iframe.html-preview");
+    await expect(frame.locator("h1")).toHaveText("Site with relative assets");
+    // Relative img/dot.png resolves to /_raw/site/img/dot.png and loads.
+    await expect
+      .poll(() =>
+        frame.locator("#rel-img").evaluate((el: HTMLImageElement) => el.complete && el.naturalWidth > 0)
+      )
+      .toBe(true);
+    // Relative css/style.css applies.
+    await expect(frame.locator("h1")).toHaveCSS("color", "rgb(255, 0, 0)");
+  });
+
   test("non-image binary shows 'Binary file not displayed' with download link", async ({ page }) => {
     await page.goto("/");
     await page.locator(".tree-item .label", { hasText: "tiny.bin" }).click();
@@ -617,7 +633,7 @@ test.describe("Binary file handling", () => {
     await expect(content.locator("text=Binary file not displayed")).toBeVisible();
     await expect(content.locator(".binary-download")).toBeVisible();
     const href = await content.locator(".binary-download").getAttribute("href");
-    expect(href).toContain("/api/raw?path=tiny.bin");
+    expect(href).toContain("/_raw/tiny.bin");
   });
 });
 
@@ -667,7 +683,7 @@ test.describe("README below directory listing", () => {
 });
 
 test.describe("Markdown image rewriting", () => {
-  test("local image src is rewritten to /api/raw", async ({ page }) => {
+  test("local image src is rewritten to /_raw", async ({ page }) => {
     await page.goto("/images.md");
     const content = page.locator("#content-area .markdown-body");
     await expect(content).toBeVisible();
@@ -676,13 +692,13 @@ test.describe("Markdown image rewriting", () => {
     const relImg = content.locator('img[alt="pixel"]');
     await expect(relImg).toBeVisible();
     const relSrc = await relImg.getAttribute("src");
-    expect(relSrc).toContain("/api/raw?path=pixel.png");
+    expect(relSrc).toContain("/_raw/pixel.png");
 
     // Dot-relative image (./pixel.png) should also be rewritten
     const dotImg = content.locator('img[alt="pixel dot"]');
     await expect(dotImg).toBeVisible();
     const dotSrc = await dotImg.getAttribute("src");
-    expect(dotSrc).toContain("/api/raw?path=pixel.png");
+    expect(dotSrc).toContain("/_raw/pixel.png");
 
     // External image should NOT be rewritten
     const extImg = content.locator('img[alt="external"]');
@@ -691,7 +707,7 @@ test.describe("Markdown image rewriting", () => {
     expect(extSrc).toBe("https://example.com/logo.png");
   });
 
-  test("rewritten image actually loads via /api/raw", async ({ page }) => {
+  test("rewritten image actually loads via /_raw", async ({ page }) => {
     await page.goto("/images.md");
     const content = page.locator("#content-area .markdown-body");
     await expect(content).toBeVisible();

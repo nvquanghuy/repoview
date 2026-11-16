@@ -136,33 +136,8 @@ func main() {
 
 	go watchLoop(watcher, hub)
 
-	http.HandleFunc("/api/tree", handleTree)
-	http.HandleFunc("/api/file", handleFile)
-	http.HandleFunc("/api/files", handleFiles)
-	http.HandleFunc("/api/search", handleSearch)
-	http.HandleFunc("/api/backlinks", handleBacklinks)
-	http.HandleFunc("/api/raw", handleRaw)
-	http.HandleFunc("/api/jsonl", handleJSONL)
-	http.HandleFunc("/api/editors", handleEditors)
-	http.HandleFunc("/api/open", handleOpen)
-	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
+	mux := newMux(filepath.Base(rootDir), func(w http.ResponseWriter, r *http.Request) {
 		handleWS(w, r, hub, watcher)
-	})
-
-	// Serve index.html for all non-API paths (SPA catch-all).
-	staticSub, err := fs.Sub(staticFiles, "static")
-	if err != nil {
-		log.Fatal(err)
-	}
-	indexHTML, err := fs.ReadFile(staticSub, "index.html")
-	if err != nil {
-		log.Fatal(err)
-	}
-	indexHTML = prepareIndexHTML(indexHTML, filepath.Base(rootDir))
-	registerPWARoutes(http.DefaultServeMux, filepath.Base(rootDir))
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		w.Write(indexHTML)
 	})
 
 	// Find an available port (auto-increment if default port is taken)
@@ -179,7 +154,64 @@ func main() {
 		_ = browser.OpenURL(url)
 	}
 
-	log.Fatal(http.ListenAndServe(addr, nil))
+	log.Fatal(http.ListenAndServe(addr, mux))
+}
+
+// rawPrefix is the path-based route for raw file bytes: /_raw/<relative/path>.
+// HTML previews load from it so relative URLs inside a page (img, link,
+// script, CSS url(), <a href>) resolve against the file's own folder. The
+// leading underscore keeps it from shadowing a real top-level "raw/" folder,
+// whose files are reachable at the SPA's clean URL /raw/<file>.
+const rawPrefix = "/_raw/"
+
+// newMux builds the HTTP routes. ws handles /ws; it may be nil (tests).
+func newMux(rootName string, ws http.HandlerFunc) *http.ServeMux {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api/tree", handleTree)
+	mux.HandleFunc("/api/file", handleFile)
+	mux.HandleFunc("/api/files", handleFiles)
+	mux.HandleFunc("/api/search", handleSearch)
+	mux.HandleFunc("/api/backlinks", handleBacklinks)
+	mux.HandleFunc("/api/raw", handleRaw)
+	mux.HandleFunc("/api/jsonl", handleJSONL)
+	mux.HandleFunc("/api/editors", handleEditors)
+	mux.HandleFunc("/api/open", handleOpen)
+	mux.HandleFunc(rawPrefix, handleRawPath)
+	if ws != nil {
+		mux.HandleFunc("/ws", ws)
+	}
+
+	// Serve index.html for all non-API paths (SPA catch-all).
+	staticSub, err := fs.Sub(staticFiles, "static")
+	if err != nil {
+		log.Fatal(err)
+	}
+	indexHTML, err := fs.ReadFile(staticSub, "index.html")
+	if err != nil {
+		log.Fatal(err)
+	}
+	indexHTML = prepareIndexHTML(indexHTML, rootName)
+	serveIndex := func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Write(indexHTML)
+	}
+	registerPWARoutes(mux, rootName)
+
+	// Unknown /api/* paths are 404 so broken API or asset URLs fail visibly,
+	// unless the path is a real file or folder under an "api/" directory in
+	// the repo, whose clean SPA URL starts with /api/.
+	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
+		rel := strings.TrimPrefix(r.URL.Path, "/")
+		if p, err := safePath(rel); err == nil {
+			if _, err := os.Stat(p); err == nil {
+				serveIndex(w, r)
+				return
+			}
+		}
+		http.NotFound(w, r)
+	})
+	mux.HandleFunc("/", serveIndex)
+	return mux
 }
 
 // findAvailablePort tries to find an available port starting from startPort.
@@ -671,26 +703,78 @@ func isBinaryContent(data []byte) bool {
 }
 
 // handleRaw serves raw file bytes with proper Content-Type for inline display.
+// Kept for backwards compatibility; the frontend uses /_raw/<path>.
 func handleRaw(w http.ResponseWriter, r *http.Request) {
 	reqPath := r.URL.Query().Get("path")
 	if reqPath == "" {
 		http.Error(w, "path required", http.StatusBadRequest)
 		return
 	}
+	serveRawFile(w, r, reqPath)
+}
 
-	filePath, err := safePath(reqPath)
+// handleRawPath serves raw file bytes at /_raw/<relative/path>.
+func handleRawPath(w http.ResponseWriter, r *http.Request) {
+	rel := strings.TrimPrefix(r.URL.Path, rawPrefix)
+	if rel == "" {
+		http.NotFound(w, r)
+		return
+	}
+	serveRawFile(w, r, rel)
+}
+
+// serveRawFile serves the file at rel (relative to rootDir). Traversal is
+// rejected with 400; missing files, directories and symlinks resolving
+// outside the root are 404.
+func serveRawFile(w http.ResponseWriter, r *http.Request, rel string) {
+	for _, seg := range strings.Split(filepath.ToSlash(rel), "/") {
+		if seg == ".." {
+			http.Error(w, "invalid path", http.StatusBadRequest)
+			return
+		}
+	}
+	filePath, err := safePath(rel)
 	if err != nil {
 		http.Error(w, "invalid path", http.StatusBadRequest)
 		return
 	}
-
-	info, err := os.Stat(filePath)
-	if err != nil || info.IsDir() {
+	real, err := realPathInRoot(filePath)
+	if err != nil {
 		http.Error(w, "file not found", http.StatusNotFound)
 		return
 	}
 
-	http.ServeFile(w, r, filePath)
+	f, err := os.Open(real)
+	if err != nil {
+		http.Error(w, "file not found", http.StatusNotFound)
+		return
+	}
+	defer f.Close()
+	info, err := f.Stat()
+	if err != nil || info.IsDir() {
+		http.Error(w, "file not found", http.StatusNotFound)
+		return
+	}
+	// ServeContent, not ServeFile: ServeFile redirects ".../index.html" to
+	// the directory, which would break previews of index.html files.
+	http.ServeContent(w, r, info.Name(), info.ModTime(), f)
+}
+
+// realPathInRoot resolves symlinks in p and checks the result is still inside
+// the (symlink-resolved) root directory.
+func realPathInRoot(p string) (string, error) {
+	real, err := filepath.EvalSymlinks(p)
+	if err != nil {
+		return "", err
+	}
+	root, err := filepath.EvalSymlinks(rootDir)
+	if err != nil {
+		return "", err
+	}
+	if real != root && !strings.HasPrefix(real, root+string(os.PathSeparator)) {
+		return "", fmt.Errorf("path outside root")
+	}
+	return real, nil
 }
 
 // handleFiles returns a flat list of all file paths for fuzzy search.
@@ -1080,7 +1164,7 @@ func countJSONLLines(filePath string) (int64, error) {
 	var count int64
 	scanner := bufio.NewScanner(file)
 	// Use larger buffer for better performance with large lines.
-	buf := make([]byte, 1024*1024) // 1MB buffer
+	buf := make([]byte, 1024*1024)    // 1MB buffer
 	scanner.Buffer(buf, 10*1024*1024) // Max 10MB per line
 
 	for scanner.Scan() {

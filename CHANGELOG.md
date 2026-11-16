@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- [fixed] HTML files can load their own relative assets (images, stylesheets, scripts, CSS `url()`) and link to each other. Raw files are now served from a path-based route, `/_raw/<path>`, so relative URLs resolve against the file's own folder, the same way a browser or Obsidian reads them. The file itself is not modified. Scripts in a previewed page still can't `fetch()` files, because the preview is sandboxed
+- [fixed] `index.html` files no longer get redirected to their folder (and a 404) when previewed
+- [changed] Unknown `/api/...` URLs return 404 instead of the RepoView page, so broken asset URLs fail visibly. Files in a repo folder named `api/` still open normally. `/api/raw?path=` keeps working
+- [changed] Raw file routes no longer serve symlinks that point outside the root folder
 
 ## [v0.22.0] - 2026-11-16
 
