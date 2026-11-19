@@ -239,6 +239,28 @@ test.describe("Pretty-printed files", () => {
 });
 
 test.describe("Frontmatter", () => {
+  test("opens an Obsidian link from a quoted property", async ({ page }) => {
+    await page.goto("/frontmatter.md");
+    const content = page.locator("#content-area .markdown-body");
+    const transcript = content.getByRole("row").filter({ hasText: "transcript" });
+    const link = transcript.getByRole("link", { name: "README.md", exact: true });
+    await expect(link).toHaveAttribute("href", "/README.md");
+
+    await link.click();
+    await expect(page).toHaveURL(/\/README\.md$/);
+    await expect(content.getByRole("heading", { name: "Root README" })).toBeVisible();
+  });
+
+  test("opens an Obsidian link from a directory README property", async ({ page }) => {
+    await page.goto("/");
+    const related = page.locator(".readme-body").getByRole("row").filter({ hasText: "related" });
+    const link = related.getByRole("link", { name: "wiki-test", exact: true });
+    await expect(link).toHaveAttribute("href", "/wiki-test.md");
+
+    await link.click();
+    await expect(page).toHaveURL(/\/wiki-test\.md$/);
+  });
+
   test("renders frontmatter table and body", async ({ page }) => {
     await page.goto("/");
     await page.locator(".tree-item .label", { hasText: "frontmatter.md" }).click();

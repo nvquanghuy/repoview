@@ -3061,6 +3061,7 @@
             function prepareMarkdown(container, filePath) {
                 stripScriptLinks(container);
                 rewriteMarkdownImages(container, filePath);
+                resolveWikiLinks(container, filePath);
             }
 
             function rewriteMarkdownImages(container, filePath) {
@@ -3881,7 +3882,6 @@
                             if (mdBody) {
                                 addHeadingAnchors(mdBody);
                                 prepareMarkdown(mdBody, path);
-                                resolveWikiLinks(mdBody, path);
                                 wrapCollapsibleSections(mdBody, currentFilePath);
                                 loadBacklinks(path, area);
                                 renderMermaidDiagrams(mdBody);

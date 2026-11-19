@@ -267,6 +267,38 @@ func TestParseFrontmatter_CRLF(t *testing.T) {
 	}
 }
 
+func TestRenderMarkdown_FrontmatterWikiLinks(t *testing.T) {
+	old := isObsidianVault
+	t.Cleanup(func() { isObsidianVault = old })
+
+	input := []byte("---\nrelated: \"<i>[[A & B#Section|<Note>]] & [[photo.png]]</i>\"\n---\n# Welcome\n")
+	for _, tc := range []struct {
+		name      string
+		vault     bool
+		wantValue string
+	}{
+		{
+			name:      "Obsidian vault",
+			vault:     true,
+			wantValue: `&#34;&lt;i&gt;<a class="wiki-link" href="#" data-wiki-target="A &amp; B" data-wiki-heading="Section">&lt;Note&gt;</a> &amp; <a class="wiki-link" href="#" data-wiki-target="photo.png">photo.png</a>&lt;/i&gt;&#34;`,
+		},
+		{
+			name:      "plain Markdown",
+			wantValue: `&#34;&lt;i&gt;[[A &amp; B#Section|&lt;Note&gt;]] &amp; [[photo.png]]&lt;/i&gt;&#34;`,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			isObsidianVault = tc.vault
+			var buf bytes.Buffer
+			renderMarkdown(&buf, input)
+			want := "<td>related</td><td>" + tc.wantValue + "</td>"
+			if !strings.Contains(buf.String(), want) {
+				t.Errorf("rendered Markdown = %s, want %s", buf.String(), want)
+			}
+		})
+	}
+}
+
 func TestHandleFile_CSV(t *testing.T) {
 	setRoot(t, "testdata")
 

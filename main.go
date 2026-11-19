@@ -492,59 +492,79 @@ var wikiImageExts = map[string]bool{
 // preprocessWikiLinks converts Obsidian wiki link syntax to HTML placeholders for frontend resolution.
 func preprocessWikiLinks(data []byte) []byte {
 	return wikiLinkRe.ReplaceAllFunc(data, func(match []byte) []byte {
-		// Inside a markdown table, the alias separator is written as \| to avoid colliding with
-		// the column separator. Treat \| identically to | by unescaping before splitting.
-		inner := strings.ReplaceAll(string(match[2:len(match)-2]), `\|`, `|`)
+		return []byte(renderWikiLink(string(match[2:len(match)-2]), true))
+	})
+}
 
-		targetPart, alias, hasAlias := strings.Cut(inner, "|")
+func renderWikiLink(link string, embedImages bool) string {
+	// Inside a markdown table, the alias separator is written as \| to avoid colliding with
+	// the column separator. Treat \| identically to | by unescaping before splitting.
+	inner := strings.ReplaceAll(link, `\|`, `|`)
 
-		heading := ""
-		target := targetPart
-		if idx := strings.IndexByte(targetPart, '#'); idx >= 0 {
-			target = targetPart[:idx]
-			heading = targetPart[idx+1:]
-		}
+	targetPart, alias, hasAlias := strings.Cut(inner, "|")
 
-		// Obsidian renders image wiki-links as <img> elements.
-		if wikiImageExts[strings.ToLower(filepath.Ext(target))] {
-			altText := strings.TrimSuffix(filepath.Base(target), filepath.Ext(target))
-			result := fmt.Sprintf(`<img class="wiki-image" data-wiki-target="%s"`, html.EscapeString(target))
-			if hasAlias && alias != "" {
-				// Alias may be a width ("200"), WxH ("200x300"), or alt text.
-				if w, err := strconv.Atoi(alias); err == nil {
-					result += fmt.Sprintf(` width="%d"`, w)
-				} else if parts := strings.SplitN(alias, "x", 2); len(parts) == 2 {
-					if w, err1 := strconv.Atoi(parts[0]); err1 == nil {
-						if h, err2 := strconv.Atoi(parts[1]); err2 == nil {
-							result += fmt.Sprintf(` width="%d" height="%d"`, w, h)
-						} else {
-							altText = alias
-						}
+	heading := ""
+	target := targetPart
+	if idx := strings.IndexByte(targetPart, '#'); idx >= 0 {
+		target = targetPart[:idx]
+		heading = targetPart[idx+1:]
+	}
+
+	// Obsidian renders image wiki-links as <img> elements.
+	if embedImages && wikiImageExts[strings.ToLower(filepath.Ext(target))] {
+		altText := strings.TrimSuffix(filepath.Base(target), filepath.Ext(target))
+		result := fmt.Sprintf(`<img class="wiki-image" data-wiki-target="%s"`, html.EscapeString(target))
+		if hasAlias && alias != "" {
+			// Alias may be a width ("200"), WxH ("200x300"), or alt text.
+			if w, err := strconv.Atoi(alias); err == nil {
+				result += fmt.Sprintf(` width="%d"`, w)
+			} else if parts := strings.SplitN(alias, "x", 2); len(parts) == 2 {
+				if w, err1 := strconv.Atoi(parts[0]); err1 == nil {
+					if h, err2 := strconv.Atoi(parts[1]); err2 == nil {
+						result += fmt.Sprintf(` width="%d" height="%d"`, w, h)
 					} else {
 						altText = alias
 					}
 				} else {
 					altText = alias
 				}
+			} else {
+				altText = alias
 			}
-			result += fmt.Sprintf(` alt="%s">`, html.EscapeString(altText))
-			return []byte(result)
 		}
+		result += fmt.Sprintf(` alt="%s">`, html.EscapeString(altText))
+		return result
+	}
 
-		display := target
-		if hasAlias {
-			display = alias
-		}
+	display := target
+	if hasAlias {
+		display = alias
+	}
 
-		// Build the placeholder anchor tag with href="#" so it's clickable
-		result := fmt.Sprintf(`<a class="wiki-link" href="#" data-wiki-target="%s"`,
-			html.EscapeString(target))
-		if heading != "" {
-			result += fmt.Sprintf(` data-wiki-heading="%s"`, html.EscapeString(heading))
-		}
-		result += fmt.Sprintf(`>%s</a>`, html.EscapeString(display))
-		return []byte(result)
-	})
+	// Build the placeholder anchor tag with href="#" so it's clickable
+	result := fmt.Sprintf(`<a class="wiki-link" href="#" data-wiki-target="%s"`,
+		html.EscapeString(target))
+	if heading != "" {
+		result += fmt.Sprintf(` data-wiki-heading="%s"`, html.EscapeString(heading))
+	}
+	result += fmt.Sprintf(`>%s</a>`, html.EscapeString(display))
+	return result
+}
+
+func renderFrontmatterValue(value string) string {
+	if !isObsidianVault {
+		return html.EscapeString(value)
+	}
+
+	var buf strings.Builder
+	end := 0
+	for _, match := range wikiLinkRe.FindAllStringSubmatchIndex(value, -1) {
+		buf.WriteString(html.EscapeString(value[end:match[0]]))
+		buf.WriteString(renderWikiLink(value[match[2]:match[3]], false))
+		end = match[1]
+	}
+	buf.WriteString(html.EscapeString(value[end:]))
+	return buf.String()
 }
 
 // renderMarkdown converts markdown bytes to HTML using goldmark with GFM.
@@ -555,7 +575,7 @@ func renderMarkdown(w io.Writer, data []byte) {
 		fmt.Fprint(w, "<table><thead><tr><th>Key</th><th>Value</th></tr></thead><tbody>")
 		for _, p := range pairs {
 			fmt.Fprintf(w, "<tr><td>%s</td><td>%s</td></tr>",
-				html.EscapeString(p[0]), html.EscapeString(p[1]))
+				html.EscapeString(p[0]), renderFrontmatterValue(p[1]))
 		}
 		fmt.Fprint(w, "</tbody></table>")
 	}
