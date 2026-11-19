@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+
+## [v0.24.2] - 2026-11-19
+
 - [fixed] Obsidian wiki links in Markdown frontmatter values now open the linked file or heading.
 
 ## [v0.24.1] - 2026-11-16
