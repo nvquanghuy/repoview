@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"mime"
 	"net/http"
 	"strings"
@@ -32,14 +33,33 @@ func scriptableType(contentType string) bool {
 // scripts: shown full-page on our domain, a planted page could otherwise
 // draw a convincing fake login form. The in-app preview iframe keeps
 // scripts, still in an opaque origin.
+//
+// The exception is "Open original" (a full tab, scripts running, still in an
+// opaque origin): allowed for preview capability URLs, which only someone
+// already signed in (or holding the share) can obtain, and in local mode,
+// which has no login form to fake. See withTopLevelScripts.
 type sandboxWriter struct {
 	http.ResponseWriter
 	wroteHeader bool
 	topLevel    bool
 }
 
+type topLevelScriptsKey struct{}
+
+// withTopLevelScripts marks a request whose script-bearing response may run
+// scripts even when opened as a top-level page.
+func withTopLevelScripts(r *http.Request) *http.Request {
+	return r.WithContext(context.WithValue(r.Context(), topLevelScriptsKey{}, true))
+}
+
+func topLevelScriptsAllowed(r *http.Request) bool {
+	ok, _ := r.Context().Value(topLevelScriptsKey{}).(bool)
+	return ok
+}
+
 func newSandboxWriter(w http.ResponseWriter, r *http.Request) *sandboxWriter {
-	return &sandboxWriter{ResponseWriter: w, topLevel: r.Header.Get("Sec-Fetch-Dest") == "document"}
+	topLevel := r.Header.Get("Sec-Fetch-Dest") == "document" && !topLevelScriptsAllowed(r)
+	return &sandboxWriter{ResponseWriter: w, topLevel: topLevel}
 }
 
 func (w *sandboxWriter) WriteHeader(code int) {

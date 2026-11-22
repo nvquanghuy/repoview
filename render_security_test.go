@@ -41,10 +41,9 @@ func TestRenderMarkdown_AutolinkScriptURLsDropped(t *testing.T) {
 	}
 }
 
-// Opened as a top-level page, a script-bearing file gets no script at all
-// (it could otherwise draw a fake login form on our domain); embedded in the
-// preview iframe it keeps scripts, still without our origin.
-func TestRaw_TopLevelDocumentsGetNoScripts(t *testing.T) {
+// Local mode has no login form a planted page could fake, so "Open original"
+// runs an HTML file's scripts full-tab, still in an opaque origin.
+func TestRaw_LocalModeTopLevelDocumentsRunScripts(t *testing.T) {
 	setRoot(t, "testdata")
 	srv := newTestServer(t)
 	defer srv.Close()
@@ -60,10 +59,7 @@ func TestRaw_TopLevelDocumentsGetNoScripts(t *testing.T) {
 		r.Body.Close()
 		return r.Header.Get("Content-Security-Policy")
 	}
-	if csp := get("document"); csp != "sandbox" {
-		t.Errorf("top-level document: CSP %q, want plain sandbox", csp)
-	}
-	for _, dest := range []string{"iframe", ""} {
+	for _, dest := range []string{"document", "iframe", ""} {
 		if csp := get(dest); csp != "sandbox allow-scripts; connect-src 'none'" {
 			t.Errorf("dest %q: CSP %q", dest, csp)
 		}

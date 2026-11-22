@@ -87,7 +87,9 @@ func servePreview(w http.ResponseWriter, r *http.Request, sc scope, rel string) 
 		http.NotFound(w, r)
 		return
 	}
-	serveRawFile(w, r.WithContext(withScope(r.Context(), sc)), rel)
+	// The token proves the opener is signed in (or holds the share), so the
+	// page may also run full-tab ("Open original").
+	serveRawFile(w, withTopLevelScripts(r.WithContext(withScope(r.Context(), sc))), rel)
 }
 
 // handleOwnerPreview serves /_preview/<token>/<path> for the owner.

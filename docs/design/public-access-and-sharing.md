@@ -162,6 +162,13 @@ the same token, so they need no cookies (`preview.go`).
   scripts can't use the token in their own URL to read other files.
 - Without a password there are no cookies to lose, so the preview loads from
   `/_raw/` directly.
+- "Open original" opens the same `previewURL` in a new tab. Opened top-level,
+  a preview URL keeps `sandbox allow-scripts; connect-src 'none'` (scripts
+  run, opaque origin) instead of the plain `sandbox` that `/_raw/` gets: only
+  a signed-in owner or a share holder can obtain the token, so an outsider
+  can't send a victim a link that shows a planted page as a script-driven
+  fake login form. Local mode (no password, no login form) allows the same on
+  `/_raw/` (`allowTopLevelScripts` in `gate.go`).
 
 ### Share storage and concurrency
 
@@ -187,7 +194,7 @@ repo, downloaded docs, a synced `.git` directory), and resource exhaustion.
 | CSRF | State-changing requests (`POST /login`, `/logout`, share login, `/api/shares`, `/api/open`) require `Origin` matching `Host` (or `Sec-Fetch-Site: same-origin/none`); `Origin: null` is refused because sandboxed previews send it. |
 | Referrer-Policy `same-origin` | Share URLs never leak to other sites via `Referer`. Not `no-referrer`: that makes Chromium send `Origin: null` on our own form posts, which the CSRF check refuses. |
 | Websocket Origin check | Browsers attach cookies to cross-site websocket handshakes. |
-| Raw content sandbox | `/_raw/` and `/api/raw` add a CSP sandbox to any response whose **final** type can run script (HTML, SVG, any XML/XSL), including files sniffed as HTML. In the preview iframe it is `sandbox allow-scripts` (opaque origin); opened as a top-level page (`Sec-Fetch-Dest: document`) it is plain `sandbox`, so a planted page can't draw a fake login form on our domain. A script-bearing file therefore never runs with the owner's cookies (otherwise it could create a passwordless share of everything). PDFs are left unsandboxed because viewers refuse to render in a sandbox. |
+| Raw content sandbox | `/_raw/` and `/api/raw` add a CSP sandbox to any response whose **final** type can run script (HTML, SVG, any XML/XSL), including files sniffed as HTML. In the preview iframe it is `sandbox allow-scripts` (opaque origin); opened as a top-level page (`Sec-Fetch-Dest: document`) it is plain `sandbox` (except through a preview capability URL or in local mode, see HTML previews), so a planted page can't draw a fake login form on our domain. A script-bearing file therefore never runs with the owner's cookies (otherwise it could create a passwordless share of everything). PDFs are left unsandboxed because viewers refuse to render in a sandbox. |
 | Untrusted content in the SPA | SVG previews use `<img>`, never inline markup. Mermaid sources are re-rendered from text (`textContent`), never `innerHTML`; `securityLevel: 'strict'`. goldmark autolinks with `javascript:`/`vbscript:`/`data:` URLs lose their link (`markdown_safety.go`; goldmark only filters `[text](url)` links), and the SPA strips such URLs from every rendered markdown and `.docx` link as a second layer, using `URL` parsing so `java\tscript:` is caught. Index placeholders are filled in one pass so names can't splice values into the injected config. Third-party scripts (mermaid, mammoth) are pinned to exact versions with SRI. |
 | Symlinked share roots | The shared item must resolve (after symlinks) inside the served root, at creation and on every visit, so a shared folder later replaced by a symlink (a pull, a sync) exposes nothing. |
 | No repository-configured commands | Share visitors never cause `git` to run (their file lists come from a walk). The owner's `git ls-files` runs with `core.fsmonitor=false`, `core.untrackedCache=false` and no system config, so a planted `.git/config` can't execute commands. |
