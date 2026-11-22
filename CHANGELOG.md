@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- [added] HTML files: an "Open original" button opens the page on its own in a new tab, scripts running, instead of inside the preview frame. It is still sandboxed to an opaque origin, so pages that use cookies, `localStorage` or `fetch` behave as they do in the preview
+
 
 ## [v0.24.2] - 2026-11-19
 

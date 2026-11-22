@@ -163,7 +163,8 @@ func (s *server) handler() http.Handler {
 	registerPWARoutes(app, rootName)
 	app.HandleFunc("/", index)
 	if !s.authEnabled() {
-		return localHeaders(s.withRootScope(app))
+		// No login form to fake, so HTML may run full-tab ("Open original").
+		return localHeaders(s.withRootScope(allowTopLevelScripts(app)))
 	}
 	app.Handle("/api/shares", requireSameOrigin(http.HandlerFunc(s.handleShares)))
 
@@ -213,6 +214,12 @@ func securityHeaders(next http.Handler) http.Handler {
 
 // localHeaders: the minimum that still matters without a password, e.g. on
 // a LAN (--host 0.0.0.0): no framing by other sites, no MIME sniffing.
+func allowTopLevelScripts(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		next.ServeHTTP(w, withTopLevelScripts(r))
+	})
+}
+
 func localHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Content-Type-Options", "nosniff")

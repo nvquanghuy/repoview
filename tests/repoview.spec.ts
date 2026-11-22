@@ -647,6 +647,25 @@ test.describe("Binary file handling", () => {
     await expect(page.frameLocator("iframe.html-preview").locator("h1")).toHaveText("Hello from HTML");
   });
 
+  test("HTML 'Open original' opens the page in a new tab with scripts running", async ({ page }) => {
+    await page.goto("/site/index.html");
+    const link = page.locator("#file-header-bar a.open-original-btn");
+    await expect(link).toBeVisible();
+    await expect(link).toHaveAttribute("href", "/_raw/site/index.html");
+    await expect(link).toHaveAttribute("target", "_blank");
+    const [tab] = await Promise.all([page.context().waitForEvent("page"), link.click()]);
+    await expect(tab).toHaveURL(/\/_raw\/site\/index\.html$/);
+    await expect(tab.locator("h1")).toHaveAttribute("data-js", "ran");
+    await expect(tab.locator("h1")).toHaveCSS("color", "rgb(255, 0, 0)");
+    await tab.close();
+  });
+
+  test("'Open original' is only offered for HTML files", async ({ page }) => {
+    await page.goto("/hello.md");
+    await expect(page.locator(".markdown-body h1").first()).toBeVisible();
+    await expect(page.locator("a.open-original-btn")).toHaveCount(0);
+  });
+
   test("HTML preview loads its own relative image and stylesheet", async ({ page }) => {
     await page.goto("/site/index.html");
     const iframe = page.locator("#content-area iframe.html-preview");

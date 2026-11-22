@@ -285,6 +285,17 @@ test.describe("HTML previews with relative assets", () => {
     await expect.poll(() => img.evaluate((el: HTMLImageElement) => el.naturalWidth)).toBeGreaterThan(0);
   }
 
+  test("'Open original' runs the page full-tab for the owner", async ({ page }) => {
+    await login(page, "/site/index.html");
+    await page.goto("/site/index.html");
+    const link = page.locator("#file-header-bar a.open-original-btn");
+    await expect(link).toHaveAttribute("href", /^\/_preview\/[^/]+\/site\/index\.html$/);
+    const [tab] = await Promise.all([page.context().waitForEvent("page"), link.click()]);
+    await expect(tab.locator("h1")).toHaveAttribute("data-js", "ran");
+    await expect.poll(() => tab.locator("#rel-img").evaluate((el: HTMLImageElement) => el.naturalWidth)).toBeGreaterThan(0);
+    await tab.close();
+  });
+
   test("load for the owner", async ({ page }) => {
     await login(page, "/site/index.html");
     await page.goto("/site/index.html");

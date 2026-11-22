@@ -148,3 +148,36 @@ func TestPreview_LocalModeUsesRaw(t *testing.T) {
 		t.Fatalf("local preview URL %q", resp.PreviewURL)
 	}
 }
+
+// With a password, a raw file opened top-level with cookies gets no scripts
+// (anyone could link a planted page that draws a fake login form), but a
+// preview capability URL, which only a signed-in viewer can obtain, may run
+// full-tab ("Open original").
+func TestPreview_TopLevelScriptsOnlyThroughPreviewURL(t *testing.T) {
+	e := newAuthEnv(t)
+	owner := e.client()
+	e.login(owner)
+	doc := map[string]string{"Sec-Fetch-Dest": "document"}
+
+	raw := e.do(owner, "GET", "/_raw/site/index.html", nil, doc)
+	if raw.code != http.StatusOK || raw.header.Get("Content-Security-Policy") != "sandbox" {
+		t.Fatalf("raw top-level: %d CSP %q, want plain sandbox", raw.code, raw.header.Get("Content-Security-Policy"))
+	}
+
+	u := e.previewURLOf(owner, "", "site/index.html")
+	cookieless := &http.Client{}
+	page := e.do(cookieless, "GET", u, nil, doc)
+	if page.code != http.StatusOK || page.header.Get("Content-Security-Policy") != "sandbox allow-scripts; connect-src 'none'" {
+		t.Fatalf("preview top-level: %d CSP %q", page.code, page.header.Get("Content-Security-Policy"))
+	}
+
+	// A forged or expired token still gets nothing.
+	tok := strings.SplitN(strings.TrimPrefix(u, "/_preview/"), "/", 2)[0]
+	if r := e.do(cookieless, "GET", "/_preview/"+tok+"x/site/index.html", nil, doc); r.code != http.StatusUnauthorized {
+		t.Fatalf("tampered token: %d", r.code)
+	}
+	e.advance(previewMaxAge + time.Minute)
+	if r := e.do(cookieless, "GET", u, nil, doc); r.code != http.StatusUnauthorized {
+		t.Fatalf("expired token: %d", r.code)
+	}
+}
