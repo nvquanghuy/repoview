@@ -13,9 +13,8 @@ I noticed my marketing team, when working with Claude Code and lots of markdown 
 - **GitHub-style UI** — familiar layout with resizable sidebar, breadcrumb navigation, and file tree
 - **Markdown rendering** — GitHub-Flavored Markdown via goldmark (tables, task lists, code blocks)
 - **CSV rendering** — automatic conversion to styled HTML tables
-- **Fuzzy file search** — press `t` to open a "Go to file" modal with fuzzy matching
-- **Recent files** — the sidebar lists the files changed most recently anywhere in the folder (including new, uncommitted ones), so a file an agent just wrote is one click away. "Go to file" lists them first, so `t` then `Enter` opens the newest
-- **Full-text search** — press `/` (or tap the search icon) to search inside every file; all words must match, `"quoted phrases"` match exactly, and opening a result scrolls to the first hit. `Tab` switches between file and content search
+- **Search** — press `t` or `/` (or tap the search icon) for one search box. File and folder names match as you type (fuzzy), and notes whose contents match are listed below them with the matching lines; all words must match, `"quoted phrases"` match exactly, and opening a note scrolls to the first hit
+- **Recent files** — the sidebar lists the files changed most recently anywhere in the folder (including new, uncommitted ones), so a file an agent just wrote is one click away. Search shows them before you type, so `t` then `Enter` opens the newest
 - **Backlinks** — markdown notes list the notes that link to them (`[[wiki links]]`, `![[embeds]]`, and relative `[text](note.md)` links), most recently edited first; tap one to jump to the link
 - **Live reload** — WebSocket-based file watching with fsnotify; changes appear instantly
 - **Single binary** — all HTML/CSS/JS embedded via `go:embed`, no external dependencies at runtime

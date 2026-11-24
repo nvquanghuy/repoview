@@ -575,32 +575,10 @@
                 font-weight: 700;
                 color: var(--rv-text);
             }
-            #search-modes {
-                display: flex;
-                gap: 4px;
-                padding: 8px 12px 0;
-            }
-            #search-modes button {
-                background: none;
-                border: 1px solid transparent;
-                border-radius: 6px;
-                padding: 4px 10px;
-                font: inherit;
-                font-size: 13px;
-                color: var(--rv-text-secondary);
-                cursor: pointer;
-            }
-            #search-modes button.active {
-                background: var(--rv-bg-secondary);
-                border-color: var(--rv-border);
-                color: var(--rv-text);
-                font-weight: 600;
-            }
-            #search-modes .search-modes-hint {
-                margin-left: auto;
-                align-self: center;
+            .sr-status {
+                padding: 8px 16px;
                 font-size: 12px;
-                color: var(--rv-text-tertiary);
+                color: var(--rv-text-secondary);
             }
             .search-result.content-result {
                 display: block;
@@ -1918,9 +1896,6 @@
                     max-height: 60vh;
                     max-height: 60dvh;
                 }
-                #search-modes .search-modes-hint {
-                    display: none;
-                }
             }
 
             /* ── Theme Toggle ─────────────────────────────────────────── */
@@ -2269,7 +2244,7 @@
                     <span id="repo-name">Files</span>
                 </div>
                 <button id="go-to-file-btn" onclick="openSearch()">
-                    Go to file <kbd>t</kbd>
+                    Search files and notes <kbd>t</kbd>
                 </button>
                 <div id="recent-section" hidden>
                     <button id="recent-toggle" onclick="toggleRecent()" aria-expanded="true" aria-controls="recent-list" title="Files changed most recently, anywhere in the folder">
@@ -2292,7 +2267,7 @@
                         >__ROOT_DIR_NAME__</span
                     >
                     <span id="breadcrumb-path"></span>
-                    <button id="search-btn" onclick="openSearch('content')" title="Search note contents (/)" aria-label="Search note contents">
+                    <button id="search-btn" onclick="openSearch()" title="Search files and notes (/)" aria-label="Search files and notes">
                         <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
                             <path d="M10.68 11.74a6 6 0 0 1-7.922-8.982 6 6 0 0 1 8.982 7.922l3.04 3.04a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215ZM11.5 7a4.499 4.499 0 1 0-8.997 0A4.499 4.499 0 0 0 11.5 7Z"/>
                         </svg>
@@ -2454,11 +2429,6 @@
             onclick="if (event.target === this) closeSearch();"
         >
             <div id="search-box">
-                <div id="search-modes">
-                    <button type="button" data-mode="files" class="active" onclick="setSearchMode('files')">Files</button>
-                    <button type="button" data-mode="content" onclick="setSearchMode('content')">Contents</button>
-                    <span class="search-modes-hint">Tab to switch</span>
-                </div>
                 <input
                     id="search-input"
                     type="search"
@@ -2466,7 +2436,7 @@
                     autocomplete="off"
                     autocapitalize="off"
                     spellcheck="false"
-                    placeholder="Go to file…"
+                    placeholder="Search files and notes…"
                     oninput="onSearchInput()"
                     onkeydown="onSearchKey(event)"
                 />
@@ -4405,55 +4375,33 @@
                 document.body.style.overflow = "";
             }
 
-            /* ── Fuzzy Search ─────────────────────────────────────────── */
-            var searchMode = "files";
+            /* ── Search: file names + note contents ───────────────────── */
+            // One box for everything. File and folder names match as you
+            // type (fuzzy, in the browser); note contents are searched on
+            // the server after a short pause and listed below them. With no
+            // query it lists recently changed files, then all files.
             var contentSearchSeq = 0;
             var contentSearchTimer = null;
+            var SEARCH_FILE_LIMIT = 8; // name matches shown above note matches
 
-            async function openSearch(mode) {
+            function isSearchOpen() {
+                return document.getElementById("search-overlay").classList.contains("open");
+            }
+
+            function searchQuery() {
+                return document.getElementById("search-input").value.trim();
+            }
+
+            async function openSearch() {
                 document.getElementById("search-overlay").classList.add("open");
                 var input = document.getElementById("search-input");
                 input.value = "";
                 input.focus();
-                if (mode === "content") {
-                    setSearchMode("content");
-                    return;
-                }
-                setSearchMode("files", true);
-                if (!(await ensureAllFiles())) return;
-                if (searchMode !== "files") return;
-                renderDefaultFileList();
-                searchIdx = 0;
-                updateSearchSelection();
+                renderSearch();
                 // Pick up files changed since the last refresh.
                 loadRecent().then(function () {
-                    var input = document.getElementById("search-input");
-                    if (
-                        searchMode === "files" &&
-                        document.getElementById("search-overlay").classList.contains("open") &&
-                        !input.value.trim()
-                    ) {
-                        renderDefaultFileList();
-                        updateSearchSelection();
-                    }
+                    if (isSearchOpen() && !searchQuery()) renderSearch();
                 });
-            }
-
-            // With no query: recently changed files first, then the rest.
-            function renderDefaultFileList() {
-                var recent = recentFiles.slice(0, RECENT_SHOWN);
-                var times = Object.create(null); // paths like "constructor" are keys too
-                recent.forEach(function (f) {
-                    times[f.path] = f.modTime;
-                });
-                var rest = (allFiles || []).filter(function (p) {
-                    return !(p in times);
-                });
-                var items = recent
-                    .map(function (f) { return f.path; })
-                    .concat(rest)
-                    .slice(0, 50);
-                renderSearchResults(items, false, { times: times, recentCount: recent.length });
             }
 
             async function ensureAllFiles() {
@@ -4480,38 +4428,100 @@
                     .classList.remove("open");
             }
 
-            function setSearchMode(mode, skipRender) {
-                searchMode = mode;
-                document.querySelectorAll("#search-modes button").forEach(function (b) {
-                    b.classList.toggle("active", b.dataset.mode === mode);
-                });
-                var input = document.getElementById("search-input");
-                input.placeholder = mode === "content" ? "Search note contents…" : "Go to file…";
-                input.focus();
-                if (!skipRender) onSearchInput();
+            function onSearchInput() {
+                renderSearch();
             }
 
-            function onSearchInput() {
-                if (searchMode === "content") {
-                    onContentSearchInput();
-                    return;
-                }
-                var q = document.getElementById("search-input").value.trim();
+            function renderSearch() {
+                var q = searchQuery();
+                var container = document.getElementById("search-results");
+                clearTimeout(contentSearchTimer);
+                var seq = ++contentSearchSeq;
+                searchIdx = 0;
                 if (!allFiles) {
-                    document.getElementById("search-results").innerHTML = "";
                     ensureAllFiles().then(function (ok) {
-                        if (ok && searchMode === "files") onSearchInput();
+                        if (ok && isSearchOpen() && seq === contentSearchSeq) renderSearch();
                     });
-                    return;
                 }
                 if (!q) {
                     renderDefaultFileList();
-                } else {
-                    var results = fuzzysort(q, getSearchTargets(), 50);
-                    renderSearchResults(results, true);
+                    updateSearchSelection();
+                    return;
                 }
-                searchIdx = 0;
+
+                var searchNotes = q.replace(/"/g, "").replace(/\s+/g, "").length >= 2;
+                var fileHits = allFiles ? fuzzysort(q, getSearchTargets(), 50) : [];
+                if (searchNotes) fileHits = closeNameMatches(q, fileHits);
+                var html = "";
+                if (fileHits.length) {
+                    if (searchNotes) html += '<div class="sr-group">Files</div>';
+                    fileHits.forEach(function (h) {
+                        html += fileResultHTML(h.target, h.highlighted);
+                    });
+                }
+                if (searchNotes) {
+                    html +=
+                        '<div id="sr-notes">' +
+                        (fileHits.length ? "" : '<div class="sr-status">Searching notes…</div>') +
+                        "</div>";
+                } else if (!fileHits.length) {
+                    html = '<div id="search-empty">No files match</div>';
+                }
+                container.innerHTML = html;
                 updateSearchSelection();
+                if (!searchNotes) return;
+
+                contentSearchTimer = setTimeout(async function () {
+                    var result = await apiFetch(RV.base + "/api/search?q=" + encodeURIComponent(q));
+                    // Ignore stale responses and results for a closed modal.
+                    if (seq !== contentSearchSeq || !isSearchOpen()) return;
+                    var box = document.getElementById("sr-notes");
+                    if (!box) return;
+                    if (!result.ok) {
+                        box.innerHTML = '<div class="sr-status">Searching notes failed</div>';
+                        return;
+                    }
+                    box.innerHTML = noteResultsHTML(result.data);
+                    if (!container.querySelector(".search-result")) {
+                        container.innerHTML = '<div id="search-empty">No files or notes match</div>';
+                    }
+                    // The highlighted row stays put; note results only add rows below.
+                    updateSearchSelection();
+                }, 150);
+            }
+
+            // Next to note results, scattered-letter matches ("vaccine" in
+            // "Accidental Complexity") are noise that pushes the notes out of
+            // view. Keep names containing every word; if none do, a few of
+            // the best fuzzy matches (typos, abbreviations).
+            function closeNameMatches(q, hits) {
+                var words = q.toLowerCase().split(/\s+/).filter(Boolean);
+                var close = hits.filter(function (h) {
+                    var t = h.target.toLowerCase();
+                    return words.every(function (w) { return t.indexOf(w) >= 0; });
+                });
+                return close.length ? close.slice(0, SEARCH_FILE_LIMIT) : hits.slice(0, 3);
+            }
+
+            // With no query: recently changed files first, then the rest.
+            function renderDefaultFileList() {
+                var container = document.getElementById("search-results");
+                var recent = recentFiles.slice(0, RECENT_SHOWN);
+                var shown = Object.create(null); // paths like "constructor" are keys too
+                var html = "";
+                if (recent.length) html += '<div class="sr-group">Recently changed</div>';
+                recent.forEach(function (f) {
+                    shown[f.path] = true;
+                    html += fileResultHTML(f.path, esc(f.path), f.modTime);
+                });
+                var rest = (allFiles || [])
+                    .filter(function (p) { return !shown[p]; })
+                    .slice(0, Math.max(0, 50 - recent.length));
+                if (recent.length && rest.length) html += '<div class="sr-group">All files</div>';
+                rest.forEach(function (p) {
+                    html += fileResultHTML(p, esc(p));
+                });
+                container.innerHTML = html || (allFiles ? '<div id="search-empty">No files</div>' : "");
             }
 
             function onSearchKey(e) {
@@ -4531,36 +4541,7 @@
                     }
                 } else if (e.key === "Escape") {
                     closeSearch();
-                } else if (e.key === "Tab") {
-                    e.preventDefault();
-                    setSearchMode(searchMode === "files" ? "content" : "files");
                 }
-            }
-
-            /* ── Full-text (content) search ───────────────────────────── */
-            function onContentSearchInput() {
-                var q = document.getElementById("search-input").value.trim();
-                clearTimeout(contentSearchTimer);
-                var seq = ++contentSearchSeq;
-                var container = document.getElementById("search-results");
-                if (q.replace(/"/g, "").replace(/\s+/g, "").length < 2) {
-                    container.innerHTML = q
-                        ? '<div id="search-empty">Keep typing…</div>'
-                        : '<div id="search-empty">Search inside every note. Use "quotes" for exact phrases.</div>';
-                    return;
-                }
-                contentSearchTimer = setTimeout(async function () {
-                    var result = await apiFetch(RV.base + "/api/search?q=" + encodeURIComponent(q));
-                    // Ignore stale responses and results for a closed modal.
-                    if (seq !== contentSearchSeq || searchMode !== "content") return;
-                    if (!result.ok) {
-                        container.innerHTML = '<div id="search-empty">Search failed</div>';
-                        return;
-                    }
-                    renderContentResults(result.data);
-                    searchIdx = 0;
-                    updateSearchSelection();
-                }, 150);
             }
 
             function highlightTerms(text, terms) {
@@ -4579,24 +4560,27 @@
                     .join("");
             }
 
-            function renderContentResults(data) {
-                var container = document.getElementById("search-results");
-                var results = data.results || [];
-                if (results.length === 0) {
-                    container.innerHTML = '<div id="search-empty">No notes match</div>';
-                    return;
-                }
-                var html = "";
+            // Notes whose contents match, with the matching lines. Results
+            // that match only by path are left out: the Files list above
+            // already covers names.
+            function noteResultsHTML(data) {
+                var results = (data.results || []).filter(function (r) {
+                    return r.count > 0;
+                });
+                if (results.length === 0) return "";
+                var terms = escAttr(JSON.stringify(data.terms || []));
+                var html = '<div class="sr-group">In notes</div>';
                 for (var i = 0; i < results.length; i++) {
                     var r = results[i];
                     var slash = r.path.lastIndexOf("/");
                     var dir = slash >= 0 ? r.path.substring(0, slash + 1) : "";
                     var name = r.path.substring(slash + 1);
                     html +=
-                        '<div class="search-result content-result" data-path="' + escAttr(r.path) + '">' +
+                        '<div class="search-result content-result" data-path="' + escAttr(r.path) +
+                        '" data-terms="' + terms + '">' +
                         '<div class="cr-head"><span class="sr-icon">' + getFileIcon(r.path) + "</span>" +
                         '<span class="sr-path">' + esc(dir) + "<strong>" + highlightTerms(name, data.terms) + "</strong></span>" +
-                        (r.count > 0 ? '<span class="cr-count">' + r.count + (r.count === 1 ? " match" : " matches") + "</span>" : "") +
+                        '<span class="cr-count">' + r.count + (r.count === 1 ? " match" : " matches") + "</span>" +
                         "</div>";
                     for (var j = 0; j < r.snippets.length; j++) {
                         var sn = r.snippets[j];
@@ -4607,17 +4591,25 @@
                     html += "</div>";
                 }
                 if (data.truncated) {
-                    html += '<div id="search-empty">Showing ' + results.length + " of " + data.total + " notes. Refine your search to narrow it down.</div>";
+                    html += '<div class="sr-status">More notes match. Add words to narrow it down.</div>';
                 }
-                container.innerHTML = html;
-                container.querySelectorAll(".search-result").forEach(function (el) {
-                    el.onclick = async function () {
-                        closeSearch();
-                        await loadFile(el.dataset.path);
-                        revealSearchHit(data.terms);
-                    };
-                });
+                return html;
             }
+
+            // One click handler for every kind of result row.
+            async function openSearchResult(el) {
+                closeSearch();
+                if (el.dataset.isdir) {
+                    navigateTo(el.dataset.path);
+                    return;
+                }
+                await loadFile(el.dataset.path);
+                if (el.dataset.terms) revealSearchHit(JSON.parse(el.dataset.terms));
+            }
+            document.getElementById("search-results").addEventListener("click", function (e) {
+                var el = e.target.closest(".search-result");
+                if (el) openSearchResult(el);
+            });
 
             /* ── Backlinks ────────────────────────────────────────────── */
             var backlinksSeq = 0;
@@ -4741,61 +4733,21 @@
                     items[searchIdx].scrollIntoView({ block: "nearest" });
             }
 
-            function renderSearchResults(items, isHighlighted, opts) {
-                var times = (opts && opts.times) || Object.create(null);
-                var recentCount = (opts && opts.recentCount) || 0;
-                var container = document.getElementById("search-results");
-                if (!items || items.length === 0) {
-                    container.innerHTML =
-                        '<div id="search-empty">No files found</div>';
-                    return;
-                }
-                var html = "";
-                for (var i = 0; i < items.length; i++) {
-                    var item = items[i];
-                    var display, raw;
-                    if (isHighlighted) {
-                        display = item.highlighted;
-                        raw = item.target;
-                    } else {
-                        display = esc(item);
-                        raw = item;
-                    }
-                    // Folder targets end with "/" (see getSearchTargets).
-                    var isDir = raw.endsWith("/");
-                    if (recentCount && i === 0) html += '<div class="sr-group">Recently changed</div>';
-                    if (recentCount && i === recentCount) html += '<div class="sr-group">All files</div>';
-                    html +=
-                        '<div class="search-result' +
-                        (isDir ? ' search-dir' : '') +
-                        '" data-path="' +
-                        escAttr(isDir ? raw.slice(0, -1) : raw) +
-                        '"' +
-                        (isDir ? ' data-isdir="true"' : '') +
-                        '>' +
-                        '<span class="sr-icon' +
-                        (isDir ? ' folder' : '') +
-                        '">' +
-                        (isDir ? SVG.folderClosed : getFileIcon(raw)) +
-                        "</span>" +
-                        '<span class="sr-path">' +
-                        display +
-                        "</span>" +
-                        (!isHighlighted && times[raw]
-                            ? '<span class="sr-time">' + esc(timeAgo(times[raw])) + "</span>"
-                            : "") +
-                        "</div>";
-                }
-                container.innerHTML = html;
-                container
-                    .querySelectorAll(".search-result")
-                    .forEach(function (el) {
-                        el.onclick = function () {
-                            closeSearch();
-                            if (el.dataset.isdir) navigateTo(el.dataset.path);
-                            else loadFile(el.dataset.path);
-                        };
-                    });
+            // A file or folder row. raw is the path (folders end with "/",
+            // see getSearchTargets); display is its escaped, maybe
+            // highlighted, text; modTime adds a "how long ago" label.
+            function fileResultHTML(raw, display, modTime) {
+                var isDir = raw.endsWith("/");
+                return (
+                    '<div class="search-result' + (isDir ? " search-dir" : "") +
+                    '" data-path="' + escAttr(isDir ? raw.slice(0, -1) : raw) + '"' +
+                    (isDir ? ' data-isdir="true"' : "") + ">" +
+                    '<span class="sr-icon' + (isDir ? " folder" : "") + '">' +
+                    (isDir ? SVG.folderClosed : getFileIcon(raw)) + "</span>" +
+                    '<span class="sr-path">' + display + "</span>" +
+                    (modTime ? '<span class="sr-time">' + esc(timeAgo(modTime)) + "</span>" : "") +
+                    "</div>"
+                );
             }
 
             // Files plus every folder that contains a file (folders get a
@@ -5886,7 +5838,7 @@
                 }
                 if (e.key === "/" && !e.ctrlKey && !e.metaKey && !e.altKey) {
                     e.preventDefault();
-                    openSearch("content");
+                    openSearch();
                 }
                 // Alt+C: Collapse all sections
                 if (e.altKey && e.key === "c") {
