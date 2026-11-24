@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+
+## [v0.26.0] - 2026-11-24
+
 - [added] Recent files: a "Recent" section at the top of the sidebar lists the files changed most recently anywhere in the folder, with how long ago, so a file an agent just wrote is one click away. App state in dot-folders (`.obsidian/`, `.claude/`) is left out. It refreshes on its own while the tab is open, and can be collapsed (remembered across reloads)
 - [changed] Search is one box: file names and note contents are searched together, with name matches first and notes whose contents match below them. The Files/Contents tabs are gone; `t`, `/` and the search icon all open the same search, which lists recent files before you type, so `t` then `Enter` opens the newest one
 - [fixed] In a git repository, search and wiki links now find new files that aren't committed yet (ignored files stay hidden)
