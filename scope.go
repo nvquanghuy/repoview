@@ -135,7 +135,8 @@ func (s scope) files() []string {
 }
 
 // listFilesIn lists files under root, preferring `git ls-files` (fast and
-// respects .gitignore) and falling back to a walk.
+// respects .gitignore; includes untracked files, so new ones show up before
+// they are committed) and falling back to a walk.
 func listFilesIn(root string) []string {
 	if files := gitFiles(root); len(files) > 0 {
 		return files
@@ -149,11 +150,12 @@ func listFilesIn(root string) []string {
 // precedence over the repository's config. -z gives raw NUL-separated paths;
 // without it git C-quotes non-ASCII names (e.g. "T\341\273\255.md"). In a
 // sub-directory of a repo it lists only that directory, relative to it.
+// --others --exclude-standard adds untracked files that aren't ignored.
 func gitFiles(root string) []string {
 	cmd := exec.Command("git",
 		"-c", "core.fsmonitor=false",
 		"-c", "core.untrackedCache=false",
-		"-C", root, "ls-files", "-z")
+		"-C", root, "ls-files", "-z", "--cached", "--others", "--exclude-standard")
 	cmd.Env = append(os.Environ(), "GIT_CONFIG_NOSYSTEM=1", "GIT_TERMINAL_PROMPT=0")
 	out, err := cmd.Output()
 	if err != nil {
@@ -213,6 +215,7 @@ func apiHandler() *http.ServeMux {
 	mux.HandleFunc("/api/file", handleFile)
 	mux.HandleFunc("/api/files", handleFiles)
 	mux.HandleFunc("/api/search", handleSearch)
+	mux.HandleFunc("/api/recent", handleRecent)
 	mux.HandleFunc("/api/backlinks", handleBacklinks)
 	mux.HandleFunc("/api/raw", handleRaw)
 	mux.HandleFunc("/api/jsonl", handleJSONL)

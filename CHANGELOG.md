@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- [added] Recent files: a "Recent" section at the top of the sidebar lists the files changed most recently anywhere in the folder, with how long ago, so a file an agent just wrote is one click away. App state in dot-folders (`.obsidian/`, `.claude/`) is left out. It refreshes on its own while the tab is open, and can be collapsed (remembered across reloads)
+- [added] "Go to file" (`t`) lists recently changed files first, so `t` then `Enter` opens the newest one
+- [fixed] In a git repository, "Go to file", full-text search and wiki links now find new files that aren't committed yet (ignored files stay hidden)
+
 
 ## [v0.25.0] - 2026-11-22
 
