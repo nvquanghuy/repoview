@@ -350,14 +350,46 @@ test.describe("Fuzzy search", () => {
   });
 });
 
-test.describe("Full-text search", () => {
-  test("press '/', search contents, open result and see the hit highlighted", async ({ page }) => {
+test.describe("Search: files and note contents in one box", () => {
+  test("'t', '/' and the header button all open the same search", async ({ page }) => {
+    await page.goto("/");
+    await expect(page.locator("#tree-container .tree-item")).not.toHaveCount(0);
+    for (const open of [
+      () => page.keyboard.press("t"),
+      () => page.keyboard.press("/"),
+      () => page.locator("#search-btn").click(),
+    ]) {
+      await open();
+      await expect(page.locator("#search-overlay")).toHaveClass(/open/);
+      await expect(page.locator("#search-input")).toHaveAttribute("placeholder", "Search files and notes…");
+      await expect(page.locator("#search-modes")).toHaveCount(0);
+      await expect(page.locator(".search-result").first()).toBeVisible();
+      await page.keyboard.press("Escape");
+      await expect(page.locator("#search-overlay")).not.toHaveClass(/open/);
+    }
+  });
+
+  test("file names come first, then notes whose contents match", async ({ page }) => {
     await page.goto("/");
     await expect(page.locator("#tree-container .tree-item")).not.toHaveCount(0);
     await page.keyboard.press("/");
-    await expect(page.locator("#search-overlay")).toHaveClass(/open/);
-    await expect(page.locator('#search-modes button[data-mode="content"]')).toHaveClass(/active/);
-    await expect(page.locator("#search-input")).toHaveAttribute("placeholder", /contents/);
+    await page.locator("#search-input").fill("nested");
+    const results = page.locator("#search-results");
+    await expect(results.locator(".sr-group")).toHaveText(["Files", "In notes"]);
+    await expect(results.locator(".search-result:not(.content-result) .sr-path", { hasText: "subdir/nested.md" })).toBeVisible();
+    await expect(results.locator(".content-result").first()).toBeVisible();
+    // The top row is a file-name match, and Enter opens it
+    const top = results.locator(".search-result").first();
+    await expect(top).not.toHaveClass(/content-result/);
+    const topPath = await top.getAttribute("data-path");
+    await page.keyboard.press("Enter");
+    await expect(page).toHaveURL(new RegExp("/" + topPath!.replace(/[.]/g, "\\.") + "$"));
+  });
+
+  test("content matches show lines, and opening one highlights the hit", async ({ page }) => {
+    await page.goto("/");
+    await expect(page.locator("#tree-container .tree-item")).not.toHaveCount(0);
+    await page.keyboard.press("/");
 
     // Two words that only co-occur in hello.md's content (not its name)
     await page.locator("#search-input").fill("alice bob");
@@ -382,54 +414,41 @@ test.describe("Full-text search", () => {
     await page.locator("#search-input").fill('"inside a subdirectory"');
     await expect(page.locator(".content-result .sr-path", { hasText: "nested.md" })).toBeVisible();
     await page.locator("#search-input").fill('"subdirectory inside"');
-    await expect(page.locator("#search-empty")).toHaveText("No notes match");
+    await expect(page.locator("#search-empty")).toHaveText("No files or notes match");
   });
 
-  test("Tab switches between Files and Contents modes", async ({ page }) => {
+  test("next to note results, only names containing the words are listed", async ({ page }) => {
     await page.goto("/");
     await expect(page.locator("#tree-container .tree-item")).not.toHaveCount(0);
     await page.keyboard.press("/");
     await page.locator("#search-input").fill("nested");
     await expect(page.locator(".content-result").first()).toBeVisible();
-
-    await page.locator("#search-input").press("Tab");
-    await expect(page.locator('#search-modes button[data-mode="files"]')).toHaveClass(/active/);
-    await expect(page.locator("#search-input")).toHaveAttribute("placeholder", "Go to file…");
-    // Same query is re-run as a file-name search
-    await expect(page.locator(".search-result:not(.content-result) .sr-path", { hasText: "subdir/nested.md" })).toBeVisible();
-    await expect(page.locator(".content-result")).toHaveCount(0);
-
-    await page.locator("#search-input").press("Tab");
-    await expect(page.locator(".content-result").first()).toBeVisible();
+    const names = await page.locator(".search-result:not(.content-result) .sr-path").allTextContents();
+    expect(names.length).toBeGreaterThan(0);
+    for (const n of names) expect(n.toLowerCase()).toContain("nested");
   });
 
-  test("short query shows a hint instead of searching", async ({ page }) => {
+  test("a one-letter query matches file names only", async ({ page }) => {
     await page.goto("/");
+    await expect(page.locator("#tree-container .tree-item")).not.toHaveCount(0);
     await page.keyboard.press("/");
-    await page.locator("#search-input").fill("a");
-    await expect(page.locator("#search-empty")).toHaveText("Keep typing…");
+    await page.locator("#search-input").fill("h");
+    await expect(page.locator(".search-result").first()).toBeVisible();
+    await expect(page.locator("#sr-notes")).toHaveCount(0);
+    await expect(page.locator(".content-result")).toHaveCount(0);
   });
 
-  test("search button in the top bar opens content search on mobile", async ({ page }) => {
+  test("on mobile the search button shows recent files, and finds notes by content", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/");
     await expect(page.locator("#search-btn")).toBeVisible();
     await page.locator("#search-btn").click();
     await expect(page.locator("#search-overlay")).toHaveClass(/open/);
-    await expect(page.locator('#search-modes button[data-mode="content"]')).toHaveClass(/active/);
+    await expect(page.locator("#search-results .sr-group").first()).toHaveText(/Recently changed/i);
     await page.locator("#search-input").fill("subdirectory");
     await page.locator(".content-result").first().click();
     await expect(page).toHaveURL(/\/subdir\/nested\.md$/);
     await expect(page.locator("#content-area mark.search-hit")).toBeInViewport();
-  });
-
-  test("'t' still opens file search in Files mode", async ({ page }) => {
-    await page.goto("/");
-    await page.keyboard.press("/");
-    await page.keyboard.press("Escape");
-    await page.keyboard.press("t");
-    await expect(page.locator('#search-modes button[data-mode="files"]')).toHaveClass(/active/);
-    await expect(page.locator(".search-result").first()).toBeVisible();
   });
 });
 
