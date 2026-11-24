@@ -358,6 +358,100 @@
             .tree-children {
                 padding-left: 12px;
             }
+
+            /* ── Recent files (sidebar) ───────────────────────────────── */
+            #recent-section {
+                flex-shrink: 0;
+                border-bottom: 1px solid var(--rv-border);
+                padding-bottom: 4px;
+            }
+            #recent-section[hidden] {
+                display: none;
+            }
+            #recent-toggle {
+                display: flex;
+                align-items: center;
+                gap: 2px;
+                width: 100%;
+                padding: 4px 8px;
+                border: 0;
+                background: none;
+                color: var(--rv-text-secondary);
+                font: inherit;
+                font-size: 11px;
+                font-weight: 600;
+                letter-spacing: 0.04em;
+                text-transform: uppercase;
+                cursor: pointer;
+            }
+            #recent-toggle:hover {
+                color: var(--rv-text);
+            }
+            #recent-toggle .caret {
+                display: flex;
+                transition: transform 0.12s;
+            }
+            #recent-toggle .caret svg {
+                width: 12px;
+                height: 12px;
+            }
+            #recent-toggle[aria-expanded="true"] .caret {
+                transform: rotate(90deg);
+            }
+            #recent-list {
+                max-height: 30vh;
+                overflow-y: auto;
+            }
+            .recent-item {
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                padding: 4px 8px;
+                margin: 1px 4px;
+                border-radius: 6px;
+                font-size: 14px;
+                white-space: nowrap;
+                cursor: pointer;
+            }
+            .recent-item:hover {
+                background: var(--rv-bg-hover);
+            }
+            .recent-item.active {
+                background: var(--rv-bg-active);
+            }
+            .recent-item .recent-icon {
+                flex-shrink: 0;
+                width: 16px;
+                height: 16px;
+                color: var(--rv-text-secondary);
+            }
+            .recent-item .recent-label {
+                flex: 1;
+                min-width: 0;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+            .recent-item .recent-dir,
+            .recent-item .recent-time,
+            .search-result .sr-time {
+                color: var(--rv-text-secondary);
+                font-size: 12px;
+            }
+            .recent-item .recent-time,
+            .search-result .sr-time {
+                flex-shrink: 0;
+                margin-left: auto;
+                padding-left: 6px;
+                font-variant-numeric: tabular-nums;
+            }
+            .sr-group {
+                padding: 8px 16px 4px;
+                font-size: 11px;
+                font-weight: 600;
+                letter-spacing: 0.04em;
+                text-transform: uppercase;
+                color: var(--rv-text-secondary);
+            }
             .tree-children.collapsed {
                 display: none;
             }
@@ -2177,6 +2271,12 @@
                 <button id="go-to-file-btn" onclick="openSearch()">
                     Go to file <kbd>t</kbd>
                 </button>
+                <div id="recent-section" hidden>
+                    <button id="recent-toggle" onclick="toggleRecent()" aria-expanded="true" aria-controls="recent-list" title="Files changed most recently, anywhere in the folder">
+                        <span class="caret"></span>Recent
+                    </button>
+                    <div id="recent-list"></div>
+                </div>
                 <div id="tree-container"></div>
                 <div id="resize-handle"></div>
             </div>
@@ -2858,6 +2958,7 @@
                 var container = document.getElementById("tree-container");
                 container.innerHTML = "";
                 renderTree(root, container, 0);
+                renderRecent();
                 var active = container.querySelector(".tree-item.active");
                 if (active) {
                     var cr = container.getBoundingClientRect();
@@ -2867,6 +2968,105 @@
                     }
                 }
             }
+
+            /* ── Recent files ─────────────────────────────────────────── */
+            // The most recently modified files anywhere in the scope, so a
+            // file an agent just wrote is one click away. Kept fresh by
+            // websocket changes, a light poll while the tab is visible, and
+            // whenever the tab regains focus.
+            var recentFiles = [];
+            var RECENT_SHOWN = 8;
+            var recentSeq = 0;
+            var recentTimer = null;
+            var recentOpen = true;
+            try {
+                recentOpen = localStorage.getItem("recentOpen") !== "0";
+            } catch (e) {}
+
+            async function loadRecent() {
+                var seq = ++recentSeq;
+                var result = await apiFetch(RV.base + "/api/recent?limit=" + RECENT_SHOWN);
+                if (seq !== recentSeq || !result.ok) return;
+                recentFiles = result.data || [];
+                renderRecent();
+                // A file the cached list doesn't know yet: refresh it, so
+                // "Go to file" and wiki links find new files too.
+                if (allFiles) {
+                    var known = new Set(allFiles);
+                    if (recentFiles.some(function (f) { return !known.has(f.path); })) {
+                        var files = await apiFetch(RV.base + "/api/files");
+                        if (files.ok) {
+                            allFiles = files.data;
+                            wikiLinkIndex = null;
+                        }
+                    }
+                }
+            }
+
+            function scheduleRecentRefresh() {
+                clearTimeout(recentTimer);
+                recentTimer = setTimeout(loadRecent, 300);
+            }
+
+            function toggleRecent() {
+                recentOpen = !recentOpen;
+                try {
+                    localStorage.setItem("recentOpen", recentOpen ? "1" : "0");
+                } catch (e) {}
+                renderRecent();
+                if (recentOpen) loadRecent();
+            }
+
+            function timeAgo(ms) {
+                var s = Math.max(0, (Date.now() - ms) / 1000);
+                if (s < 60) return "now";
+                if (s < 3600) return Math.floor(s / 60) + "m";
+                if (s < 86400) return Math.floor(s / 3600) + "h";
+                if (s < 7 * 86400) return Math.floor(s / 86400) + "d";
+                var d = new Date(ms);
+                return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+            }
+
+            function renderRecent() {
+                var section = document.getElementById("recent-section");
+                if (!section) return;
+                section.hidden = recentFiles.length === 0;
+                var toggle = document.getElementById("recent-toggle");
+                toggle.setAttribute("aria-expanded", recentOpen ? "true" : "false");
+                toggle.querySelector(".caret").innerHTML = SVG.caret;
+                var list = document.getElementById("recent-list");
+                list.hidden = !recentOpen;
+                if (!recentOpen) return;
+                var html = "";
+                recentFiles.slice(0, RECENT_SHOWN).forEach(function (f) {
+                    var slash = f.path.lastIndexOf("/");
+                    var name = f.path.slice(slash + 1);
+                    var dir = slash >= 0 ? f.path.slice(0, slash) : "";
+                    html +=
+                        '<div class="recent-item' +
+                        (f.path === currentFilePath ? " active" : "") +
+                        '" data-path="' + escAttr(f.path) +
+                        '" title="' + escAttr(f.path + " · " + new Date(f.modTime).toLocaleString()) + '">' +
+                        '<span class="recent-icon">' + getFileIcon(name) + "</span>" +
+                        '<span class="recent-label">' + esc(name) +
+                        (dir ? ' <span class="recent-dir">' + esc(dir) + "</span>" : "") +
+                        "</span>" +
+                        '<span class="recent-time">' + esc(timeAgo(f.modTime)) + "</span></div>";
+                });
+                list.innerHTML = html;
+                list.querySelectorAll(".recent-item").forEach(function (el) {
+                    el.onclick = function () {
+                        loadFile(el.dataset.path);
+                    };
+                });
+            }
+
+            setInterval(function () {
+                if (!document.hidden && recentOpen) loadRecent();
+            }, 10000);
+            document.addEventListener("visibilitychange", function () {
+                if (!document.hidden) loadRecent();
+            });
 
             /* ── Dir listing in main area ─────────────────────────────── */
             function renderDirListing(items, dirPath) {
@@ -4222,9 +4422,38 @@
                 setSearchMode("files", true);
                 if (!(await ensureAllFiles())) return;
                 if (searchMode !== "files") return;
-                renderSearchResults(allFiles.slice(0, 50), false);
+                renderDefaultFileList();
                 searchIdx = 0;
                 updateSearchSelection();
+                // Pick up files changed since the last refresh.
+                loadRecent().then(function () {
+                    var input = document.getElementById("search-input");
+                    if (
+                        searchMode === "files" &&
+                        document.getElementById("search-overlay").classList.contains("open") &&
+                        !input.value.trim()
+                    ) {
+                        renderDefaultFileList();
+                        updateSearchSelection();
+                    }
+                });
+            }
+
+            // With no query: recently changed files first, then the rest.
+            function renderDefaultFileList() {
+                var recent = recentFiles.slice(0, RECENT_SHOWN);
+                var times = Object.create(null); // paths like "constructor" are keys too
+                recent.forEach(function (f) {
+                    times[f.path] = f.modTime;
+                });
+                var rest = (allFiles || []).filter(function (p) {
+                    return !(p in times);
+                });
+                var items = recent
+                    .map(function (f) { return f.path; })
+                    .concat(rest)
+                    .slice(0, 50);
+                renderSearchResults(items, false, { times: times, recentCount: recent.length });
             }
 
             async function ensureAllFiles() {
@@ -4276,7 +4505,7 @@
                     return;
                 }
                 if (!q) {
-                    renderSearchResults(allFiles.slice(0, 50), false);
+                    renderDefaultFileList();
                 } else {
                     var results = fuzzysort(q, getSearchTargets(), 50);
                     renderSearchResults(results, true);
@@ -4512,7 +4741,9 @@
                     items[searchIdx].scrollIntoView({ block: "nearest" });
             }
 
-            function renderSearchResults(items, isHighlighted) {
+            function renderSearchResults(items, isHighlighted, opts) {
+                var times = (opts && opts.times) || Object.create(null);
+                var recentCount = (opts && opts.recentCount) || 0;
                 var container = document.getElementById("search-results");
                 if (!items || items.length === 0) {
                     container.innerHTML =
@@ -4532,6 +4763,8 @@
                     }
                     // Folder targets end with "/" (see getSearchTargets).
                     var isDir = raw.endsWith("/");
+                    if (recentCount && i === 0) html += '<div class="sr-group">Recently changed</div>';
+                    if (recentCount && i === recentCount) html += '<div class="sr-group">All files</div>';
                     html +=
                         '<div class="search-result' +
                         (isDir ? ' search-dir' : '') +
@@ -4547,7 +4780,11 @@
                         "</span>" +
                         '<span class="sr-path">' +
                         display +
-                        "</span></div>";
+                        "</span>" +
+                        (!isHighlighted && times[raw]
+                            ? '<span class="sr-time">' + esc(timeAgo(times[raw])) + "</span>"
+                            : "") +
+                        "</div>";
                 }
                 container.innerHTML = html;
                 container
@@ -4726,6 +4963,7 @@
                     try {
                         var msg = JSON.parse(e.data);
                         if (msg.path) {
+                            scheduleRecentRefresh();
                             refreshTree();
                             if (msg.path === currentFilePath) {
                                 loadFile(currentFilePath);
@@ -5773,7 +6011,7 @@
 
             /* ── Init ─────────────────────────────────────────────────── */
             (async function init() {
-                await Promise.all([refreshTree(), loadEditors()]);
+                await Promise.all([refreshTree(), loadEditors(), loadRecent()]);
                 connectWS();
                 if (!navigateFromURL(true)) {
                     await navigateTo("", true);

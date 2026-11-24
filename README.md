@@ -14,6 +14,7 @@ I noticed my marketing team, when working with Claude Code and lots of markdown 
 - **Markdown rendering** — GitHub-Flavored Markdown via goldmark (tables, task lists, code blocks)
 - **CSV rendering** — automatic conversion to styled HTML tables
 - **Fuzzy file search** — press `t` to open a "Go to file" modal with fuzzy matching
+- **Recent files** — the sidebar lists the files changed most recently anywhere in the folder (including new, uncommitted ones), so a file an agent just wrote is one click away. "Go to file" lists them first, so `t` then `Enter` opens the newest
 - **Full-text search** — press `/` (or tap the search icon) to search inside every file; all words must match, `"quoted phrases"` match exactly, and opening a result scrolls to the first hit. `Tab` switches between file and content search
 - **Backlinks** — markdown notes list the notes that link to them (`[[wiki links]]`, `![[embeds]]`, and relative `[text](note.md)` links), most recently edited first; tap one to jump to the link
 - **Live reload** — WebSocket-based file watching with fsnotify; changes appear instantly
@@ -134,6 +135,7 @@ Known limitation: in Obsidian vaults, raw HTML in notes is rendered as-is, so do
 | `GET /api/file?path=` | Returns rendered file content as JSON (`content`, `name`, `path`, `isMarkdown`, `isCSV`) |
 | `GET /api/files` | Returns a flat list of all file paths (uses `git ls-files` when available) |
 | `GET /api/search?q=&limit=` | Case-insensitive full-text search over text files (≤2 MB). Every term must appear in the file's contents or path; `"quoted phrases"` are matched exactly. Returns ranked results with up to 3 matching lines each |
+| `GET /api/recent?limit=` | The most recently modified files (default 20, max 100), newest first, leaving out dot-folders such as `.obsidian/`: `[{path, modTime, size}]` |
 | `GET /api/manifest.webmanifest` | Web app manifest (enables "Add to Home Screen") |
 | `GET /api/backlinks?path=` | Markdown notes linking to `path`, most recently modified first, with up to 3 linking lines each. Counts wiki links (in Obsidian vaults) and relative/root-relative markdown links; ignores code blocks |
 | `WS /ws` | WebSocket for file change notifications |

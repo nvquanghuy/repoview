@@ -65,7 +65,7 @@ app (owner mux)                    securityHeaders(public mux)
 ```
 
 `apiHandler()` (in `scope.go`) is the **only** set of endpoints share
-visitors can reach: tree, file, files, search, backlinks, raw, jsonl,
+visitors can reach: tree, file, files, search, recent, backlinks, raw, jsonl,
 `/_raw/`. Anything owner-only (`/api/editors`, `/api/open`, `/api/shares`,
 the manifest) is registered on the owner mux and is therefore 404 inside a
 share. **Adding an endpoint:** put it in `apiHandler()` only if share

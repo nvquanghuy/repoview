@@ -1023,3 +1023,79 @@ test.describe("Rendering safety", () => {
     }
   });
 });
+
+test.describe("Recent files", () => {
+  const fs = require("fs") as typeof import("fs");
+  const path = require("path") as typeof import("path");
+  const nested = path.join(__dirname, "..", "testdata", "subdir", "nested.md");
+  let saved: { atime: Date; mtime: Date };
+
+  // Make subdir/nested.md the newest file in testdata.
+  test.beforeEach(() => {
+    const st = fs.statSync(nested);
+    saved = { atime: st.atime, mtime: st.mtime };
+    const soon = new Date(Date.now() + 60_000);
+    fs.utimesSync(nested, soon, soon);
+  });
+  test.afterEach(() => {
+    fs.utimesSync(nested, saved.atime, saved.mtime);
+  });
+
+  test("sidebar lists the newest file first and opens it in one click", async ({ page }) => {
+    await page.goto("/");
+    const first = page.locator("#recent-list .recent-item").first();
+    await expect(first).toContainText("nested.md");
+    await expect(first.locator(".recent-dir")).toHaveText("subdir");
+    await expect(first.locator(".recent-time")).toHaveText("now");
+    await first.click();
+    await expect(page).toHaveURL(/\/subdir\/nested\.md$/);
+    await expect(page.locator("#content-area .markdown-body")).toBeVisible();
+    await expect(page.locator("#recent-list .recent-item.active")).toContainText("nested.md");
+  });
+
+  test("section collapses and stays collapsed after reload", async ({ page }) => {
+    await page.goto("/");
+    await expect(page.locator("#recent-list .recent-item").first()).toBeVisible();
+    await page.locator("#recent-toggle").click();
+    await expect(page.locator("#recent-list")).toBeHidden();
+    await expect(page.locator("#recent-toggle")).toHaveAttribute("aria-expanded", "false");
+    await page.reload();
+    await expect(page.locator("#recent-section")).toBeVisible();
+    await expect(page.locator("#recent-list")).toBeHidden();
+    await page.locator("#recent-toggle").click();
+    await expect(page.locator("#recent-list .recent-item").first()).toContainText("nested.md");
+  });
+
+  test("'Go to file' lists recent files first; Enter opens the newest", async ({ page }) => {
+    await page.goto("/");
+    await expect(page.locator("#tree-container .tree-item")).not.toHaveCount(0);
+    await page.keyboard.press("t");
+    const results = page.locator("#search-results");
+    await expect(results.locator(".sr-group").first()).toHaveText(/Recently changed/i);
+    const first = results.locator(".search-result").first();
+    await expect(first.locator(".sr-path")).toHaveText("subdir/nested.md");
+    await expect(first.locator(".sr-time")).toHaveText("now");
+    await expect(results.locator(".sr-group", { hasText: /All files/i })).toBeVisible();
+    await page.keyboard.press("Enter");
+    await expect(page).toHaveURL(/\/subdir\/nested\.md$/);
+  });
+
+  test("a newly created file appears without reloading and is searchable", async ({ page }) => {
+    const created = path.join(__dirname, "..", "testdata", "subdir", "zz-agent-note.md");
+    try {
+      await page.goto("/");
+      // Expand subdir so the server watches it.
+      await page.locator("#tree-container .tree-item .label", { hasText: "subdir" }).click();
+      await expect(page.locator("#tree-container .tree-item .label", { hasText: "nested.md" })).toBeVisible();
+      fs.writeFileSync(created, "# From the agent\n");
+      const future = new Date(Date.now() + 120_000);
+      fs.utimesSync(created, future, future);
+      await expect(page.locator("#recent-list .recent-item").first()).toContainText("zz-agent-note.md");
+      await page.keyboard.press("t");
+      await page.locator("#search-input").fill("zz-agent");
+      await expect(page.locator(".search-result .sr-path", { hasText: "zz-agent-note.md" })).toBeVisible();
+    } finally {
+      fs.rmSync(created, { force: true });
+    }
+  });
+});
