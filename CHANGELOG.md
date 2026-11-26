@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- [added] Folder listings can be sorted: click the Name, Size or Modified column header to sort by it, and click again to switch between ascending and descending. Folders stay above files, and the choice is remembered across reloads
+
 
 ## [v0.26.0] - 2026-11-24
 

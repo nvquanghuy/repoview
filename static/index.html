@@ -277,6 +277,47 @@
             .dir-listing-row:last-child {
                 border-bottom: none;
             }
+            .dir-listing-header {
+                display: flex;
+                align-items: center;
+                padding: 6px 16px;
+                gap: 8px;
+                border-bottom: 1px solid var(--rv-border);
+                background: var(--rv-bg-secondary);
+                font-size: 12px;
+            }
+            .dir-sort {
+                background: none;
+                border: none;
+                padding: 0;
+                font: inherit;
+                color: var(--rv-text-secondary);
+                cursor: pointer;
+                display: inline-flex;
+                align-items: center;
+                gap: 4px;
+                flex-shrink: 0;
+            }
+            .dir-sort:hover,
+            .dir-sort.active {
+                color: var(--rv-text);
+            }
+            .dir-sort .arrow {
+                font-size: 10px;
+                width: 8px;
+            }
+            .dir-sort.name {
+                flex: 1;
+                margin-left: 24px;
+            }
+            .dir-sort.size {
+                width: 70px;
+                justify-content: flex-end;
+            }
+            .dir-sort.modified {
+                width: 140px;
+                justify-content: flex-end;
+            }
             .dir-listing-row:hover {
                 background: var(--rv-bg-secondary);
             }
@@ -1835,7 +1876,9 @@
                     padding-bottom: calc(16px + env(safe-area-inset-bottom));
                 }
                 .dir-listing-row .size,
-                .dir-listing-row .modified {
+                .dir-listing-row .modified,
+                .dir-sort.size,
+                .dir-sort.modified {
                     display: none;
                 }
                 #go-to-file-btn kbd {
@@ -3039,12 +3082,66 @@
             });
 
             /* ── Dir listing in main area ─────────────────────────────── */
-            function renderDirListing(items, dirPath) {
+            // Sort order of the directory listing, remembered across reloads.
+            // Folders always stay above files; the order applies within each group.
+            var DIR_SORT_DEFAULT_DIR = { name: "asc", size: "desc", modified: "desc" };
+            var dirSort = { key: "name", dir: "asc" };
+            try {
+                var savedSort = JSON.parse(localStorage.getItem("dirSort") || "null");
+                if (savedSort && DIR_SORT_DEFAULT_DIR[savedSort.key] &&
+                    (savedSort.dir === "asc" || savedSort.dir === "desc")) {
+                    dirSort = savedSort;
+                }
+            } catch (e) {}
+            var lastDirListing = null;
+
+            function sortDirItems(items) {
+                var sign = dirSort.dir === "desc" ? -1 : 1;
                 items.sort(function (a, b) {
                     if (a.isDir !== b.isDir) return a.isDir ? -1 : 1;
-                    return a.name.localeCompare(b.name);
+                    var c = 0;
+                    if (dirSort.key === "size" && !a.isDir) c = (a.size || 0) - (b.size || 0);
+                    else if (dirSort.key === "modified") c = (a.modTime || 0) - (b.modTime || 0);
+                    if (c === 0) c = a.name.localeCompare(b.name);
+                    return sign * c;
                 });
-                var html = '<div class="dir-listing">';
+            }
+
+            function setDirSort(key) {
+                if (dirSort.key === key) {
+                    dirSort = { key: key, dir: dirSort.dir === "asc" ? "desc" : "asc" };
+                } else {
+                    dirSort = { key: key, dir: DIR_SORT_DEFAULT_DIR[key] };
+                }
+                try { localStorage.setItem("dirSort", JSON.stringify(dirSort)); } catch (e) {}
+                var listing = document.querySelector("#content-area .dir-listing");
+                if (listing && lastDirListing) {
+                    listing.outerHTML = renderDirListing(lastDirListing.items, lastDirListing.path);
+                    bindDirListingClicks();
+                }
+            }
+
+            function dirSortButton(key, label) {
+                var active = dirSort.key === key;
+                var arrow = active ? (dirSort.dir === "asc" ? "\u25B2" : "\u25BC") : "";
+                return '<button type="button" class="dir-sort ' + key + (active ? " active" : "") +
+                    '" data-sort="' + key + '" aria-sort="' +
+                    (active ? (dirSort.dir === "asc" ? "ascending" : "descending") : "none") +
+                    '" title="Sort by ' + label.toLowerCase() + '">' +
+                    (key === "name" ? label + '<span class="arrow">' + arrow + "</span>"
+                                    : '<span class="arrow">' + arrow + "</span>" + label) +
+                    "</button>";
+            }
+
+            function renderDirListing(items, dirPath) {
+                lastDirListing = { items: items, path: dirPath };
+                sortDirItems(items);
+                var html = '<div class="dir-listing">' +
+                    '<div class="dir-listing-header">' +
+                    dirSortButton("name", "Name") +
+                    dirSortButton("size", "Size") +
+                    dirSortButton("modified", "Modified") +
+                    "</div>";
                 if (dirPath) {
                     var parent = dirPath.includes("/")
                         ? dirPath.substring(0, dirPath.lastIndexOf("/"))
@@ -3158,6 +3255,11 @@
             }
 
             function bindDirListingClicks() {
+                document.querySelectorAll(".dir-listing .dir-sort").forEach(function (btn) {
+                    btn.onclick = function () {
+                        setDirSort(btn.dataset.sort);
+                    };
+                });
                 var rows = document.querySelectorAll(".dir-listing-row");
                 rows.forEach(function (row) {
                     row.onclick = function () {

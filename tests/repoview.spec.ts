@@ -297,6 +297,56 @@ test.describe("Directory listing", () => {
   });
 });
 
+test.describe("Directory listing sort", () => {
+  async function names(page) {
+    return page.locator("#content-area .dir-listing-row .name").allTextContents();
+  }
+
+  test("header toggles name order asc/desc, keeps folders first, and is remembered", async ({ page }) => {
+    await page.goto("/");
+    await page.evaluate(() => localStorage.removeItem("dirSort"));
+    await page.reload();
+    const nameBtn = page.locator(".dir-listing-header .dir-sort.name");
+    await expect(nameBtn).toHaveAttribute("aria-sort", "ascending");
+    const asc = await names(page);
+    expect(asc.indexOf("site")).toBeLessThan(asc.indexOf("subdir"));
+    expect(asc.indexOf("subdir")).toBeLessThan(asc.indexOf("README.md"));
+    expect(asc.indexOf("hello.md")).toBeLessThan(asc.indexOf("wiki-test.md"));
+
+    await nameBtn.click();
+    await expect(nameBtn).toHaveAttribute("aria-sort", "descending");
+    const desc = await names(page);
+    // Folders stay above files, each group reversed.
+    expect(desc.indexOf("subdir")).toBeLessThan(desc.indexOf("site"));
+    expect(desc.indexOf("site")).toBeLessThan(desc.indexOf("wiki-test.md"));
+    expect(desc.indexOf("wiki-test.md")).toBeLessThan(desc.indexOf("hello.md"));
+
+    // Rows still navigate after re-render.
+    await page.reload();
+    await expect(page.locator(".dir-listing-header .dir-sort.name")).toHaveAttribute("aria-sort", "descending");
+    await page.locator("#content-area .dir-listing-row .name", { hasText: "subdir" }).click();
+    await expect(page.locator("#content-area .dir-listing-row .name", { hasText: "nested.md" })).toBeVisible();
+    await page.evaluate(() => localStorage.removeItem("dirSort"));
+  });
+
+  test("sorting by size puts largest files first, then toggles to smallest", async ({ page }) => {
+    await page.goto("/");
+    await page.evaluate(() => localStorage.removeItem("dirSort"));
+    await page.reload();
+    const sizeBtn = page.locator(".dir-listing-header .dir-sort.size");
+    await sizeBtn.click();
+    await expect(sizeBtn).toHaveAttribute("aria-sort", "descending");
+    const desc = await names(page);
+    expect(desc.indexOf("large.jsonl")).toBeLessThan(desc.indexOf("empty.jsonl"));
+    await sizeBtn.click();
+    await expect(sizeBtn).toHaveAttribute("aria-sort", "ascending");
+    const asc = await names(page);
+    expect(asc.indexOf("empty.jsonl")).toBeLessThan(asc.indexOf("large.jsonl"));
+    expect(asc.indexOf("subdir")).toBeLessThan(asc.indexOf("empty.jsonl"));
+    await page.evaluate(() => localStorage.removeItem("dirSort"));
+  });
+});
+
 test.describe("Fuzzy search", () => {
   test("press 't', type query, see results, select one", async ({ page }) => {
     await page.goto("/");
